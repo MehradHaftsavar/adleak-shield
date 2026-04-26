@@ -10,8 +10,12 @@ export default function VerifyEmailPage() {
   const token = params.token as string;
   const [state, setState] = useState<VerifyState>("loading");
   const [errorMessage, setErrorMessage] = useState<string>("");
-
+  const hasRun = React.useRef(false);
+  
   useEffect(() => {
+    if (hasRun.current) return;
+    hasRun.current = true;
+
     if (!token) {
       setState("error");
       setErrorMessage("Invalid verification link.");
