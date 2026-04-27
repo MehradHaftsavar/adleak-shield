@@ -7,7 +7,8 @@
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
-    "type-check": "tsc --noEmit"
+    "type-check": "tsc --noEmit",
+    "build:tracker": "node snippet/scripts/build.mjs"
   },
   "dependencies": {
     "@azure/identity": "^4.4.1",
@@ -37,6 +38,7 @@
     "eslint-config-next": "14.2.5",
     "postcss": "^8.4.40",
     "tailwindcss": "^3.4.7",
+    "terser": "^5.46.2",
     "typescript": "^5.5.4"
   }
 }
