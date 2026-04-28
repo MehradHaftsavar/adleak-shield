@@ -1,0 +1,11 @@
+.git
+.vscode
+local.settings.json
+test
+tsconfig.json
+src
+*.ts
+.gitignore
+.funcignore
+README.md
+node_modules/.cache
