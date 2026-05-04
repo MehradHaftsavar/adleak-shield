@@ -110,6 +110,10 @@ export interface ClickLog {
   landing_page_path: string | null;
   clicked_at: Date;
   estimated_cpc_gbp: number | null;
+  // Phase 3.1 additions
+  is_validated: boolean;
+  validation_failure_reason: string | null;
+  session_duration: number;
 }
 
 export type NewClickLog = Omit<ClickLog, "click_id" | "clicked_at"> & {
@@ -130,6 +134,8 @@ export interface JourneyEvent {
   scroll_depth_pct: number | null;
   dwell_time_ms: number | null;
   occurred_at: Date;
+  // Phase 3.1 addition
+  is_success_event: boolean;
 }
 
 export type NewJourneyEvent = Omit<JourneyEvent, "event_id" | "occurred_at"> & {

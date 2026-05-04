@@ -154,7 +154,7 @@ async function setTenantContext(
   await request
     .input("tenantId", mssql.UniqueIdentifier, tenantId)
     .query(
-      "EXEC sp_set_session_context N'TenantId', @tenantId, @read_only = 1"
+      "EXEC sp_set_session_context N'TenantId', @tenantId, @read_only = 0"
     );
 }
 
@@ -183,7 +183,7 @@ export async function withTenantDb<T>(
     // Set RLS context BEFORE the callback runs any queries
     await setTenantContext(request, tenantId);
 
-    const result = await callback(new mssql.Request(transaction));
+    const result = await callback(request);
     await transaction.commit();
     return result;
   } catch (err) {

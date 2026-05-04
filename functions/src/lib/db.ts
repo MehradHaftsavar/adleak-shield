@@ -5,12 +5,12 @@
 
 
 import mssql, * as sql from "mssql";
-import { DefaultAzureCredential } from "@azure/identity";
+import { ManagedIdentityCredential  } from "@azure/identity";
 
 let pool: mssql.ConnectionPool | null = null;
 
 async function getToken(): Promise<string> {
-  const credential = new DefaultAzureCredential();
+  const credential = new ManagedIdentityCredential ();
   const tokenResponse = await credential.getToken(
     "https://database.windows.net/"
   );
