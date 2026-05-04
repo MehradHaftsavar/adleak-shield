@@ -9,24 +9,15 @@
 //   2. Trial/expiry banner
 //   3. Navigation bar
 //   4. Thaw progress bar (appears only if DB takes > 2s)
-//   5. Skeleton loaders while data loads
 //
-// WHY SPLIT INTO SERVER + CLIENT?
-// The session (who is logged in) is read on the SERVER for security.
-// Interactive UI elements (banners, navigation, SWR) run on the CLIENT.
-// Splitting them gives us the best of both worlds.
+// Phase 1.2: Skeleton loaders
+// Phase 3.2: Accepts children to render actual dashboard content
 // =============================================================================
 
 import React, { useState, useEffect } from "react";
 import { SWRConfig } from "swr";
 import { signOut } from "next-auth/react";
 import Link from "next/link";
-import { ThawProgressBar } from "@/components/ui/skeletons";
-import {
-  LeakTableSkeleton,
-  StatsCardsSkeleton,
-  CampaignStatusSkeleton,
-} from "@/components/ui/skeletons";
 
 interface DashboardShellProps {
   email: string;
@@ -34,6 +25,7 @@ interface DashboardShellProps {
   isTrialing: boolean;
   isExpired: boolean;
   daysRemaining: number;
+  children: React.ReactNode;
 }
 
 export function DashboardShell({
@@ -42,6 +34,7 @@ export function DashboardShell({
   isTrialing,
   isExpired,
   daysRemaining,
+  children,
 }: DashboardShellProps) {
   const [thawVisible, setThawVisible] = useState(false);
   const [thawProgress, setThawProgress] = useState(0);
@@ -185,39 +178,8 @@ export function DashboardShell({
           </p>
         </div>
 
-        {/* 
-          PHASE 1.2 SCAFFOLD
-          The skeleton loaders below are placeholders.
-          They will be replaced with real data components in:
-          - Phase 3: Stats cards + Leak Table
-          - Phase 4: Journey Timeline
-          - Phase 3: Campaign status
-        */}
-        <div className="space-y-8">
-          {/* Stats cards */}
-          <section>
-            <h2 className="text-sm font-medium text-gray-500 uppercase tracking-wider mb-4">
-              This week
-            </h2>
-            <StatsCardsSkeleton />
-          </section>
-
-          {/* Campaign status */}
-          <section>
-            <h2 className="text-sm font-medium text-gray-500 uppercase tracking-wider mb-4">
-              Campaign status
-            </h2>
-            <CampaignStatusSkeleton />
-          </section>
-
-          {/* Leak table */}
-          <section>
-            <h2 className="text-sm font-medium text-gray-500 uppercase tracking-wider mb-4">
-              Leak table
-            </h2>
-            <LeakTableSkeleton />
-          </section>
-        </div>
+        {/* Phase 3.2: Render actual dashboard content */}
+        {children}
       </main>
     </SWRConfig>
   );

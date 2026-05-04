@@ -148,7 +148,7 @@ export async function GET(request: NextRequest) {
   }
 }
 
-// DELETE - Remove domain and cascade delete all campaigns
+// DELETE - Remove domain and cascade delete all campaigns + unregistered traffic logs
 export async function DELETE(request: NextRequest) {
   try {
     const session = await auth();
@@ -157,14 +157,16 @@ export async function DELETE(request: NextRequest) {
     }
 
     const result = await withTenantDb(session.user.tenantId, async (req) => {
-      // Get campaign IDs before deletion for cascade
+      // Get campaign IDs and their google_campaign_ids before deletion
       const campaignsResult = await req.query(`
-        SELECT campaign_id FROM Campaigns
+        SELECT campaign_id, google_campaign_id FROM Campaigns
       `);
 
-      const campaignIds = campaignsResult.recordset.map(c => c.campaign_id);
+      const campaigns = campaignsResult.recordset;
+      const campaignIds = campaigns.map(c => c.campaign_id);
+      const googleCampaignIds = campaigns.map(c => c.google_campaign_id);
 
-      // Manual cascade delete for each campaign
+      // Manual cascade delete for each campaign's related data
       for (let i = 0; i < campaignIds.length; i++) {
         const campaignId = campaignIds[i];
         const paramName = `cid${i}`;
@@ -184,7 +186,20 @@ export async function DELETE(request: NextRequest) {
         await req.query(`DELETE FROM Campaigns WHERE campaign_id = @${paramName}`);
       }
 
-      // Finally delete the domain
+      // 5. Delete UnregisteredTrafficLog entries for these google_campaign_ids
+      for (let i = 0; i < googleCampaignIds.length; i++) {
+        const googleCampaignId = googleCampaignIds[i];
+        const paramName = `gcid${i}`;
+        
+        req.input(paramName, mssql.NVarChar, googleCampaignId);
+        
+        await req.query(`
+          DELETE FROM UnregisteredTrafficLog 
+          WHERE unrecognised_campaign_id = @${paramName}
+        `);
+      }
+
+      // 6. Finally delete the domain
       const deleteResult = await req.query(`DELETE FROM Domains`);
 
       if (deleteResult.rowsAffected[0] === 0) {
@@ -193,8 +208,9 @@ export async function DELETE(request: NextRequest) {
 
       return { 
         success: true, 
-        message: 'Domain and all campaigns deleted successfully',
+        message: 'Domain, campaigns, and unregistered traffic logs deleted successfully',
         deletedCampaigns: campaignIds.length,
+        cleanedUnregisteredLogs: googleCampaignIds.length,
       };
     });
 

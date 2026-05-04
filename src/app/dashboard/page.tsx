@@ -1,22 +1,16 @@
 // =============================================================================
-// AdLeak Shield — Dashboard Page (Phase 1.2 Scaffold)
+// AdLeak Shield — Dashboard Page
 // src/app/dashboard/page.tsx
 //
-// This is a SERVER COMPONENT — it runs on the server, not the browser.
-// It reads the session and passes data to client components.
+// SERVER COMPONENT — reads session and passes data to client components
 //
-// At Phase 1.2 this is a scaffold — the real dashboard content (Leak Table,
-// Journey Timeline) is built in Phases 3 and 4.
-// What we build here:
-//   - Session reading (who is logged in)
-//   - Trial status banner
-//   - Skeleton loaders wired up and ready
-//   - SWR provider wrapper
+// Phase 1.2: Auth, trial status banner, skeleton loaders
+// Phase 3.2: Script verification status added
 // =============================================================================
-
 import { auth } from "@/lib/auth";
 import { redirect } from "next/navigation";
 import { DashboardShell } from "@/components/layout/dashboard-shell";
+import { DashboardContent } from "@/components/dashboard/DashboardContent";
 
 export default async function DashboardPage() {
   // Read the session on the server
@@ -36,6 +30,7 @@ export default async function DashboardPage() {
   const daysRemaining = Math.ceil(
     (trialEnd.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)
   );
+
   const isTrialing = subscriptionStatus === "trialing" && daysRemaining > 0;
   const isExpired = subscriptionStatus === "trialing" && daysRemaining <= 0;
 
@@ -46,6 +41,9 @@ export default async function DashboardPage() {
       isTrialing={isTrialing}
       isExpired={isExpired}
       daysRemaining={daysRemaining}
-    />
+    >
+      {/* Phase 3.2: Dashboard content with verification status */}
+      <DashboardContent />
+    </DashboardShell>
   );
 }
