@@ -52,15 +52,20 @@ export const authConfig: NextAuthConfig = {
   // ==========================================================================
   callbacks: {
     // JWT callback: runs when the JWT token is created or updated.
-    // We add tenantId, isOwner, subscriptionStatus to the token so they're
+    // We add tenantId, isOwner, subscriptionStatus, onboardingCompleted to the token so they're
     // available everywhere without needing another database query.
-    async jwt({ token, user }) {
+    async jwt({ token, user, trigger, session }) {
       if (user) {
         // First sign in — user object is populated from the authorize() below
         token.tenantId = user.tenantId;
         token.isOwner = user.isOwner;
         token.subscriptionStatus = user.subscriptionStatus;
         token.trialEndsAt = user.trialEndsAt;
+        token.onboardingCompleted = user.onboardingCompleted;
+      }
+      // update() called from client — patch only the fields passed in
+      if (trigger === "update" && session?.onboardingCompleted !== undefined) {
+        token.onboardingCompleted = session.onboardingCompleted;
       }
       return token;
     },
@@ -73,6 +78,7 @@ export const authConfig: NextAuthConfig = {
         session.user.isOwner = token.isOwner as boolean;
         session.user.subscriptionStatus = token.subscriptionStatus as string;
         session.user.trialEndsAt = token.trialEndsAt as string;
+        session.user.onboardingCompleted = token.onboardingCompleted as boolean;
       }
       return session;
     },
@@ -84,6 +90,8 @@ export const authConfig: NextAuthConfig = {
       const isOnDashboard = nextUrl.pathname.startsWith("/dashboard");
       const isOnAdmin = nextUrl.pathname.startsWith("/admin");
       const isOnAuth = nextUrl.pathname.startsWith("/auth");
+      const isOnOnboarding = nextUrl.pathname.startsWith("/onboarding");
+      const isOnSettings = nextUrl.pathname.startsWith("/settings");
 
       // Admin routes: must be logged in AND be the owner
       if (isOnAdmin) {
@@ -91,14 +99,38 @@ export const authConfig: NextAuthConfig = {
         return Response.redirect(new URL("/auth/login", nextUrl));
       }
 
-      // Dashboard routes: must be logged in
+      // Dashboard routes: must be logged in AND completed onboarding
       if (isOnDashboard) {
-        if (isLoggedIn) return true;
-        return Response.redirect(new URL("/auth/login", nextUrl));
+        if (!isLoggedIn) {
+          return Response.redirect(new URL("/auth/login", nextUrl));
+        }
+        if (!auth.user.onboardingCompleted) {
+          return Response.redirect(new URL("/onboarding", nextUrl));
+        }
+        return true;
       }
 
-      // Auth pages: if already logged in, redirect to dashboard
+      // Settings routes: must be logged in AND completed onboarding
+      if (isOnSettings) {
+        if (!isLoggedIn) {
+          return Response.redirect(new URL("/auth/login", nextUrl));
+        }
+        if (!auth.user.onboardingCompleted) {
+          return Response.redirect(new URL("/onboarding", nextUrl));
+        }
+        return true;
+      }
+
+      // Onboarding route: if already completed, redirect to settings
+      if (isOnOnboarding && isLoggedIn && auth.user.onboardingCompleted) {
+        return Response.redirect(new URL("/settings", nextUrl));
+      }
+
+      // Auth pages: if already logged in, redirect appropriately
       if (isOnAuth && isLoggedIn) {
+        if (!auth.user.onboardingCompleted) {
+          return Response.redirect(new URL("/onboarding", nextUrl));
+        }
         return Response.redirect(new URL("/dashboard", nextUrl));
       }
 
@@ -132,6 +164,7 @@ export const authConfig: NextAuthConfig = {
           subscription_status: string;
           trial_ends_at: Date;
           email_verified: boolean;
+          onboarding_completed: boolean;
         } | null = null;
 
         try {
@@ -143,7 +176,8 @@ export const authConfig: NextAuthConfig = {
               .input("email", email.toLowerCase().trim())
               .query(
                 `SELECT tenant_id, email, password_hash, is_owner, 
-                        subscription_status, trial_ends_at, email_verified
+                        subscription_status, trial_ends_at, email_verified,
+                        onboarding_completed
                  FROM Tenants 
                  WHERE email = @email`
               );
@@ -181,6 +215,7 @@ export const authConfig: NextAuthConfig = {
           isOwner: tenant.is_owner,
           subscriptionStatus: tenant.subscription_status,
           trialEndsAt: tenant.trial_ends_at.toISOString(),
+          onboardingCompleted: tenant.onboarding_completed ?? false,
         };
       },
     }),

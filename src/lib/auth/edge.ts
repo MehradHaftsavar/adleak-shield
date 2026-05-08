@@ -36,6 +36,7 @@ const edgeConfig: NextAuthConfig = {
         token.isOwner = user.isOwner;
         token.subscriptionStatus = user.subscriptionStatus;
         token.trialEndsAt = user.trialEndsAt;
+        token.onboardingCompleted = user.onboardingCompleted;
       }
       return token;
     },
@@ -45,6 +46,7 @@ const edgeConfig: NextAuthConfig = {
         session.user.isOwner = token.isOwner as boolean;
         session.user.subscriptionStatus = token.subscriptionStatus as string;
         session.user.trialEndsAt = token.trialEndsAt as string;
+        session.user.onboardingCompleted = token.onboardingCompleted as boolean;
       }
       return session;
     },

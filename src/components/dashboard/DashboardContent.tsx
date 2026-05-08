@@ -1,12 +1,13 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { Activity, Settings, Plus } from 'lucide-react';
+import { Activity, Settings, Plus, RefreshCw } from 'lucide-react';
 import Link from 'next/link';
 import { StatusIndicator } from '@/components/dashboard/StatusIndicator';
 import { CampaignStatusCard } from '@/components/dashboard/CampaignStatusCard';
 import { UnregisteredTrafficAlert } from '@/components/dashboard/UnregisteredTrafficAlert';
-import { LeakTable } from './LeakTable'; // NEW
+import { LeakTable } from './LeakTable';
+import { DateRangePicker } from './DateRangePicker';
 
 interface DashboardStatus {
   isLive: boolean;
@@ -20,24 +21,44 @@ export function DashboardContent() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState('');
 
+  // Date range state for Leak Table
+  const [leakDateRange, setLeakDateRange] = useState({
+    start: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString(),
+    end: new Date().toISOString(),
+  });
+
+  // Refresh trigger for LeakTable
+  const [refreshTrigger, setRefreshTrigger] = useState(0);
+
+  const handleLeakDateChange = (start: string, end: string) => {
+    setLeakDateRange({ start, end });
+  };
+
+  const handleManualRefresh = () => {
+    setRefreshTrigger(prev => prev + 1);
+  };
+
   useEffect(() => {
     loadStatus();
-    // Auto-refresh every 30 seconds
-    const interval = setInterval(loadStatus, 30000);
-    return () => clearInterval(interval);
   }, []);
 
   const loadStatus = async () => {
+    setError('');
+    setIsLoading(true);
+    
     try {
       const res = await fetch('/api/dashboard/status');
       if (res.ok) {
         const data = await res.json();
         setStatus(data);
+        setError('');
       } else {
-        setError('Failed to load dashboard');
+        const errorData = await res.json().catch(() => ({}));
+        setError(errorData.error || 'Failed to load dashboard');
       }
     } catch (err) {
-      setError('Network error');
+      console.error('Dashboard load error:', err);
+      setError('Network error - please check your connection');
     } finally {
       setIsLoading(false);
     }
@@ -63,12 +84,23 @@ export function DashboardContent() {
   if (error || !status) {
     return (
       <div className="text-center py-12">
-        <p className="text-red-600 mb-4">{error || 'Failed to load dashboard'}</p>
+        <div className="mb-4">
+          <div className="inline-flex items-center justify-center w-16 h-16 bg-red-100 rounded-full mb-4">
+            <Activity className="w-8 h-8 text-red-600" />
+          </div>
+          <p className="text-red-600 text-lg font-semibold mb-2">
+            {error || 'Failed to load dashboard'}
+          </p>
+          <p className="text-gray-600 text-sm">
+            The dashboard data couldn't be loaded. This might be a temporary issue.
+          </p>
+        </div>
         <button
           onClick={loadStatus}
-          className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+          disabled={isLoading}
+          className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed font-semibold transition-colors"
         >
-          Retry
+          {isLoading ? 'Retrying...' : 'Retry'}
         </button>
       </div>
     );
@@ -89,7 +121,7 @@ export function DashboardContent() {
         </div>
 
         <Link
-          href="/onboarding"
+          href="/settings"
           className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
         >
           <Settings className="w-5 h-5" />
@@ -120,7 +152,7 @@ export function DashboardContent() {
               No campaigns registered yet
             </p>
             <Link
-              href="/onboarding"
+              href="/settings"
               className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg transition-colors"
             >
               <Plus className="w-5 h-5" />
@@ -145,19 +177,36 @@ export function DashboardContent() {
         )}
       </div>
 
-      {/* NEW: Leak Table */}
+      {/* Leak Table Section */}
       <div>
-        <h2 className="text-xl font-semibold text-gray-900 mb-4">
-          Wasted Spend Analysis
-        </h2>
-        <LeakTable />
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-4">
+          <h2 className="text-xl font-semibold text-gray-900">
+            Wasted Spend Analysis
+          </h2>
+          
+          <div className="flex items-center justify-center sm:justify-end gap-3">
+            <DateRangePicker onRangeChange={handleLeakDateChange} />
+            
+            {/* Manual Refresh Button */}
+            <button
+              onClick={handleManualRefresh}
+              className="flex items-center gap-2 px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg transition-colors"
+              title="Refresh leak data"
+            >
+              <RefreshCw className="w-4 h-4" />
+              <span className="hidden sm:inline">Refresh</span>
+            </button>
+          </div>
+        </div>
+        
+        <LeakTable dateRange={leakDateRange} refreshTrigger={refreshTrigger} />
       </div>
 
       {/* Info Box */}
       <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
         <p className="text-sm text-blue-900">
-          <strong>💡 Tip:</strong> The Live status updates automatically every 30 seconds. 
-          Campaign status changes to "Active" once we receive the first click.
+          <strong>💡 Tip:</strong> Campaign status changes to "Active" once we receive the first click. 
+          Use the refresh button to update your leak data manually.
         </p>
       </div>
     </div>

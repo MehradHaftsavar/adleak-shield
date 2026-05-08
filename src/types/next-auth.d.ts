@@ -21,6 +21,7 @@ declare module "next-auth" {
       isOwner: boolean;
       subscriptionStatus: string;
       trialEndsAt: string;
+      onboardingCompleted: boolean;
     } & DefaultSession["user"];
   }
 
@@ -29,6 +30,7 @@ declare module "next-auth" {
     isOwner: boolean;
     subscriptionStatus: string;
     trialEndsAt: string;
+    onboardingCompleted: boolean;
   }
 }
 
@@ -38,5 +40,6 @@ declare module "next-auth/jwt" {
     isOwner: boolean;
     subscriptionStatus: string;
     trialEndsAt: string;
+    onboardingCompleted: boolean;
   }
 }

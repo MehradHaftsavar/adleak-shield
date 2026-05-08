@@ -2,16 +2,19 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+import { useSession } from 'next-auth/react';
 import { DomainStep } from '@/components/onboarding/DomainStep';
 import { CampaignStep } from '@/components/onboarding/CampaignStep';
 import { SnippetStep } from '@/components/onboarding/SnippetStep';
 
 export default function OnboardingPage() {
   const router = useRouter();
+  const { update } = useSession();
   const [currentStep, setCurrentStep] = useState<1 | 2 | 3>(1);
   const [domain, setDomain] = useState<string>('');
   const [campaigns, setCampaigns] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [isRedirecting, setIsRedirecting] = useState(false);
 
   // Check if user already completed onboarding
   useEffect(() => {
@@ -47,9 +50,27 @@ export default function OnboardingPage() {
     setCurrentStep(3);
   };
 
-  const handleOnboardingComplete = () => {
-    // Redirect to dashboard
-    router.push('/dashboard');
+  const handleOnboardingComplete = async () => {
+    setIsRedirecting(true);
+    try {
+      // Mark onboarding as complete in the database
+      const res = await fetch('/api/user/complete-onboarding', {
+        method: 'POST'
+      });
+
+      if (!res.ok) {
+        console.error('Failed to mark onboarding complete');
+      }
+
+      // Refresh the JWT so the middleware sees onboardingCompleted: true
+      // Without this, the middleware reads the stale token and bounces back here
+      await update({ onboardingCompleted: true });
+
+      router.push('/dashboard');
+    } catch (error) {
+      console.error('Error completing onboarding:', error);
+      setIsRedirecting(false);
+    }
   };
 
   // Loading skeleton
@@ -96,6 +117,11 @@ export default function OnboardingPage() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">
+      {isRedirecting && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+          <div className="w-12 h-12 rounded-full border-4 border-white border-t-transparent animate-spin" />
+        </div>
+      )}
       <div className="container mx-auto px-4 py-12">
         {/* Progress indicator */}
         <div className="max-w-3xl mx-auto mb-8">

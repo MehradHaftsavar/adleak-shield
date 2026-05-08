@@ -2,7 +2,6 @@
 
 import { useState, useEffect } from 'react';
 import { Download, TrendingDown, AlertTriangle } from 'lucide-react';
-import { DateRangePicker } from './DateRangePicker';
 import { generateNegativeKeywordCSV, downloadCSV } from '@/lib/utils/csv-export';
 
 interface Leak {
@@ -25,21 +24,27 @@ interface LeakTableData {
   };
 }
 
-export function LeakTable() {
+interface LeakTableProps {
+  dateRange: {
+    start: string;
+    end: string;
+  };
+  refreshTrigger: number;
+}
+
+export function LeakTable({ dateRange, refreshTrigger }: LeakTableProps) {
   const [data, setData] = useState<LeakTableData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState('');
-  const [dateRange, setDateRange] = useState({
-    start: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString(),
-    end: new Date().toISOString(),
-  });
 
   useEffect(() => {
     loadLeaks();
-  }, [dateRange]);
+  }, [dateRange, refreshTrigger]);
 
   const loadLeaks = async () => {
     setIsLoading(true);
+    setError('');
+    
     try {
       const params = new URLSearchParams({
         start: dateRange.start,
@@ -58,10 +63,6 @@ export function LeakTable() {
     } finally {
       setIsLoading(false);
     }
-  };
-
-  const handleDateRangeChange = (start: string, end: string) => {
-    setDateRange({ start, end });
   };
 
   const handleExportCSV = () => {
@@ -117,9 +118,6 @@ export function LeakTable() {
         <p className="text-gray-600">
           Great news! No wasted spend found in the selected date range.
         </p>
-        <div className="mt-6">
-          <DateRangePicker onRangeChange={handleDateRangeChange} />
-        </div>
       </div>
     );
   }
@@ -128,9 +126,9 @@ export function LeakTable() {
     <div className="bg-white rounded-lg border border-gray-200">
       {/* Header */}
       <div className="p-6 border-b border-gray-200">
-        <div className="flex items-center justify-between mb-4">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-4">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-red-100 rounded-full flex items-center justify-center">
+            <div className="w-10 h-10 bg-red-100 rounded-full flex items-center justify-center flex-shrink-0">
               <AlertTriangle className="w-5 h-5 text-red-600" />
             </div>
             <div>
@@ -147,28 +145,24 @@ export function LeakTable() {
             className="flex items-center gap-2 px-4 py-2 bg-green-600 hover:bg-green-700 disabled:bg-gray-300 disabled:cursor-not-allowed text-white font-semibold rounded-lg transition-colors"
           >
             <Download className="w-4 h-4" />
-            Export Negative Keywords
+            <span className="hidden sm:inline">Export Negative Keywords</span>
+            <span className="sm:hidden">Export</span>
           </button>
         </div>
 
-        {/* Date Range Picker */}
-        <div className="flex items-center justify-between">
-          <DateRangePicker onRangeChange={handleDateRangeChange} />
-          
-          {/* Summary Stats */}
-          <div className="flex items-center gap-6 text-sm">
-            <div>
-              <span className="text-gray-600">Total Waste:</span>
-              <span className="ml-2 font-bold text-red-600">
-                £{data.summary.totalWaste.toFixed(2)}
-              </span>
-            </div>
-            <div>
-              <span className="text-gray-600">Bounce Clicks:</span>
-              <span className="ml-2 font-semibold text-gray-900">
-                {data.summary.totalBounceClicks}
-              </span>
-            </div>
+        {/* Summary Stats */}
+        <div className="flex items-center gap-4 sm:gap-6 text-sm">
+          <div>
+            <span className="text-gray-600">Total Waste:</span>
+            <span className="ml-2 font-bold text-red-600">
+              £{data.summary.totalWaste.toFixed(2)}
+            </span>
+          </div>
+          <div>
+            <span className="text-gray-600">Bounce Clicks:</span>
+            <span className="ml-2 font-semibold text-gray-900">
+              {data.summary.totalBounceClicks}
+            </span>
           </div>
         </div>
       </div>
@@ -178,22 +172,22 @@ export function LeakTable() {
         <table className="w-full">
           <thead className="bg-gray-50 border-b border-gray-200">
             <tr>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+              <th className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                 Keyword
               </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+              <th className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                 Match Type
               </th>
-              <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+              <th className="px-4 sm:px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
                 Total Clicks
               </th>
-              <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+              <th className="px-4 sm:px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
                 Bounce Clicks
               </th>
-              <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+              <th className="px-4 sm:px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
                 Bounce Rate
               </th>
-              <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+              <th className="px-4 sm:px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
                 Est. Wasted Spend
               </th>
             </tr>
@@ -201,21 +195,21 @@ export function LeakTable() {
           <tbody className="bg-white divide-y divide-gray-200">
             {data.leaks.map((leak, idx) => (
               <tr key={idx} className="hover:bg-gray-50 transition-colors">
-                <td className="px-6 py-4 whitespace-nowrap">
+                <td className="px-4 sm:px-6 py-4 whitespace-nowrap">
                   <span className="font-medium text-gray-900">{leak.keyword}</span>
                 </td>
-                <td className="px-6 py-4 whitespace-nowrap">
+                <td className="px-4 sm:px-6 py-4 whitespace-nowrap">
                   <span className="inline-flex px-2 py-1 text-xs font-medium rounded-full bg-blue-100 text-blue-800">
                     {leak.matchType}
                   </span>
                 </td>
-                <td className="px-6 py-4 whitespace-nowrap text-right text-sm text-gray-900">
+                <td className="px-4 sm:px-6 py-4 whitespace-nowrap text-right text-sm text-gray-900">
                   {leak.totalClicks}
                 </td>
-                <td className="px-6 py-4 whitespace-nowrap text-right text-sm text-gray-900">
+                <td className="px-4 sm:px-6 py-4 whitespace-nowrap text-right text-sm text-gray-900">
                   {leak.bounceClicks}
                 </td>
-                <td className="px-6 py-4 whitespace-nowrap text-right text-sm">
+                <td className="px-4 sm:px-6 py-4 whitespace-nowrap text-right text-sm">
                   <span className={`font-semibold ${
                     leak.bounceRate > 80 ? 'text-red-600' :
                     leak.bounceRate > 50 ? 'text-orange-600' :
@@ -224,7 +218,7 @@ export function LeakTable() {
                     {leak.bounceRate.toFixed(1)}%
                   </span>
                 </td>
-                <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-bold text-red-600">
+                <td className="px-4 sm:px-6 py-4 whitespace-nowrap text-right text-sm font-bold text-red-600">
                   £{leak.estimatedWaste.toFixed(2)}
                 </td>
               </tr>
