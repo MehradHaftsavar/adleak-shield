@@ -4,7 +4,7 @@
 // =============================================================================
 
 
-import mssql, * as sql from "mssql";
+import mssql from "mssql";
 import { ManagedIdentityCredential  } from "@azure/identity";
 
 let pool: mssql.ConnectionPool | null = null;
@@ -85,15 +85,17 @@ export async function withTenantDb<T>(
   try {
     const ctxRequest = new mssql.Request(transaction);
     await ctxRequest
-      .input("tenantId", sql.UniqueIdentifier, tenantId)
+      .input("tenantId", mssql.UniqueIdentifier, tenantId)
       .query(
-        "EXEC sp_set_session_context N'TenantId', @tenantId, @read_only = 1"
-      );
+        "EXEC sp_set_session_context N'TenantId', @tenantId, @read_only = 0"
+    );
 
+    console.log('[withTenantDb] About to call callback with transaction:', typeof transaction);  // ADD THIS
     const result = await callback(transaction);
     await transaction.commit();
     return result;
   } catch (err) {
+    console.error('[withTenantDb] Error:', err);  // ADD THIS
     await transaction.rollback();
     throw err;
   }
@@ -111,4 +113,4 @@ export async function withAdminDb<T>(
 }
 
 // Export sql namespace for use in other files
-export { sql };
+//export { sql };

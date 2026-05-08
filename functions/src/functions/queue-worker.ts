@@ -19,6 +19,7 @@ interface CampaignLookup {
   tenantId: string;
   campaignId: string;
   domainName: string;
+  googleCampaignId: string;
 }
 
 async function lookupCampaign(
@@ -26,18 +27,18 @@ async function lookupCampaign(
 ): Promise<CampaignLookup | null> {
   return withAdminDb(async (request) => {
     const result = await request
-      .input("gid", mssql.NVarChar, googleCampaignId)
-      .query(
-        `SELECT TOP 1
-            c.tenant_id   AS tenantId,
-            c.campaign_id AS campaignId,
-            d.domain_name AS domainName
-         FROM Campaigns c
-         INNER JOIN Domains d ON d.domain_id = c.domain_id
-         WHERE c.google_campaign_id = @gid`
-      );
+      .input("googleCampaignId", mssql.NVarChar, googleCampaignId)
+      .execute('sp_LookupCampaignForWorker');
+    
     if (result.recordset.length === 0) return null;
-    return result.recordset[0] as CampaignLookup;
+    
+    const row = result.recordset[0];
+    return {
+      tenantId: row.tenant_id,
+      campaignId: row.campaign_id,
+      domainName: row.domain_name,
+      googleCampaignId: row.google_campaign_id,
+    };
   });
 }
 
@@ -80,7 +81,8 @@ async function ensureSession(
   tx: mssql.Transaction,
   msg: QueueMessage,
   tenantId: string,
-  campaignId: string
+  campaignId: string,
+  googleCampaignId: string
 ): Promise<string | null> {
   const env = msg.envelope;
   const sessionFingerprint =
@@ -120,7 +122,26 @@ async function ensureSession(
           (@tenantId, @campaignId, @fp, @keyword, @matchType, @device,
            @gclid, @ipMasked)`
     );
-  return created.recordset[0]?.session_id ?? null;
+  
+  const sessionId = created.recordset[0]?.session_id ?? null;
+  
+  // Auto-cleanup: Delete old unregistered traffic logs for this campaign
+  // This handles the case where user tested multiple times and earlier tests failed
+  if (sessionId && googleCampaignId) {
+    try {
+      await new mssql.Request(tx)
+        .input("gCampaignId", mssql.NVarChar, googleCampaignId.substring(0, 20))
+        .query(
+          `DELETE FROM UnregisteredTrafficLog
+           WHERE unrecognised_campaign_id = @gCampaignId`
+        );
+    } catch (err) {
+      // Don't fail session creation if cleanup fails - just log it
+      console.warn('[ensureSession] Failed to cleanup old unregistered logs', err);
+    }
+  }
+  
+  return sessionId;
 }
 
 async function insertClickLog(
@@ -291,6 +312,7 @@ export async function queueWorkerHandler(
       tenantId: sessionInfo.tenant_id,
       campaignId: sessionInfo.campaign_id,
       domainName: env.domain,
+      googleCampaignId: googleCampaignId,
     };
   }
 
@@ -300,7 +322,8 @@ export async function queueWorkerHandler(
         tx,
         msg,
         campaign!.tenantId,
-        campaign!.campaignId
+        campaign!.campaignId,
+        campaign!.googleCampaignId
       );
       if (!sessionId) {
         context.log("[Worker] Could not resolve session_id — skipping event");

@@ -12,9 +12,10 @@ interface CampaignStepProps {
 export function CampaignStep({ domain, onComplete, onBack }: CampaignStepProps) {
   const [campaigns, setCampaigns] = useState<any[]>([]);
   const [newCampaignId, setNewCampaignId] = useState('');
+  const [newAvgCpc, setNewAvgCpc] = useState(''); // NEW
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  const [isFetching, setIsFetching] = useState(true); // NEW: for initial load
+  const [isFetching, setIsFetching] = useState(true);
 
   useEffect(() => {
     loadCampaigns();
@@ -38,6 +39,13 @@ export function CampaignStep({ domain, onComplete, onBack }: CampaignStepProps) 
   const handleAddCampaign = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
+    
+    // Validate CPC is provided and valid
+    if (!newAvgCpc || parseFloat(newAvgCpc) <= 0) {
+      setError('Please enter your average CPC (must be greater than £0)');
+      return;
+    }
+    
     setIsLoading(true);
 
     try {
@@ -46,6 +54,7 @@ export function CampaignStep({ domain, onComplete, onBack }: CampaignStepProps) 
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           googleCampaignId: newCampaignId,
+          avgCpc: parseFloat(newAvgCpc), // REQUIRED - no default
         }),
       });
 
@@ -60,6 +69,7 @@ export function CampaignStep({ domain, onComplete, onBack }: CampaignStepProps) 
       // Add to list and reset form
       setCampaigns([...campaigns, data.campaign]);
       setNewCampaignId('');
+      setNewAvgCpc(''); // Reset CPC field
       setIsLoading(false);
     } catch (err) {
       setError('Network error. Please try again.');
@@ -133,6 +143,11 @@ export function CampaignStep({ domain, onComplete, onBack }: CampaignStepProps) 
                 <p className="text-sm text-gray-600">
                   Campaign ID: {campaign.googleCampaignId}
                 </p>
+                {campaign.avgCpc && (
+                  <p className="text-xs text-gray-500 mt-1">
+                    Avg. CPC: £{campaign.avgCpc.toFixed(2)}
+                  </p>
+                )}
               </div>
               <button
                 onClick={() => handleDeleteCampaign(campaign.id)}
@@ -162,13 +177,39 @@ export function CampaignStep({ domain, onComplete, onBack }: CampaignStepProps) 
               placeholder="e.g., 12345678"
               className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
               required
-              disabled={isFetching}
+              disabled={isFetching || isLoading}
             />
+          </div>
+
+          {/* NEW: Average CPC input - REQUIRED */}
+          <div>
+            <label htmlFor="avgCpc" className="block text-sm font-medium text-gray-700 mb-2">
+              Average CPC <span className="text-red-500">*</span>
+            </label>
+            <div className="relative">
+              <span className="absolute left-3 top-3 text-gray-500">£</span>
+              <input
+                id="avgCpc"
+                type="number"
+                step="0.01"
+                min="0.01"
+                max="1000"
+                value={newAvgCpc}
+                onChange={(e) => setNewAvgCpc(e.target.value)}
+                placeholder="2.50"
+                className="w-full pl-8 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                required
+                disabled={isFetching || isLoading}
+              />
+            </div>
+            <p className="mt-2 text-xs text-gray-500">
+              💡 Find this in Google Ads → Campaigns → "Avg. CPC" column. You can update this later if your CPC changes.
+            </p>
           </div>
 
           <button
             type="submit"
-            disabled={isLoading || isFetching || !newCampaignId.trim()}
+            disabled={isLoading || isFetching || !newCampaignId.trim() || !newAvgCpc}
             className="w-full bg-green-600 hover:bg-green-700 disabled:bg-gray-400 text-white font-semibold py-3 px-6 rounded-lg transition-colors flex items-center justify-center gap-2"
           >
             <Plus className="w-5 h-5" />

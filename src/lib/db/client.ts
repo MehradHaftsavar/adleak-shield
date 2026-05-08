@@ -179,9 +179,17 @@ export async function withTenantDb<T>(
   await transaction.begin();
 
   try {
+    // Create request for callback
     const request = new mssql.Request(transaction);
-    // Set RLS context BEFORE the callback runs any queries
-    await setTenantContext(request, tenantId);
+    
+    // CRITICAL: Add tenant_id as a parameter that callback can use
+    request.input("currentTenantId", mssql.UniqueIdentifier, tenantId);
+    
+    // Set session context using the SAME request
+    await request.query(`
+      DECLARE @tid VARBINARY(128) = CAST(CAST(@currentTenantId AS UNIQUEIDENTIFIER) AS VARBINARY(128));
+      EXEC sp_set_session_context N'TenantId', @tid, @read_only = 0;
+    `);
 
     const result = await callback(request);
     await transaction.commit();

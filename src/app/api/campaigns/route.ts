@@ -10,6 +10,9 @@ const campaignSchema = z.object({
     .regex(/^\d+$/, 'Campaign ID must be numeric')
     .min(1, 'Campaign ID is required')
     .max(20, 'Campaign ID too long'),
+  avgCpc: z.number()
+    .min(0.01, 'CPC must be at least £0.01')
+    .max(1000, 'CPC must be less than £1000'),
 });
 
 // POST - Register a new campaign
@@ -21,13 +24,23 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
-    const validation = campaignSchema.safeParse(body);
+    const { googleCampaignId, avgCpc } = body;
+
+    // Validate avgCpc is provided
+    if (!avgCpc || isNaN(parseFloat(avgCpc))) {
+      return NextResponse.json({ error: 'Average CPC is required' }, { status: 400 });
+    }
+
+    const validation = campaignSchema.safeParse({
+      googleCampaignId,
+      avgCpc: parseFloat(avgCpc),
+    });
     
     if (!validation.success) {
       return NextResponse.json({ error: validation.error.errors[0].message }, { status: 400 });
     }
 
-    const { googleCampaignId } = validation.data;
+    const validatedData = validation.data;
 
     const result = await withTenantDb(session.user.tenantId, async (req) => {
       // Check domain registered (RLS auto-filters by tenant)
@@ -51,7 +64,7 @@ export async function POST(request: NextRequest) {
       }
 
       // Check duplicate
-      const duplicate = existingCampaigns.find(c => c.google_campaign_id === googleCampaignId);
+      const duplicate = existingCampaigns.find(c => c.google_campaign_id === validatedData.googleCampaignId);
       if (duplicate) {
         throw new Error('DUPLICATE_CAMPAIGN');
       }
@@ -66,24 +79,40 @@ export async function POST(request: NextRequest) {
         }
       }
 
-      // Insert campaign - use SESSION_CONTEXT for tenant_id
+      // Insert campaign with avg_cpc
       req.input('domainId', mssql.UniqueIdentifier, domain.domain_id);
-      req.input('googleCampaignId', mssql.NVarChar, googleCampaignId);
+      req.input('googleCampaignId', mssql.NVarChar, validatedData.googleCampaignId);
       req.input('slotNumber', mssql.Int, slotNumber);
+      req.input('avgCpc', mssql.Decimal(10, 2), validatedData.avgCpc);
       
       await req.query(`
-        INSERT INTO Campaigns (tenant_id, domain_id, google_campaign_id, slot_number, status)
-        VALUES (CAST(SESSION_CONTEXT(N'TenantId') AS uniqueidentifier), @domainId, @googleCampaignId, @slotNumber, 'awaiting_data')
+        INSERT INTO Campaigns (tenant_id, domain_id, google_campaign_id, slot_number, status, avg_cpc, created_at)
+        VALUES (
+          CAST(SESSION_CONTEXT(N'TenantId') AS uniqueidentifier), 
+          @domainId, 
+          @googleCampaignId, 
+          @slotNumber, 
+          'awaiting_data',
+          @avgCpc,
+          GETUTCDATE()
+        )
       `);
 
       // Get the inserted campaign
       const selectResult = await req.query(`
-        SELECT campaign_id, google_campaign_id, slot_number, domain_id, created_at, status
+        SELECT campaign_id, google_campaign_id, slot_number, domain_id, created_at, status, avg_cpc
         FROM Campaigns
         WHERE google_campaign_id = @googleCampaignId
       `);
 
       const newCampaign = selectResult.recordset[0];
+
+      // Auto-cleanup: Delete old unregistered traffic logs for this campaign
+      // This ensures the dashboard shows a clean state immediately after registration
+      await req.query(`
+        DELETE FROM UnregisteredTrafficLog
+        WHERE unrecognised_campaign_id = @googleCampaignId
+      `);
 
       return {
         success: true,
@@ -94,6 +123,7 @@ export async function POST(request: NextRequest) {
           domainId: newCampaign.domain_id,
           createdAt: newCampaign.created_at,
           status: newCampaign.status,
+          avgCpc: newCampaign.avg_cpc,
         },
         message: 'Campaign registered successfully',
       };
@@ -128,9 +158,9 @@ export async function GET(request: NextRequest) {
     }
 
     const result = await withTenantDb(session.user.tenantId, async (req) => {
-      // Get all campaigns (RLS auto-filters by tenant)
+      // Get all campaigns with avg_cpc (RLS auto-filters by tenant)
       const campaignsResult = await req.query(`
-        SELECT campaign_id, google_campaign_id, slot_number, domain_id, created_at, status
+        SELECT campaign_id, google_campaign_id, slot_number, domain_id, created_at, status, avg_cpc
         FROM Campaigns
         ORDER BY slot_number
       `);
@@ -141,8 +171,9 @@ export async function GET(request: NextRequest) {
           googleCampaignId: c.google_campaign_id,
           slotNumber: c.slot_number,
           domainId: c.domain_id,
-          createdAt: c.created_at,
+          createdAt: c.createdAt,
           status: c.status,
+          avgCpc: c.avg_cpc,
         })),
         count: campaignsResult.recordset?.length || 0,
         maxAllowed: 3,

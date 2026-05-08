@@ -202,7 +202,7 @@ export function SnippetStep({ domain, onComplete, onBack }: SnippetStepProps) {
             <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
               <div className="flex items-center justify-between mb-2">
                 <p className="text-sm font-medium text-gray-700">
-                  Tracking template (applies to all campaigns):
+                  Tracking template (add to each campaign):
                 </p>
                 <button
                   onClick={() => copyToClipboard(template, 'template')}
@@ -227,24 +227,45 @@ export function SnippetStep({ domain, onComplete, onBack }: SnippetStepProps) {
               </pre>
             </div>
 
-            <div className="mt-3 bg-blue-50 border border-blue-200 rounded-lg p-3">
-              <p className="text-sm text-blue-900 font-semibold mb-2">
-                How to add in Google Ads:
+            <div className="mt-3 bg-blue-50 border border-blue-200 rounded-lg p-4">
+              <p className="text-sm text-blue-900 font-semibold mb-3">
+                How to add the template to Google Ads:
               </p>
-              <ol className="text-sm text-blue-800 space-y-1 list-decimal list-inside">
-                <li>Go to Google Ads → Settings</li>
-                <li>Click "Account settings"</li>
-                <li>Scroll to "Tracking" section</li>
-                <li>Paste the template into "Tracking template" field</li>
-                <li>Click "Save"</li>
+              <ol className="text-sm text-blue-800 space-y-2 list-decimal list-inside ml-2">
+                <li>Sign in to your Google Ads account</li>
+                <li>Click <strong>Campaigns</strong> in the left menu</li>
+                <li>Select your campaign (the one you registered above)</li>
+                <li>Click the <strong>Settings</strong> tab</li>
+                <li>Scroll down to <strong>Other settings</strong></li>
+                <li>Click <strong>Campaign URL options</strong></li>
+                <li>In the <strong>Tracking template</strong> field, paste the template above</li>
+                <li>Click <strong>Save</strong></li>
               </ol>
               
-                <a href="https://support.google.com/google-ads/answer/6305348"
+              <div className="mt-4 bg-yellow-100 border border-yellow-300 rounded p-3">
+                <p className="text-sm text-yellow-900">
+                  <strong>⚠️ Critical:</strong> The template must be added at the <strong>campaign level</strong> (steps above), 
+                  not at the account level or ad level. Add it separately to each campaign you registered.
+                </p>
+              </div>
+
+              <div className="mt-3 bg-white border border-blue-300 rounded p-3">
+                <p className="text-sm text-blue-900 mb-2">
+                  <strong>📌 Multiple ads in the same campaign?</strong>
+                </p>
+                <p className="text-sm text-blue-800">
+                  No problem! All ads within a campaign automatically use the same template. 
+                  You only need to add the template once per campaign, not per ad.
+                </p>
+              </div>
+
+              <a 
+                href="https://support.google.com/google-ads/answer/6305348"
                 target="_blank"
                 rel="noopener noreferrer"
-                className="inline-flex items-center gap-1 text-sm text-blue-700 hover:text-blue-800 mt-2 font-medium"
+                className="inline-flex items-center gap-1 text-sm text-blue-700 hover:text-blue-800 mt-3 font-medium"
               >
-                Google Ads help article
+                Google Ads official help article
                 <ExternalLink className="w-3 h-3" />
               </a>
             </div>
@@ -337,7 +358,7 @@ export function SnippetStep({ domain, onComplete, onBack }: SnippetStepProps) {
             <ul className="text-sm text-green-800 space-y-1">
               {campaigns.map((campaign, idx) => (
                 <li key={idx}>
-                  • (ID: {campaign.id})
+                  • Campaign {idx + 1} (ID: {campaign.id})
                 </li>
               ))}
             </ul>

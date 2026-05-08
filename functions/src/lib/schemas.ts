@@ -58,7 +58,7 @@ export const IngestEnvelopeSchema = z
       .string()
       .min(1)
       .max(253)
-      .regex(/^[a-zA-Z0-9.-]+$/, "Invalid domain"),
+      .regex(/^[a-zA-Z0-9.:-]+$/, "Invalid domain"),
     ts: z.number().int().positive(),
   })
   .strict();

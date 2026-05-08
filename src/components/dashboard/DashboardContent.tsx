@@ -6,6 +6,7 @@ import Link from 'next/link';
 import { StatusIndicator } from '@/components/dashboard/StatusIndicator';
 import { CampaignStatusCard } from '@/components/dashboard/CampaignStatusCard';
 import { UnregisteredTrafficAlert } from '@/components/dashboard/UnregisteredTrafficAlert';
+import { LeakTable } from './LeakTable'; // NEW
 
 interface DashboardStatus {
   isLive: boolean;
@@ -142,6 +143,14 @@ export function DashboardContent() {
             })}
           </div>
         )}
+      </div>
+
+      {/* NEW: Leak Table */}
+      <div>
+        <h2 className="text-xl font-semibold text-gray-900 mb-4">
+          Wasted Spend Analysis
+        </h2>
+        <LeakTable />
       </div>
 
       {/* Info Box */}
