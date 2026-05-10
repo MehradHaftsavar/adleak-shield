@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Target, Trash2, Plus } from 'lucide-react';
+import { Target, Trash2, Plus, Pencil, Check, X } from 'lucide-react';
 
 interface CampaignStepProps {
   domain: string;
@@ -12,10 +12,14 @@ interface CampaignStepProps {
 export function CampaignStep({ domain, onComplete, onBack }: CampaignStepProps) {
   const [campaigns, setCampaigns] = useState<any[]>([]);
   const [newCampaignId, setNewCampaignId] = useState('');
-  const [newAvgCpc, setNewAvgCpc] = useState(''); // NEW
+  const [newAvgCpc, setNewAvgCpc] = useState('');
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [isFetching, setIsFetching] = useState(true);
+  const [editingCpcId, setEditingCpcId] = useState<string | null>(null);
+  const [editingCpcValue, setEditingCpcValue] = useState('');
+  const [cpcSaving, setCpcSaving] = useState(false);
+  const [cpcError, setCpcError] = useState('');
 
   useEffect(() => {
     loadCampaigns();
@@ -39,13 +43,12 @@ export function CampaignStep({ domain, onComplete, onBack }: CampaignStepProps) 
   const handleAddCampaign = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
-    
-    // Validate CPC is provided and valid
+
     if (!newAvgCpc || parseFloat(newAvgCpc) <= 0) {
       setError('Please enter your average CPC (must be greater than £0)');
       return;
     }
-    
+
     setIsLoading(true);
 
     try {
@@ -54,7 +57,7 @@ export function CampaignStep({ domain, onComplete, onBack }: CampaignStepProps) 
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           googleCampaignId: newCampaignId,
-          avgCpc: parseFloat(newAvgCpc), // REQUIRED - no default
+          avgCpc: parseFloat(newAvgCpc),
         }),
       });
 
@@ -66,10 +69,9 @@ export function CampaignStep({ domain, onComplete, onBack }: CampaignStepProps) 
         return;
       }
 
-      // Add to list and reset form
       setCampaigns([...campaigns, data.campaign]);
       setNewCampaignId('');
-      setNewAvgCpc(''); // Reset CPC field
+      setNewAvgCpc('');
       setIsLoading(false);
     } catch (err) {
       setError('Network error. Please try again.');
@@ -88,6 +90,37 @@ export function CampaignStep({ domain, onComplete, onBack }: CampaignStepProps) 
       }
     } catch (err) {
       console.error('Failed to delete campaign:', err);
+    }
+  };
+
+  const handleUpdateCpc = async (campaignId: string) => {
+    setCpcError('');
+    const parsed = parseFloat(editingCpcValue);
+    if (isNaN(parsed) || parsed < 0.01 || parsed > 1000) {
+      setCpcError('Enter a valid CPC between £0.01 and £1000');
+      return;
+    }
+    setCpcSaving(true);
+    try {
+      const res = await fetch('/api/campaigns', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ campaignId, avgCpc: parsed }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setCpcError(data.error || 'Failed to update CPC');
+        return;
+      }
+      setCampaigns(campaigns.map(c =>
+        c.id === campaignId ? { ...c, avgCpc: parsed } : c
+      ));
+      setEditingCpcId(null);
+      setEditingCpcValue('');
+    } catch {
+      setCpcError('Network error. Please try again.');
+    } finally {
+      setCpcSaving(false);
     }
   };
 
@@ -134,29 +167,83 @@ export function CampaignStep({ domain, onComplete, onBack }: CampaignStepProps) 
           {campaigns.map((campaign) => (
             <div
               key={campaign.id}
-              className="flex items-center justify-between p-4 bg-gray-50 rounded-lg border border-gray-200"
+              className="p-4 bg-gray-50 rounded-lg border border-gray-200"
             >
-              <div>
-                <p className="font-semibold text-gray-900">
-                  Campaign {campaign.slotNumber}
-                </p>
-                <p className="text-sm text-gray-600">
-                  Campaign ID: {campaign.googleCampaignId}
-                </p>
-                {campaign.avgCpc && (
-                  <p className="text-xs text-gray-500 mt-1">
-                    Avg. CPC: £{campaign.avgCpc.toFixed(2)}
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="font-semibold text-gray-900">
+                    Campaign {campaign.slotNumber}
                   </p>
-                )}
+                  <p className="text-sm text-gray-600">
+                    Campaign ID: {campaign.googleCampaignId}
+                  </p>
+                </div>
+                <button
+                  onClick={() => handleDeleteCampaign(campaign.id)}
+                  className="text-red-600 hover:text-red-700 p-2"
+                  title="Remove campaign"
+                  disabled={isFetching}
+                >
+                  <Trash2 className="w-5 h-5" />
+                </button>
               </div>
-              <button
-                onClick={() => handleDeleteCampaign(campaign.id)}
-                className="text-red-600 hover:text-red-700 p-2"
-                title="Remove campaign"
-                disabled={isFetching}
-              >
-                <Trash2 className="w-5 h-5" />
-              </button>
+
+              {/* CPC row */}
+              {editingCpcId === campaign.id ? (
+                <div className="mt-3">
+                  <div className="flex items-center gap-2">
+                    <div className="relative flex-1">
+                      <span className="absolute left-3 top-2 text-gray-500 text-sm">£</span>
+                      <input
+                        type="number"
+                        step="0.01"
+                        min="0.01"
+                        max="1000"
+                        value={editingCpcValue}
+                        onChange={(e) => setEditingCpcValue(e.target.value)}
+                        className="w-full pl-7 pr-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                        autoFocus
+                        disabled={cpcSaving}
+                      />
+                    </div>
+                    <button
+                      onClick={() => handleUpdateCpc(campaign.id)}
+                      disabled={cpcSaving || !editingCpcValue}
+                      className="p-2 bg-green-600 hover:bg-green-700 disabled:bg-gray-300 text-white rounded-lg"
+                      title="Save"
+                    >
+                      <Check className="w-4 h-4" />
+                    </button>
+                    <button
+                      onClick={() => { setEditingCpcId(null); setEditingCpcValue(''); setCpcError(''); }}
+                      disabled={cpcSaving}
+                      className="p-2 bg-gray-200 hover:bg-gray-300 text-gray-700 rounded-lg"
+                      title="Cancel"
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
+                  </div>
+                  {cpcError && <p className="mt-1 text-xs text-red-600">{cpcError}</p>}
+                </div>
+              ) : (
+                <div className="mt-2 flex items-center gap-2">
+                  <span className="text-xs text-gray-500">
+                    Avg. CPC: {campaign.avgCpc ? `£${campaign.avgCpc.toFixed(2)}` : 'Not set'}
+                  </span>
+                  <button
+                    onClick={() => {
+                      setEditingCpcId(campaign.id);
+                      setEditingCpcValue(campaign.avgCpc ? campaign.avgCpc.toString() : '');
+                      setCpcError('');
+                    }}
+                    className="text-blue-600 hover:text-blue-700 p-0.5"
+                    title="Edit CPC"
+                    disabled={isFetching}
+                  >
+                    <Pencil className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              )}
             </div>
           ))}
         </div>
@@ -181,7 +268,6 @@ export function CampaignStep({ domain, onComplete, onBack }: CampaignStepProps) 
             />
           </div>
 
-          {/* NEW: Average CPC input - REQUIRED */}
           <div>
             <label htmlFor="avgCpc" className="block text-sm font-medium text-gray-700 mb-2">
               Average CPC <span className="text-red-500">*</span>

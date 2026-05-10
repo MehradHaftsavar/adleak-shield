@@ -10,6 +10,17 @@ export async function GET(request: NextRequest) {
     }
 
     const result = await withTenantDb(session.user.tenantId, async (req) => {
+      // Self-heal: flip any campaign that has real sessions but is still
+      // marked awaiting_data — catches legacy data and any queue worker gaps
+      await req.query(`
+        UPDATE Campaigns
+        SET status = 'active'
+        WHERE status = 'awaiting_data'
+          AND EXISTS (
+            SELECT 1 FROM Sessions s WHERE s.campaign_id = Campaigns.campaign_id
+          )
+      `);
+
       // 1. Check if ANY data received in last 24 hours (Live status)
       const liveCheckResult = await req.query(`
         SELECT TOP 1 session_id

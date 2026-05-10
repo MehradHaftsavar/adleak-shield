@@ -126,8 +126,8 @@ BEGIN
         RAISERROR('Starter plan limit: maximum 3 campaigns per tenant.', 16, 1);
         RETURN;
     END
-    INSERT INTO Campaigns (campaign_id, tenant_id, domain_id, google_campaign_id, slot_number, status)
-    SELECT campaign_id, tenant_id, domain_id, google_campaign_id, slot_number, status
+    INSERT INTO Campaigns (campaign_id, tenant_id, domain_id, google_campaign_id, slot_number, status, avg_cpc)
+    SELECT campaign_id, tenant_id, domain_id, google_campaign_id, slot_number, status, avg_cpc
     FROM inserted;
 END;
 GO

@@ -187,6 +187,55 @@ export async function GET(request: NextRequest) {
   }
 }
 
+// PATCH - Update avg_cpc for an existing campaign
+export async function PATCH(request: NextRequest) {
+  try {
+    const session = await auth();
+    if (!session?.user?.tenantId) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    const body = await request.json();
+    const { campaignId, avgCpc } = body;
+
+    if (!campaignId) {
+      return NextResponse.json({ error: 'Campaign ID required' }, { status: 400 });
+    }
+
+    const parsedCpc = parseFloat(avgCpc);
+    if (isNaN(parsedCpc) || parsedCpc < 0.01 || parsedCpc > 1000) {
+      return NextResponse.json({ error: 'CPC must be between £0.01 and £1000' }, { status: 400 });
+    }
+
+    const result = await withTenantDb(session.user.tenantId, async (req) => {
+      req.input('campaignId', mssql.UniqueIdentifier, campaignId);
+      req.input('avgCpc', mssql.Decimal(10, 2), parsedCpc);
+
+      const updateResult = await req.query(`
+        UPDATE Campaigns
+        SET avg_cpc = @avgCpc
+        WHERE campaign_id = @campaignId
+      `);
+
+      if (updateResult.rowsAffected[0] === 0) {
+        throw new Error('NOT_FOUND');
+      }
+
+      return { success: true, avgCpc: parsedCpc };
+    });
+
+    return NextResponse.json(result);
+  } catch (error) {
+    console.error('Update CPC error:', error);
+
+    if (error instanceof Error && error.message === 'NOT_FOUND') {
+      return NextResponse.json({ error: 'Campaign not found or unauthorized' }, { status: 404 });
+    }
+
+    return NextResponse.json({ error: 'Failed to update CPC' }, { status: 500 });
+  }
+}
+
 // DELETE - Permanently remove a campaign and ALL related data
 export async function DELETE(request: NextRequest) {
   try {

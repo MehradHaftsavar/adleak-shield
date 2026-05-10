@@ -1,7 +1,8 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Download, TrendingDown, AlertTriangle } from 'lucide-react';
+import { Download, TrendingDown, AlertTriangle, ExternalLink } from 'lucide-react';
+import { JourneyTimeline } from './JourneyTimeline';
 import { generateNegativeKeywordCSV, downloadCSV } from '@/lib/utils/csv-export';
 
 interface Leak {
@@ -34,6 +35,8 @@ interface LeakTableProps {
 
 export function LeakTable({ dateRange, refreshTrigger }: LeakTableProps) {
   const [data, setData] = useState<LeakTableData | null>(null);
+  const [selectedKeyword,   setSelectedKeyword]   = useState<string | null>(null);
+  const [selectedMatchType, setSelectedMatchType] = useState<string>('');
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState('');
 
@@ -123,6 +126,7 @@ export function LeakTable({ dateRange, refreshTrigger }: LeakTableProps) {
   }
 
   return (
+    <>
     <div className="bg-white rounded-lg border border-gray-200">
       {/* Header */}
       <div className="p-6 border-b border-gray-200">
@@ -194,9 +198,19 @@ export function LeakTable({ dateRange, refreshTrigger }: LeakTableProps) {
           </thead>
           <tbody className="bg-white divide-y divide-gray-200">
             {data.leaks.map((leak, idx) => (
-              <tr key={idx} className="hover:bg-gray-50 transition-colors">
+              <tr
+                key={idx}
+                className="hover:bg-blue-50 transition-colors cursor-pointer group"
+                onClick={() => {
+                  setSelectedKeyword(leak.keyword);
+                  setSelectedMatchType(leak.matchType);
+                }}
+              >
                 <td className="px-4 sm:px-6 py-4 whitespace-nowrap">
-                  <span className="font-medium text-gray-900">{leak.keyword}</span>
+                  <div className="flex items-center gap-2">
+                    <span className="font-medium text-gray-900">{leak.keyword}</span>
+                    <ExternalLink className="w-3.5 h-3.5 text-gray-400 opacity-0 group-hover:opacity-100 transition-opacity" />
+                  </div>
                 </td>
                 <td className="px-4 sm:px-6 py-4 whitespace-nowrap">
                   <span className="inline-flex px-2 py-1 text-xs font-medium rounded-full bg-blue-100 text-blue-800">
@@ -230,10 +244,25 @@ export function LeakTable({ dateRange, refreshTrigger }: LeakTableProps) {
       {/* Footer Info */}
       <div className="p-4 bg-gray-50 border-t border-gray-200">
         <p className="text-xs text-gray-600">
-          💡 <strong>Tip:</strong> Export these as negative keywords to prevent future wasted spend. 
+          💡 <strong>Tip:</strong> Export these as negative keywords to prevent future wasted spend.
           Calculated using your campaign's actual CPC at the time of each click.
+          Click any row to view visitor journey sessions.
         </p>
       </div>
     </div>
+
+    {/* Journey Timeline slide-over */}
+    {selectedKeyword && (
+      <JourneyTimeline
+        keyword={selectedKeyword}
+        matchType={selectedMatchType}
+        dateRange={dateRange}
+        onClose={() => {
+          setSelectedKeyword(null);
+          setSelectedMatchType('');
+        }}
+      />
+    )}
+    </>
   );
 }

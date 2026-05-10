@@ -346,6 +346,13 @@ export async function queueWorkerHandler(
             sessionId,
             "session_start"
           );
+          await new mssql.Request(tx)
+            .input("campaignId", mssql.UniqueIdentifier, campaign!.campaignId)
+            .query(
+              `UPDATE Campaigns SET status = 'active'
+               WHERE campaign_id = @campaignId
+                 AND status = 'awaiting_data'`
+            );
           break;
         case "pageview":
         case "click":
