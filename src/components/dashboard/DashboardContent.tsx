@@ -7,6 +7,7 @@ import { StatusIndicator } from '@/components/dashboard/StatusIndicator';
 import { CampaignStatusCard } from '@/components/dashboard/CampaignStatusCard';
 import { UnregisteredTrafficAlert } from '@/components/dashboard/UnregisteredTrafficAlert';
 import { LeakTable } from './LeakTable';
+import { SessionsTable } from './SessionsTable';
 import { DateRangePicker } from './DateRangePicker';
 
 interface DashboardStatus {
@@ -202,10 +203,18 @@ export function DashboardContent() {
         <LeakTable dateRange={leakDateRange} refreshTrigger={refreshTrigger} />
       </div>
 
+      {/* All Sessions */}
+      <div>
+        <h2 className="text-xl font-semibold text-gray-900 mb-4">
+          Visitor Journeys
+        </h2>
+        <SessionsTable campaigns={status.campaigns} />
+      </div>
+
       {/* Info Box */}
       <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
         <p className="text-sm text-blue-900">
-          <strong>💡 Tip:</strong> Campaign status changes to "Active" once we receive the first click. 
+          <strong>💡 Tip:</strong> Campaign status changes to "Active" once we receive the first click.
           Use the refresh button to update your leak data manually.
         </p>
       </div>

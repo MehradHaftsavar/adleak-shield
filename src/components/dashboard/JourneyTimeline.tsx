@@ -44,10 +44,11 @@ interface JourneyDetail {
 }
 
 export interface JourneyTimelineProps {
-  keyword:   string;
-  matchType: string;
-  dateRange: { start: string; end: string };
-  onClose:   () => void;
+  keyword:    string;
+  matchType:  string;
+  dateRange:  { start: string; end: string };
+  onClose:    () => void;
+  sessionId?: string; // if set, skip sessions list and open this session directly
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -319,18 +320,22 @@ function TimelineEventRow({ event, index }: { event: JourneyEvent; index: number
 
 // ─── Main exported component ───────────────────────────────────────────────────
 
-export function JourneyTimeline({ keyword, matchType, dateRange, onClose }: JourneyTimelineProps) {
-  const [view, setView] = useState<'sessions' | 'timeline'>('sessions');
+export function JourneyTimeline({ keyword, matchType, dateRange, onClose, sessionId }: JourneyTimelineProps) {
+  const directMode = !!sessionId;
+  const [view, setView] = useState<'sessions' | 'timeline'>(directMode ? 'timeline' : 'sessions');
 
   const [sessions,        setSessions]        = useState<SessionSummary[]>([]);
-  const [sessionsLoading, setSessionsLoading] = useState(true);
+  const [sessionsLoading, setSessionsLoading] = useState(!directMode);
   const [sessionsError,   setSessionsError]   = useState('');
 
   const [journeyDetail,  setJourneyDetail]  = useState<JourneyDetail | null>(null);
-  const [journeyLoading, setJourneyLoading] = useState(false);
+  const [journeyLoading, setJourneyLoading] = useState(directMode);
   const [journeyError,   setJourneyError]   = useState('');
 
+  // Load sessions list (only when opened from LeakTable)
   useEffect(() => {
+    if (directMode) return;
+
     const params = new URLSearchParams({
       keyword,
       start: dateRange.start,
@@ -348,16 +353,33 @@ export function JourneyTimeline({ keyword, matchType, dateRange, onClose }: Jour
       })
       .catch(err => setSessionsError(err.message || 'Failed to load sessions'))
       .finally(() => setSessionsLoading(false));
-  }, [keyword, dateRange]);
+  }, [keyword, dateRange, directMode]);
 
-  const handleSelectSession = useCallback(async (sessionId: string) => {
+  // Load journey directly when sessionId is provided
+  useEffect(() => {
+    if (!directMode || !sessionId) return;
+
+    setJourneyLoading(true);
+    setJourneyError('');
+
+    fetch(`/api/journey/${sessionId}`)
+      .then(r => r.json())
+      .then(data => {
+        if (data.error) throw new Error(data.error);
+        setJourneyDetail(data);
+      })
+      .catch(err => setJourneyError(err.message || 'Failed to load journey'))
+      .finally(() => setJourneyLoading(false));
+  }, [sessionId, directMode]);
+
+  const handleSelectSession = useCallback(async (sid: string) => {
     setView('timeline');
     setJourneyLoading(true);
     setJourneyError('');
     setJourneyDetail(null);
 
     try {
-      const res  = await fetch(`/api/journey/${sessionId}`);
+      const res  = await fetch(`/api/journey/${sid}`);
       const data = await res.json();
       if (data.error) throw new Error(data.error);
       setJourneyDetail(data);
@@ -369,6 +391,10 @@ export function JourneyTimeline({ keyword, matchType, dateRange, onClose }: Jour
   }, []);
 
   const handleBack = () => {
+    if (directMode) {
+      onClose();
+      return;
+    }
     setView('sessions');
     setJourneyDetail(null);
     setJourneyError('');

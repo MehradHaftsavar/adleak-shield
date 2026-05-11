@@ -5,7 +5,7 @@ import * as mssql from 'mssql';
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { sessionId: string } }
+  { params }: { params: Promise<{ sessionId: string }> }
 ) {
   try {
     const session = await auth();
@@ -13,7 +13,7 @@ export async function GET(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const { sessionId } = params;
+    const { sessionId } = await params;
 
     const result = await withTenantDb(session.user.tenantId, async (req) => {
       req.input('sessionId', mssql.UniqueIdentifier, sessionId);
