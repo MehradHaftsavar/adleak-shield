@@ -51,7 +51,7 @@ function Navbar() {
             Log in
           </Link>
           <Link
-            href="/auth/register"
+            href="/auth/signup"
             className="text-sm font-semibold bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg transition-colors"
           >
             Start free trial
@@ -80,7 +80,7 @@ function Navbar() {
           ))}
           <div className="pt-2 flex flex-col gap-2">
             <Link href="/auth/login" className="text-sm font-medium text-slate-600 py-1">Log in</Link>
-            <Link href="/auth/register" className="text-sm font-semibold bg-blue-600 text-white px-4 py-2 rounded-lg text-center">
+            <Link href="/auth/signup" className="text-sm font-semibold bg-blue-600 text-white px-4 py-2 rounded-lg text-center">
               Start free trial
             </Link>
           </div>
@@ -110,7 +110,7 @@ function Hero() {
         </p>
         <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
           <Link
-            href="/auth/register"
+            href="/auth/signup"
             className="w-full sm:w-auto px-8 py-3.5 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg transition-colors text-base"
           >
             Start your free 7-day trial
@@ -271,7 +271,7 @@ function Pricing() {
             </div>
 
             <Link
-              href="/auth/register"
+              href="/auth/signup"
               className="block w-full text-center px-6 py-3.5 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg transition-colors"
             >
               Start free 7-day trial
@@ -428,7 +428,7 @@ function Footer() {
         </div>
         <div className="flex items-center gap-4 text-sm">
           <Link href="/auth/login" className="hover:text-white transition-colors">Log in</Link>
-          <Link href="/auth/register" className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-1.5 rounded-lg transition-colors font-medium">
+          <Link href="/auth/signup" className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-1.5 rounded-lg transition-colors font-medium">
             Get started
           </Link>
         </div>
