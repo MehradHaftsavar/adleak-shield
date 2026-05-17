@@ -22,18 +22,12 @@ import Link from "next/link";
 interface DashboardShellProps {
   email: string;
   tenantId: string;
-  isTrialing: boolean;
-  isExpired: boolean;
-  daysRemaining: number;
   children: React.ReactNode;
 }
 
 export function DashboardShell({
   email,
   tenantId,
-  isTrialing,
-  isExpired,
-  daysRemaining,
   children,
 }: DashboardShellProps) {
   const [thawVisible, setThawVisible] = useState(false);
@@ -101,39 +95,6 @@ export function DashboardShell({
         />
       )}
 
-      {/* Trial / Expiry Banner */}
-      {isTrialing && daysRemaining <= 3 && (
-        <div className="bg-amber-50 border-b border-amber-200 px-4 py-2 text-center">
-          <p className="text-sm text-amber-800">
-            Your free trial ends in{" "}
-            <strong>
-              {daysRemaining} day{daysRemaining !== 1 ? "s" : ""}
-            </strong>
-            .{" "}
-            <Link
-              href="/dashboard/billing"
-              className="font-semibold underline underline-offset-2 hover:text-amber-900"
-            >
-              Upgrade to keep access →
-            </Link>
-          </p>
-        </div>
-      )}
-
-      {isExpired && (
-        <div className="bg-red-50 border-b border-red-200 px-4 py-3 text-center">
-          <p className="text-sm text-red-800">
-            Your free trial has ended. Your data is safe —{" "}
-            <Link
-              href="/dashboard/billing"
-              className="font-semibold underline underline-offset-2 hover:text-red-900"
-            >
-              subscribe for £12.99/mo to unlock your dashboard →
-            </Link>
-          </p>
-        </div>
-      )}
-
       {/* Navigation */}
       <nav className="bg-white border-b border-gray-200">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -172,9 +133,7 @@ export function DashboardShell({
             Dashboard
           </h1>
           <p className="mt-1 text-sm text-gray-500">
-            {isTrialing
-              ? `Free trial · ${daysRemaining} day${daysRemaining !== 1 ? "s" : ""} remaining`
-              : "Active subscription"}
+            Monitor your tracking status
           </p>
         </div>
 

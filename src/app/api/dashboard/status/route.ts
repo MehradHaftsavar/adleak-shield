@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@/lib/auth';
-import { withTenantDb } from '@/lib/db/client';
+import { withTenantDb, withAdminDb } from '@/lib/db/client';
+import * as mssql from 'mssql';
 
 export async function GET(request: NextRequest) {
   try {
@@ -81,7 +82,39 @@ export async function GET(request: NextRequest) {
       };
     });
 
-    return NextResponse.json(result);
+    const tenantId = session.user.tenantId as string;
+
+    const tenantRow = await withAdminDb(async (req) => {
+      const r = await req
+        .input('tenantId', mssql.UniqueIdentifier, tenantId)
+        .query(`
+          SELECT subscription_status, trial_ends_at
+          FROM Tenants
+          WHERE tenant_id = @tenantId
+        `);
+      return r.recordset[0] ?? null;
+    });
+
+    const subscriptionStatus: string | null = tenantRow?.subscription_status ?? null;
+    const trialEndsAt: Date | null = tenantRow?.trial_ends_at ?? null;
+
+    const isActive = subscriptionStatus === 'active';
+    const isTrialing = subscriptionStatus === 'trialing' && trialEndsAt !== null && new Date(trialEndsAt) > new Date();
+    const isPaywalled = !isActive && !isTrialing;
+
+    let daysLeftInTrial: number | null = null;
+    if (trialEndsAt) {
+      const ms = new Date(trialEndsAt).getTime() - Date.now();
+      daysLeftInTrial = Math.max(0, Math.ceil(ms / (1000 * 60 * 60 * 24)));
+    }
+
+    return NextResponse.json({
+      ...result,
+      subscriptionStatus,
+      trialEndsAt: trialEndsAt ? new Date(trialEndsAt).toISOString() : null,
+      isPaywalled,
+      daysLeftInTrial,
+    });
   } catch (error) {
     console.error('Dashboard status error:', error);
     return NextResponse.json({ error: 'Failed to fetch status' }, { status: 500 });

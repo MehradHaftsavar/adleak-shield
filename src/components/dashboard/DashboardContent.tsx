@@ -1,26 +1,37 @@
 'use client';
 
-import { useEffect, useState } from 'react';
-import { Activity, Settings, Plus, RefreshCw } from 'lucide-react';
-import Link from 'next/link';
+import { useEffect, useState, useCallback } from 'react';
+import { useSearchParams, useRouter } from 'next/navigation';
+import { useSession } from 'next-auth/react';
+import { Activity, Settings, Plus, RefreshCw, CheckCircle, CreditCard } from 'lucide-react';
 import { StatusIndicator } from '@/components/dashboard/StatusIndicator';
 import { CampaignStatusCard } from '@/components/dashboard/CampaignStatusCard';
 import { UnregisteredTrafficAlert } from '@/components/dashboard/UnregisteredTrafficAlert';
 import { LeakTable } from './LeakTable';
 import { SessionsTable } from './SessionsTable';
 import { DateRangePicker } from './DateRangePicker';
+import PaywallOverlay from './PaywallOverlay';
 
 interface DashboardStatus {
   isLive: boolean;
   campaigns: any[];
   unregisteredTraffic: any[];
   hasUnregisteredTraffic: boolean;
+  subscriptionStatus: string | null;
+  trialEndsAt: string | null;
+  isPaywalled: boolean;
+  daysLeftInTrial: number | null;
 }
 
 export function DashboardContent() {
   const [status, setStatus] = useState<DashboardStatus | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState('');
+  const [paymentSuccess, setPaymentSuccess] = useState(false);
+  const [upgrading, setUpgrading] = useState(false);
+  const searchParams = useSearchParams();
+  const router = useRouter();
+  const { update: updateSession } = useSession();
 
   // Date range state for Leak Table
   const [leakDateRange, setLeakDateRange] = useState({
@@ -38,6 +49,43 @@ export function DashboardContent() {
   const handleManualRefresh = () => {
     setRefreshTrigger(prev => prev + 1);
   };
+
+  const handleUpgrade = useCallback(async () => {
+    setUpgrading(true);
+    try {
+      const res = await fetch('/api/stripe/checkout', { method: 'POST' });
+      const data = await res.json();
+      if (data.url) window.location.href = data.url;
+    } catch (err) {
+      console.error('Checkout error:', err);
+      setUpgrading(false);
+    }
+  }, []);
+
+  const [portalLoading, setPortalLoading] = useState(false);
+  const [settingsLoading, setSettingsLoading] = useState(false);
+
+  const handlePortal = useCallback(async () => {
+    setPortalLoading(true);
+    try {
+      const res = await fetch('/api/stripe/portal', { method: 'POST' });
+      const data = await res.json();
+      if (data.url) window.open(data.url, '_blank', 'noopener,noreferrer');
+    } catch (err) {
+      console.error('Portal error:', err);
+    } finally {
+      setPortalLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (searchParams.get('payment') === 'success') {
+      setPaymentSuccess(true);
+      router.replace('/dashboard');
+      // Refresh the JWT so the banner and paywall reflect the new subscription
+      updateSession().then(() => loadStatus());
+    }
+  }, [searchParams, router]);
 
   useEffect(() => {
     loadStatus();
@@ -109,6 +157,57 @@ export function DashboardContent() {
 
   return (
     <div className="space-y-6">
+      {/* Payment success toast */}
+      {paymentSuccess && (
+        <div className="flex items-center gap-3 bg-green-50 border border-green-200 rounded-lg p-4">
+          <CheckCircle className="w-5 h-5 text-green-600 flex-shrink-0" />
+          <p className="text-sm font-medium text-green-800">
+            Subscription activated — full access unlocked.
+          </p>
+          <button
+            onClick={() => setPaymentSuccess(false)}
+            className="ml-auto text-green-600 hover:text-green-800 text-lg leading-none"
+          >
+            ×
+          </button>
+        </div>
+      )}
+
+      {/* Trial expiring soon banner (≤3 days left, not yet paywalled) */}
+      {!status.isPaywalled && status.daysLeftInTrial !== null && status.daysLeftInTrial <= 3 && status.subscriptionStatus !== 'active' && (
+        <div className="bg-amber-50 border border-amber-200 rounded-lg px-4 py-2 text-center">
+          <p className="text-sm text-amber-800">
+            Your free trial ends in{' '}
+            <strong>{status.daysLeftInTrial} day{status.daysLeftInTrial !== 1 ? 's' : ''}</strong>.{' '}
+            <button
+              onClick={handleUpgrade}
+              disabled={upgrading}
+              className="inline-flex items-center gap-1 font-semibold underline underline-offset-2 hover:text-amber-900 disabled:opacity-60"
+            >
+              {upgrading && <span className="inline-block w-3 h-3 border-2 border-amber-800 border-t-transparent rounded-full animate-spin" />}
+              Upgrade to keep access →
+            </button>
+          </p>
+        </div>
+      )}
+
+      {/* Trial expired banner */}
+      {status.isPaywalled && (
+        <div className="bg-red-50 border border-red-200 rounded-lg px-4 py-3 text-center">
+          <p className="text-sm text-red-800">
+            Your free trial has ended. Your data is safe —{' '}
+            <button
+              onClick={handleUpgrade}
+              disabled={upgrading}
+              className="inline-flex items-center gap-1 font-semibold underline underline-offset-2 hover:text-red-900 disabled:opacity-60"
+            >
+              {upgrading && <span className="inline-block w-3 h-3 border-2 border-red-800 border-t-transparent rounded-full animate-spin" />}
+              subscribe for £12.99/mo to unlock your dashboard →
+            </button>
+          </p>
+        </div>
+      )}
+
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
@@ -121,13 +220,30 @@ export function DashboardContent() {
           </div>
         </div>
 
-        <Link
-          href="/settings"
-          className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
-        >
-          <Settings className="w-5 h-5" />
-          Manage Setup
-        </Link>
+        <div className="flex items-center gap-2">
+          {status?.subscriptionStatus === 'active' && (
+            <button
+              onClick={handlePortal}
+              disabled={portalLoading}
+              className="flex items-center gap-2 px-4 py-2 text-sm font-medium bg-white border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-60 transition-colors"
+            >
+              {portalLoading
+                ? <span className="w-4 h-4 border-2 border-gray-400 border-t-transparent rounded-full animate-spin" />
+                : <CreditCard className="w-4 h-4" />}
+              Manage Subscription
+            </button>
+          )}
+          <button
+            onClick={() => { setSettingsLoading(true); router.push('/settings'); }}
+            disabled={settingsLoading}
+            className="flex items-center gap-2 px-4 py-2 text-sm font-medium bg-white border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-60 transition-colors"
+          >
+            {settingsLoading
+              ? <span className="w-4 h-4 border-2 border-gray-400 border-t-transparent rounded-full animate-spin" />
+              : <Settings className="w-4 h-4" />}
+            Manage Setup
+          </button>
+        </div>
       </div>
 
       {/* Live Status Indicator */}
@@ -178,37 +294,45 @@ export function DashboardContent() {
         )}
       </div>
 
-      {/* Leak Table Section */}
-      <div>
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-4">
-          <h2 className="text-xl font-semibold text-gray-900">
-            Wasted Spend Analysis
-          </h2>
-          
-          <div className="flex items-center justify-center sm:justify-end gap-3">
-            <DateRangePicker onRangeChange={handleLeakDateChange} />
-            
-            {/* Manual Refresh Button */}
-            <button
-              onClick={handleManualRefresh}
-              className="flex items-center gap-2 px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg transition-colors"
-              title="Refresh leak data"
-            >
-              <RefreshCw className="w-4 h-4" />
-              <span className="hidden sm:inline">Refresh</span>
-            </button>
-          </div>
-        </div>
-        
-        <LeakTable dateRange={leakDateRange} refreshTrigger={refreshTrigger} />
-      </div>
+      {/* Leak Table + Visitor Journeys — single paywall wraps both */}
+      <div className="relative space-y-6">
+        {status.isPaywalled && (
+          <PaywallOverlay onUpgrade={handleUpgrade} />
+        )}
 
-      {/* All Sessions */}
-      <div>
-        <h2 className="text-xl font-semibold text-gray-900 mb-4">
-          Visitor Journeys
-        </h2>
-        <SessionsTable campaigns={status.campaigns} />
+        <div className={status.isPaywalled ? 'select-none pointer-events-none' : ''}>
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-4">
+            <h2 className="text-xl font-semibold text-gray-900">
+              Wasted Spend Analysis
+            </h2>
+
+            <div className="flex items-center justify-center sm:justify-end gap-3">
+              <DateRangePicker onRangeChange={handleLeakDateChange} />
+
+              <button
+                onClick={handleManualRefresh}
+                className="flex items-center gap-2 px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg transition-colors"
+                title="Refresh leak data"
+              >
+                <RefreshCw className="w-4 h-4" />
+                <span className="hidden sm:inline">Refresh</span>
+              </button>
+            </div>
+          </div>
+
+          <LeakTable dateRange={leakDateRange} refreshTrigger={refreshTrigger} />
+        </div>
+
+        <div className={status.isPaywalled ? 'select-none pointer-events-none' : ''}>
+          <h2 className="text-xl font-semibold text-gray-900 mb-4">
+            Visitor Journeys
+          </h2>
+          <SessionsTable
+            campaigns={status.campaigns}
+            dateRange={leakDateRange}
+            refreshTrigger={refreshTrigger}
+          />
+        </div>
       </div>
 
       {/* Info Box */}

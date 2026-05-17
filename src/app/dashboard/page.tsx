@@ -22,25 +22,12 @@ export default async function DashboardPage() {
     redirect("/auth/login");
   }
 
-  const { tenantId, email, subscriptionStatus, trialEndsAt } = session.user;
-
-  // Calculate days remaining in trial
-  const trialEnd = new Date(trialEndsAt);
-  const now = new Date();
-  const daysRemaining = Math.ceil(
-    (trialEnd.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)
-  );
-
-  const isTrialing = subscriptionStatus === "trialing" && daysRemaining > 0;
-  const isExpired = subscriptionStatus === "trialing" && daysRemaining <= 0;
+  const { tenantId, email } = session.user;
 
   return (
     <DashboardShell
       email={email ?? ""}
       tenantId={tenantId}
-      isTrialing={isTrialing}
-      isExpired={isExpired}
-      daysRemaining={daysRemaining}
     >
       {/* Phase 3.2: Dashboard content with verification status */}
       <DashboardContent />

@@ -43,12 +43,13 @@ export function CampaignStep({ domain, onComplete, onBack }: CampaignStepProps) 
   const handleAddCampaign = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
-
+    
+    // Validate CPC is provided and valid
     if (!newAvgCpc || parseFloat(newAvgCpc) <= 0) {
       setError('Please enter your average CPC (must be greater than £0)');
       return;
     }
-
+    
     setIsLoading(true);
 
     try {
@@ -57,7 +58,7 @@ export function CampaignStep({ domain, onComplete, onBack }: CampaignStepProps) 
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           googleCampaignId: newCampaignId,
-          avgCpc: parseFloat(newAvgCpc),
+          avgCpc: parseFloat(newAvgCpc), // REQUIRED - no default
         }),
       });
 
@@ -69,9 +70,10 @@ export function CampaignStep({ domain, onComplete, onBack }: CampaignStepProps) 
         return;
       }
 
+      // Add to list and reset form
       setCampaigns([...campaigns, data.campaign]);
       setNewCampaignId('');
-      setNewAvgCpc('');
+      setNewAvgCpc(''); // Reset CPC field
       setIsLoading(false);
     } catch (err) {
       setError('Network error. Please try again.');
@@ -268,6 +270,7 @@ export function CampaignStep({ domain, onComplete, onBack }: CampaignStepProps) 
             />
           </div>
 
+          {/* NEW: Average CPC input - REQUIRED */}
           <div>
             <label htmlFor="avgCpc" className="block text-sm font-medium text-gray-700 mb-2">
               Average CPC <span className="text-red-500">*</span>

@@ -11,7 +11,6 @@ import {
   AlertCircle,
   Clock,
   ChevronRight,
-  Filter,
 } from 'lucide-react';
 import { JourneyTimeline } from './JourneyTimeline';
 
@@ -37,6 +36,8 @@ interface Campaign {
 
 interface SessionsTableProps {
   campaigns: Campaign[];
+  dateRange: { start: string; end: string };
+  refreshTrigger: number;
 }
 
 function formatDuration(ms: number | null): string {
@@ -90,7 +91,7 @@ function OutcomeBadge({ isBounce, hasSuccessEvent }: { isBounce: boolean; hasSuc
   );
 }
 
-export function SessionsTable({ campaigns }: SessionsTableProps) {
+export function SessionsTable({ campaigns, dateRange, refreshTrigger }: SessionsTableProps) {
   const [sessions,   setSessions]   = useState<Session[]>([]);
   const [isLoading,  setIsLoading]  = useState(true);
   const [error,      setError]      = useState('');
@@ -101,11 +102,6 @@ export function SessionsTable({ campaigns }: SessionsTableProps) {
   const [matchType,  setMatchType]  = useState('');
   const [device,     setDevice]     = useState('');
   const [outcome,    setOutcome]    = useState('');
-  const [dateRange,  setDateRange]  = useState({
-    start: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString(),
-    end:   new Date().toISOString(),
-  });
-
   // Journey slide-over
   const [selectedSession, setSelectedSession] = useState<Session | null>(null);
 
@@ -130,7 +126,7 @@ export function SessionsTable({ campaigns }: SessionsTableProps) {
     } finally {
       setIsLoading(false);
     }
-  }, [keyword, campaignId, matchType, device, outcome, dateRange]);
+  }, [keyword, campaignId, matchType, device, outcome, dateRange, refreshTrigger]);
 
   useEffect(() => {
     const timer = setTimeout(loadSessions, keyword ? 400 : 0);
@@ -217,32 +213,12 @@ export function SessionsTable({ campaigns }: SessionsTableProps) {
             </select>
           </div>
 
-          {/* Date range row */}
-          <div className="flex items-center gap-3 mt-3">
-            <Filter className="w-4 h-4 text-gray-400 shrink-0" />
-            <div className="flex items-center gap-2 flex-wrap">
-              <label className="text-xs text-gray-500">From</label>
-              <input
-                type="date"
-                value={dateRange.start.split('T')[0]}
-                onChange={e => setDateRange(prev => ({ ...prev, start: new Date(e.target.value).toISOString() }))}
-                className="text-sm border border-gray-300 rounded-lg px-2 py-1 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              />
-              <label className="text-xs text-gray-500">To</label>
-              <input
-                type="date"
-                value={dateRange.end.split('T')[0]}
-                onChange={e => setDateRange(prev => ({ ...prev, end: new Date(e.target.value + 'T23:59:59').toISOString() }))}
-                className="text-sm border border-gray-300 rounded-lg px-2 py-1 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              />
-            </div>
-            {!isLoading && (
-              <span className="text-xs text-gray-400 ml-auto">
-                {sessions.length} session{sessions.length !== 1 ? 's' : ''}
-                {sessions.length === 100 ? ' (showing first 100)' : ''}
-              </span>
-            )}
-          </div>
+          {!isLoading && (
+            <p className="text-xs text-gray-400 mt-3">
+              {sessions.length} session{sessions.length !== 1 ? 's' : ''}
+              {sessions.length === 100 ? ' (showing first 100)' : ''}
+            </p>
+          )}
         </div>
 
         {/* Table */}

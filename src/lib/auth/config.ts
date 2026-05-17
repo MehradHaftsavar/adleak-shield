@@ -63,9 +63,26 @@ export const authConfig: NextAuthConfig = {
         token.trialEndsAt = user.trialEndsAt;
         token.onboardingCompleted = user.onboardingCompleted;
       }
-      // update() called from client — patch only the fields passed in
-      if (trigger === "update" && session?.onboardingCompleted !== undefined) {
-        token.onboardingCompleted = session.onboardingCompleted;
+      if (trigger === "update") {
+        // Patch onboarding flag if passed
+        if (session?.onboardingCompleted !== undefined) {
+          token.onboardingCompleted = session.onboardingCompleted;
+        }
+        // Re-fetch subscription status from DB so the token reflects Stripe webhook updates
+        try {
+          const fresh = await withAdminDb(async (req) => {
+            const result = await req
+              .input("tenantId", token.tenantId as string)
+              .query(`SELECT subscription_status, trial_ends_at FROM Tenants WHERE tenant_id = @tenantId`);
+            return result.recordset[0] ?? null;
+          });
+          if (fresh) {
+            token.subscriptionStatus = fresh.subscription_status;
+            token.trialEndsAt = fresh.trial_ends_at ? new Date(fresh.trial_ends_at).toISOString() : token.trialEndsAt;
+          }
+        } catch {
+          // Non-fatal — keep existing token values
+        }
       }
       return token;
     },

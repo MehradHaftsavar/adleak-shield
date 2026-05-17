@@ -2,12 +2,17 @@ import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@/lib/auth';
 import { withTenantDb } from '@/lib/db/client';
 import * as mssql from 'mssql';
+import { isPaywalled } from '@/lib/paywallCheck';
 
 export async function GET(request: NextRequest) {
   try {
     const session = await auth();
     if (!session?.user?.tenantId) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    if (await isPaywalled(session.user.tenantId as string)) {
+      return NextResponse.json({ error: 'Subscription required' }, { status: 402 });
     }
 
     const { searchParams } = new URL(request.url);
