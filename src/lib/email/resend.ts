@@ -48,7 +48,7 @@ export async function sendPasswordResetEmail({
     // IMPORTANT: Replace 'noreply@yourdomain.com' with your actual verified
     // sender domain in Resend. You set this up in the Resend dashboard.
     // Until you have a custom domain, use onboarding@resend.dev for testing.
-    from: "AdLeak Shield <onboarding@resend.dev>",
+    from: "AdLeak Shield <notifications@adleakshield.com>",
     to,
     subject: "Reset your AdLeak Shield password",
     html: passwordResetTemplate(resetUrl),
@@ -160,7 +160,7 @@ export async function sendVerificationEmail({
   const resend = getResendClient();
 
   const { error } = await resend.emails.send({
-    from: "AdLeak Shield <onboarding@resend.dev>",
+    from: "AdLeak Shield <notifications@adleakshield.com>",
     to,
     subject: "Verify your AdLeak Shield account",
     html: verificationEmailTemplate(verificationUrl),
