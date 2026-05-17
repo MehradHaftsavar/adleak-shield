@@ -257,7 +257,7 @@ function Pricing() {
               <span className="text-4xl font-bold text-slate-900">£12.99</span>
               <span className="text-slate-500">/month</span>
             </div>
-            <p className="text-sm text-slate-500 mb-6">+ VAT where applicable</p>
+            <p className="text-sm text-slate-500 mb-6">per month</p>
 
             <div className="space-y-3 mb-8">
               {PLAN_FEATURES.map(f => (
