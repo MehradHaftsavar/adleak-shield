@@ -40,7 +40,23 @@ export async function POST(request: NextRequest) {
 
     const { domain } = validation.data;
 
-    // 3. Use withTenantDb to set RLS context
+    // 3. Check if this domain is already claimed by a different tenant
+    const claimedByOther = await withAdminDb(async (req) => {
+      const result = await req
+        .input('domainName', mssql.NVarChar, domain)
+        .query(`SELECT tenant_id FROM Domains WHERE domain_name = @domainName`);
+      const row = result.recordset[0];
+      return row && row.tenant_id !== session.user.tenantId ? true : false;
+    });
+
+    if (claimedByOther) {
+      return NextResponse.json(
+        { error: 'This domain has already been registered by another account.' },
+        { status: 409 }
+      );
+    }
+
+    // 4. Use withTenantDb to set RLS context
     const result = await withTenantDb(session.user.tenantId, async (req) => {
       // Check if tenant already has a domain
       const existingDomainResult = await req.query(`
@@ -98,6 +114,13 @@ export async function POST(request: NextRequest) {
         return NextResponse.json(
           { error: 'You can only register 1 domain on Starter plan' },
           { status: 400 }
+        );
+      }
+      // SQL unique constraint violation (race condition safety net)
+      if ('number' in error && (error as any).number === 2627) {
+        return NextResponse.json(
+          { error: 'This domain has already been registered by another account.' },
+          { status: 409 }
         );
       }
     }
