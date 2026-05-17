@@ -33,7 +33,7 @@ export async function POST(request: NextRequest) {
     await resend.emails.send({
       from: process.env.RESEND_FROM_EMAIL ?? 'AdLeak Shield <notifications@adleakshield.com>',
       to: 'mehradhaftsavar@outlook.com',
-      replyTo: email,
+      reply_to: email,
       subject: `New contact form message from ${name}`,
       html: `
         <div style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;max-width:560px;margin:0 auto;padding:40px 20px;">
