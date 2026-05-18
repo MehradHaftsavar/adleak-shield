@@ -73,8 +73,6 @@ async function getPool(): Promise<mssql.ConnectionPool> {
     return pool;
   }
 
-  const token = await getManagedIdentityToken();
-
   const server = process.env.DATABASE_SERVER;
   const database = process.env.DATABASE_NAME;
 
@@ -84,26 +82,45 @@ async function getPool(): Promise<mssql.ConnectionPool> {
     );
   }
 
-  const config: mssql.config = {
-    server,
-    database,
-    options: {
-      encrypt: true,               // Required for Azure SQL — enforces TLS
-      trustServerCertificate: false, // Never trust self-signed certs in production
-      enableArithAbort: true,
-    },
-    authentication: {
-      type: "azure-active-directory-access-token",
-      options: { token },
-    },
-    pool: {
-      max: 5,
-      min: 0,
-      idleTimeoutMillis: 30_000,
-    },
-    requestTimeout: 35_000,    // 35s — covers the 30s auto-pause cold-start
-    connectionTimeout: 35_000,
-  };
+  let config: mssql.config;
+
+  if (process.env.DATABASE_PASSWORD) {
+    // SQL authentication — used on Vercel (non-Azure environments).
+    // Set DATABASE_USER and DATABASE_PASSWORD in Vercel env vars.
+    config = {
+      server,
+      database,
+      user: process.env.DATABASE_USER,
+      password: process.env.DATABASE_PASSWORD,
+      options: {
+        encrypt: true,
+        trustServerCertificate: false,
+        enableArithAbort: true,
+      },
+      pool: { max: 5, min: 0, idleTimeoutMillis: 30_000 },
+      requestTimeout: 35_000,
+      connectionTimeout: 35_000,
+    };
+  } else {
+    // Managed Identity — used inside Azure (Functions, App Service).
+    const token = await getManagedIdentityToken();
+    config = {
+      server,
+      database,
+      options: {
+        encrypt: true,
+        trustServerCertificate: false,
+        enableArithAbort: true,
+      },
+      authentication: {
+        type: "azure-active-directory-access-token",
+        options: { token },
+      },
+      pool: { max: 5, min: 0, idleTimeoutMillis: 30_000 },
+      requestTimeout: 35_000,
+      connectionTimeout: 35_000,
+    };
+  }
 
   pool = new mssql.ConnectionPool(config);
 
