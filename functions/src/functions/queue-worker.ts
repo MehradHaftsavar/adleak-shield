@@ -326,8 +326,14 @@ export async function queueWorkerHandler(
         campaign!.googleCampaignId
       );
       if (!sessionId) {
-        context.log("[Worker] Could not resolve session_id — skipping event");
-        return;
+        if (env.eventType === "session_start") {
+          context.log("[Worker] Could not create session — missing payload, skipping");
+          return;
+        }
+        // Race condition: session_start hasn't committed yet. Throw so Azure
+        // Functions retries this message after the visibility timeout (~30s),
+        // by which time session_start will be committed.
+        throw new Error(`[Worker] Session not found for ${env.eventType} — will retry`);
       }
 
       switch (env.eventType) {
