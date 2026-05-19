@@ -87,15 +87,14 @@ export async function withTenantDb<T>(
     await ctxRequest
       .input("tenantId", mssql.UniqueIdentifier, tenantId)
       .query(
-        "EXEC sp_set_session_context N'TenantId', @tenantId, @read_only = 0"
-    );
+        `DECLARE @tid VARBINARY(128) = CAST(CAST(@tenantId AS UNIQUEIDENTIFIER) AS VARBINARY(128));
+         EXEC sp_set_session_context N'TenantId', @tid, @read_only = 0`
+      );
 
-    console.log('[withTenantDb] About to call callback with transaction:', typeof transaction);  // ADD THIS
     const result = await callback(transaction);
     await transaction.commit();
     return result;
   } catch (err) {
-    console.error('[withTenantDb] Error:', err);  // ADD THIS
     await transaction.rollback();
     throw err;
   }
