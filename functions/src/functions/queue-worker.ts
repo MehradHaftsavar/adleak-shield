@@ -197,15 +197,16 @@ async function insertJourneyEvent(
     .input("pagePath", mssql.NVarChar, env.payload.pagePath ?? null)
     .input("elementTag", mssql.NVarChar, env.payload.elementTag ?? null)
     .input("elementHref", mssql.NVarChar, env.payload.elementHref ?? null)
+    .input("elementText", mssql.NVarChar(100), env.payload.elementText ?? null)
     .input("scrollPct", mssql.TinyInt, env.payload.scrollPct ?? null)
     .input("dwellMs", mssql.Int, env.payload.dwellMs ?? null)
     .query(
       `INSERT INTO JourneyEvents
           (tenant_id, session_id, event_type, page_path, element_tag,
-           element_href, scroll_depth_pct, dwell_time_ms)
+           element_href, element_text, scroll_depth_pct, dwell_time_ms)
        VALUES
           (@tenantId, @sessionId, @eventType, @pagePath, @elementTag,
-           @elementHref, @scrollPct, @dwellMs)`
+           @elementHref, @elementText, @scrollPct, @dwellMs)`
     );
 }
 

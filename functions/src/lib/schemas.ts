@@ -43,6 +43,7 @@ const EventPayloadSchema = z
     pagePath: z.string().max(500).optional().nullable(),
     elementTag: z.string().max(20).optional().nullable(),
     elementHref: z.string().max(500).optional().nullable(),
+    elementText: z.string().max(100).optional().nullable(),
     dwellMs: z.number().int().min(0).max(86400000).optional(), // max 24h
     scrollPct: z.number().int().min(0).max(100).optional(),
     referrerHost: z.string().max(253).optional().nullable(),
