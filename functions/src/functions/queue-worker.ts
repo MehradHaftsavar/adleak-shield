@@ -217,11 +217,18 @@ async function updateSessionDwell(
   await new mssql.Request(tx)
     .input("sessionId", mssql.UniqueIdentifier, sessionId)
     .input("dwellMs", mssql.Int, Math.min(dwellMs, 86_400_000))
-    .input("isBounce", mssql.Bit, dwellMs < 5000 ? 1 : 0)
+    .input("shortDwell", mssql.Bit, dwellMs < 5000 ? 1 : 0)
     .query(
       `UPDATE Sessions
          SET total_duration_ms = @dwellMs,
-             is_bounce = @isBounce
+             is_bounce = CASE
+               WHEN @shortDwell = 1 AND NOT EXISTS (
+                 SELECT 1 FROM JourneyEvents
+                 WHERE session_id = @sessionId
+                   AND event_type IN ('click', 'success_event')
+               ) THEN 1
+               ELSE 0
+             END
        WHERE session_id = @sessionId`
     );
 }
