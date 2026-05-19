@@ -66,7 +66,7 @@ export function LeakTable({ dateRange, refreshTrigger }: LeakTableProps) {
     setError('');
     try {
       const params = new URLSearchParams({ start: dateRange.start, end: dateRange.end });
-      const res = await fetch(`/api/leaks?${params}`);
+      const res = await fetch(`/api/leaks?${params}`, { cache: 'no-store' });
       const json = await res.json();
       if (res.ok) {
         setData(json);

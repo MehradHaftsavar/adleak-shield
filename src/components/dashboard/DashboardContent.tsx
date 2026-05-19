@@ -48,6 +48,7 @@ export function DashboardContent() {
   };
 
   const handleManualRefresh = () => {
+    setLeakDateRange(prev => ({ ...prev, end: new Date().toISOString() }));
     setRefreshTrigger(prev => prev + 1);
   };
 

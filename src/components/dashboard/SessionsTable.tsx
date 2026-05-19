@@ -117,7 +117,7 @@ export function SessionsTable({ campaigns, dateRange, refreshTrigger }: Sessions
       if (device)     params.set('device',     device);
       if (outcome)    params.set('outcome',    outcome);
 
-      const res  = await fetch(`/api/sessions?${params}`);
+      const res  = await fetch(`/api/sessions?${params}`, { cache: 'no-store' });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Failed to load sessions');
       setSessions(data.sessions || []);
