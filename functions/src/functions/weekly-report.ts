@@ -9,7 +9,7 @@
 
 import { app, type InvocationContext } from "@azure/functions";
 import mssql from "mssql";
-import { withAdminDb } from "../lib/db.js";
+import { withAdminDb, withTenantDb } from "../lib/db.js";
 import { sendWeeklyReportEmail, type WeeklyKeyword } from "../lib/email.js";
 
 interface TenantRow {
@@ -37,12 +37,11 @@ async function getActiveTenants(): Promise<TenantRow[]> {
 }
 
 async function getTenantWeeklyLeaks(tenantId: string): Promise<LeakRow[]> {
-  return withAdminDb(async (req) => {
+  return withTenantDb(tenantId, async (tx) => {
     const since = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
     const now = new Date();
 
-    const result = await req
-      .input("tenantId", mssql.UniqueIdentifier, tenantId)
+    const result = await new mssql.Request(tx)
       .input("startDate", mssql.DateTime, since)
       .input("endDate", mssql.DateTime, now)
       .query(`
@@ -54,8 +53,7 @@ async function getTenantWeeklyLeaks(tenantId: string): Promise<LeakRow[]> {
             * COALESCE(s.session_cpc, c.avg_cpc) AS estimated_waste
         FROM Sessions s
         INNER JOIN Campaigns c ON s.campaign_id = c.campaign_id
-        WHERE s.tenant_id = @tenantId
-          AND s.started_at >= @startDate
+        WHERE s.started_at >= @startDate
           AND s.started_at <= @endDate
           AND s.keyword IS NOT NULL
         GROUP BY s.keyword, s.match_type, COALESCE(s.session_cpc, c.avg_cpc)
@@ -89,17 +87,11 @@ export async function weeklyReportHandler(
   context.log(`[WeeklyReport] ${tenants.length} active tenant(s) to process`);
 
   let sent = 0;
-  let skipped = 0;
   let failed = 0;
 
   for (const tenant of tenants) {
     try {
       const leaks = await getTenantWeeklyLeaks(tenant.tenant_id);
-
-      if (leaks.length === 0) {
-        skipped++;
-        continue;
-      }
 
       const topKeywords: WeeklyKeyword[] = leaks.map((r) => ({
         keyword: r.keyword,
@@ -130,7 +122,7 @@ export async function weeklyReportHandler(
   }
 
   context.log(
-    `[WeeklyReport] Done — sent: ${sent}, skipped (no waste): ${skipped}, failed: ${failed}`
+    `[WeeklyReport] Done — sent: ${sent}, failed: ${failed}`
   );
 }
 

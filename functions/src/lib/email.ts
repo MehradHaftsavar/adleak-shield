@@ -31,6 +31,7 @@ interface WeeklyReportParams {
   totalBounceClicks: number;
   topKeywords: WeeklyKeyword[];
   dashboardUrl: string;
+  cleanWeek?: boolean;
 }
 
 export async function sendWeeklyReportEmail({
@@ -44,13 +45,16 @@ export async function sendWeeklyReportEmail({
   const from = process.env.RESEND_FROM_EMAIL ?? "AdLeak Shield <onboarding@resend.dev>";
 
   const wasteFormatted = `£${totalWaste.toFixed(2)}`;
-  const subject = `You lost ${wasteFormatted} last week on ${totalBounceClicks} junk click${totalBounceClicks !== 1 ? "s" : ""} — view the list`;
+  const cleanWeek = topKeywords.length === 0;
+  const subject = cleanWeek
+    ? "Clean week — no ad budget wasted last week"
+    : `You lost ${wasteFormatted} last week on ${totalBounceClicks} junk click${totalBounceClicks !== 1 ? "s" : ""} — view the list`;
 
   const { error } = await resend.emails.send({
     from,
     to,
     subject,
-    html: weeklyReportTemplate({ totalWaste, totalBounceClicks, topKeywords, dashboardUrl }),
+    html: weeklyReportTemplate({ totalWaste, totalBounceClicks, topKeywords, dashboardUrl, cleanWeek }),
   });
 
   if (error) throw new Error(`Resend error: ${error.message}`);
@@ -61,6 +65,7 @@ function weeklyReportTemplate({
   totalBounceClicks,
   topKeywords,
   dashboardUrl,
+  cleanWeek,
 }: Omit<WeeklyReportParams, "to">): string {
   const wasteFormatted = `£${totalWaste.toFixed(2)}`;
 
@@ -110,40 +115,43 @@ function weeklyReportTemplate({
           <!-- Summary -->
           <tr>
             <td style="padding:40px 40px 24px;">
+              ${cleanWeek ? `
+              <h1 style="margin:0 0 8px;font-size:24px;font-weight:700;color:#111827;letter-spacing:-0.5px;">
+                Clean week — no waste detected
+              </h1>
+              <p style="margin:0 0 28px;font-size:15px;color:#6b7280;line-height:1.6;">
+                Good news: AdLeak Shield found no junk traffic in your Google Ads campaigns last week. Your budget is being well spent.
+              </p>
+              <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:28px;">
+                <tr>
+                  <td style="background:#f0fdf4;border-radius:8px;padding:24px;border:1px solid #bbf7d0;text-align:center;">
+                    <p style="margin:0 0 4px;font-size:12px;font-weight:600;color:#16a34a;text-transform:uppercase;letter-spacing:0.5px;">Estimated Waste</p>
+                    <p style="margin:0;font-size:36px;font-weight:700;color:#15803d;">£0.00</p>
+                    <p style="margin:8px 0 0;font-size:13px;color:#16a34a;">AdLeak Shield is working</p>
+                  </td>
+                </tr>
+              </table>
+              ` : `
               <h1 style="margin:0 0 8px;font-size:24px;font-weight:700;color:#111827;letter-spacing:-0.5px;">
                 Your weekly waste report
               </h1>
               <p style="margin:0 0 28px;font-size:15px;color:#6b7280;line-height:1.6;">
                 Here's what your Google Ads budget lost to junk traffic in the past 7 days.
               </p>
-
-              <!-- Stat boxes -->
               <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:28px;">
                 <tr>
                   <td width="48%" style="background:#fef2f2;border-radius:8px;padding:20px 24px;border:1px solid #fecaca;">
-                    <p style="margin:0 0 4px;font-size:12px;font-weight:600;color:#dc2626;text-transform:uppercase;letter-spacing:0.5px;">
-                      Estimated Waste
-                    </p>
-                    <p style="margin:0;font-size:28px;font-weight:700;color:#b91c1c;">
-                      ${wasteFormatted}
-                    </p>
+                    <p style="margin:0 0 4px;font-size:12px;font-weight:600;color:#dc2626;text-transform:uppercase;letter-spacing:0.5px;">Estimated Waste</p>
+                    <p style="margin:0;font-size:28px;font-weight:700;color:#b91c1c;">${wasteFormatted}</p>
                   </td>
                   <td width="4%"></td>
                   <td width="48%" style="background:#f9fafb;border-radius:8px;padding:20px 24px;border:1px solid #e5e7eb;">
-                    <p style="margin:0 0 4px;font-size:12px;font-weight:600;color:#6b7280;text-transform:uppercase;letter-spacing:0.5px;">
-                      Bounce Clicks
-                    </p>
-                    <p style="margin:0;font-size:28px;font-weight:700;color:#374151;">
-                      ${totalBounceClicks}
-                    </p>
+                    <p style="margin:0 0 4px;font-size:12px;font-weight:600;color:#6b7280;text-transform:uppercase;letter-spacing:0.5px;">Bounce Clicks</p>
+                    <p style="margin:0;font-size:28px;font-weight:700;color:#374151;">${totalBounceClicks}</p>
                   </td>
                 </tr>
               </table>
-
-              <!-- Top keywords table -->
-              <h2 style="margin:0 0 12px;font-size:15px;font-weight:600;color:#111827;">
-                Top wasted keywords
-              </h2>
+              <h2 style="margin:0 0 12px;font-size:15px;font-weight:600;color:#111827;">Top wasted keywords</h2>
               <table width="100%" cellpadding="0" cellspacing="0" style="border:1px solid #e5e7eb;border-radius:8px;overflow:hidden;">
                 <thead>
                   <tr style="background:#f9fafb;">
@@ -153,10 +161,9 @@ function weeklyReportTemplate({
                     <th style="padding:10px 12px;text-align:right;font-size:11px;font-weight:600;color:#6b7280;text-transform:uppercase;letter-spacing:0.5px;">Wasted</th>
                   </tr>
                 </thead>
-                <tbody>
-                  ${keywordRows}
-                </tbody>
+                <tbody>${keywordRows}</tbody>
               </table>
+              `}
             </td>
           </tr>
 
@@ -164,8 +171,10 @@ function weeklyReportTemplate({
           <tr>
             <td style="padding:0 40px 40px;">
               <p style="margin:0 0 20px;font-size:14px;color:#6b7280;line-height:1.6;">
-                Pause these keywords in Google Ads to stop the waste. Log in to your dashboard
-                to see the full breakdown and visitor journeys.
+                ${cleanWeek
+                  ? "Log in to your dashboard to review your campaigns and visitor journeys."
+                  : "Pause these keywords in Google Ads to stop the waste. Log in to your dashboard to see the full breakdown and visitor journeys."
+                }
               </p>
               <table cellpadding="0" cellspacing="0">
                 <tr>
