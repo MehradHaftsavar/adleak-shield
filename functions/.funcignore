@@ -8,4 +8,4 @@ src
 .gitignore
 .funcignore
 README.md
-node_modules/.cache
+node_modules
