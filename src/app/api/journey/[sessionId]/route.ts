@@ -49,6 +49,7 @@ export async function GET(
           page_path,
           element_tag,
           element_href,
+          element_text,
           scroll_depth_pct,
           dwell_time_ms,
           occurred_at
@@ -74,6 +75,7 @@ export async function GET(
           pagePath:       row.page_path,
           elementTag:     row.element_tag,
           elementHref:    row.element_href,
+          elementText:    row.element_text,
           scrollDepthPct: row.scroll_depth_pct,
           dwellTimeMs:    row.dwell_time_ms,
           occurredAt:     row.occurred_at,

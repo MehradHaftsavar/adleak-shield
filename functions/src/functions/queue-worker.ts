@@ -379,6 +379,11 @@ export async function queueWorkerHandler(
             sessionId,
             env.eventType
           );
+          if (env.eventType === "click" || env.eventType === "success_event") {
+            await new mssql.Request(tx)
+              .input("sessionId", mssql.UniqueIdentifier, sessionId)
+              .query(`UPDATE Sessions SET is_bounce = 0 WHERE session_id = @sessionId AND is_bounce = 1`);
+          }
           if (env.eventType === "heartbeat" && env.payload.dwellMs) {
             await updateSessionDwell(tx, sessionId, env.payload.dwellMs);
           }

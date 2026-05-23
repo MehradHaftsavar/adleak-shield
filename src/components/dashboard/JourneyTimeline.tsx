@@ -33,6 +33,7 @@ interface JourneyEvent {
   pagePath:       string | null;
   elementTag:     string | null;
   elementHref:    string | null;
+  elementText:    string | null;
   scrollDepthPct: number | null;
   dwellTimeMs:    number | null;
   occurredAt:     string;
@@ -284,9 +285,9 @@ function TimelineEventRow({ event, index }: { event: JourneyEvent; index: number
   if (isPageview) {
     label = `Visited ${event.pagePath || '/'}`;
   } else if (isSuccess) {
-    label = `✅ ${event.elementHref || event.elementTag || 'Success event'}`;
+    label = `✅ ${event.elementText || event.elementHref || event.elementTag || 'Success event'}`;
   } else {
-    label = `Clicked ${event.elementHref || event.elementTag || 'element'}`;
+    label = `Clicked ${event.elementText || event.elementHref || event.elementTag || 'element'}`;
   }
 
   return (
