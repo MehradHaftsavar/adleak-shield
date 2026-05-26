@@ -168,10 +168,10 @@ export function AdminDashboard() {
           </div>
         ) : (
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-            <MetricCard label="Total Users"    value={String(metrics?.tenants.total ?? 0)} sub={`${metrics?.tenants.active ?? 0} active · ${metrics?.tenants.trialing ?? 0} trial`} />
-            <MetricCard label="MRR"            value={`£${fmt(metrics?.mrr ?? 0)}`}         sub="from Stripe active subs" />
-            <MetricCard label="Waste (30d)"    value={`£${fmt(metrics?.waste30d.total ?? 0)}`} sub={`across ${metrics?.waste30d.tenantsWithData ?? 0} tenants`} color="red" />
-            <MetricCard label="Inactive"       value={String(metrics?.tenants.inactive ?? 0)} sub="canceled / no sub" color="gray" />
+            <MetricCard label="Total Users"    value={String(metrics?.tenants?.total ?? 0)} sub={`${metrics?.tenants?.active ?? 0} active · ${metrics?.tenants?.trialing ?? 0} trial`} />
+            <MetricCard label="MRR"            value={`£${fmt(metrics?.mrr ?? 0)}`}          sub="from Stripe active subs" />
+            <MetricCard label="Waste (30d)"    value={`£${fmt(metrics?.waste30d?.total ?? 0)}`} sub={`across ${metrics?.waste30d?.tenantsWithData ?? 0} tenants`} color="red" />
+            <MetricCard label="Inactive"       value={String(metrics?.tenants?.inactive ?? 0)} sub="canceled / no sub" color="gray" />
           </div>
         )}
       </section>
