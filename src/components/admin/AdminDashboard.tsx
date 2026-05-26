@@ -4,21 +4,23 @@
 // src/components/admin/AdminDashboard.tsx
 //
 // Three sections:
-//   1. Global Metrics (users, MRR, waste)
-//   2. User Management table (all tenants)
-//   3. System Health (queue, SQL)
+//   1. Date range picker (Last 7d / 14d / 30d / custom)
+//   2. Global Metrics (users, MRR, waste for selected range)
+//   3. User Management table
+//   4. System Health
 // =============================================================================
 
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import useSWR from 'swr';
 
 // ---------------------------------------------------------------------------
 // Types
 // ---------------------------------------------------------------------------
 interface MetricsData {
-  tenants: { total: number; active: number; trialing: number; inactive: number };
-  mrr: number;
-  waste30d: { total: number; tenantsWithData: number };
+  tenants:   { total: number; active: number; trialing: number; inactive: number };
+  mrr:       number;
+  waste:     { total: number; tenantsWithData: number };
+  dateRange: { start: string; end: string };
 }
 
 interface TenantRow {
@@ -28,10 +30,16 @@ interface TenantRow {
   trialEndsAt:         string | null;
   createdAt:           string | null;
   onboardingCompleted: boolean;
-  sessions30d:         number;
+  sessionsInRange:     number;
   lastSessionAt:       string | null;
-  waste30d:            number;
+  waste:               number;
   campaignCount:       number;
+}
+
+interface TenantsData {
+  tenants:   TenantRow[];
+  count:     number;
+  dateRange: { start: string; end: string };
 }
 
 interface HealthData {
@@ -39,6 +47,8 @@ interface HealthData {
   sql:   { avgCpuPercent: number | null; maxCpuPercent: number | null; sampleCount: number; error?: string };
   checkedAt: string;
 }
+
+type Preset = '7d' | '14d' | '30d' | 'custom';
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -51,6 +61,7 @@ function timeSince(iso: string | null) {
   if (!iso) return '—';
   const diff = Date.now() - new Date(iso).getTime();
   const mins = Math.floor(diff / 60_000);
+  if (mins < 2)   return 'just now';
   if (mins < 60)  return `${mins}m ago`;
   const hrs = Math.floor(mins / 60);
   if (hrs < 24)   return `${hrs}h ago`;
@@ -74,25 +85,54 @@ function daysLeft(iso: string | null) {
   return Math.ceil(ms / (1000 * 60 * 60 * 24));
 }
 
+function toDateInput(iso: string) {
+  return iso.slice(0, 10); // "YYYY-MM-DD"
+}
+
+function presetRange(preset: Preset, customStart: string, customEnd: string) {
+  const now = new Date();
+  const endISO = now.toISOString();
+  if (preset === '7d')     return { start: new Date(now.getTime() - 7  * 86400_000).toISOString(), end: endISO };
+  if (preset === '14d')    return { start: new Date(now.getTime() - 14 * 86400_000).toISOString(), end: endISO };
+  if (preset === '30d')    return { start: new Date(now.getTime() - 30 * 86400_000).toISOString(), end: endISO };
+  // custom
+  const s = customStart ? new Date(customStart).toISOString() : new Date(now.getTime() - 30 * 86400_000).toISOString();
+  const e = customEnd   ? new Date(new Date(customEnd).setHours(23, 59, 59, 999)).toISOString() : endISO;
+  return { start: s, end: e };
+}
+
 // ---------------------------------------------------------------------------
 // Component
 // ---------------------------------------------------------------------------
 export function AdminDashboard() {
-  const [search,    setSearch]    = useState('');
-  const [extending, setExtending] = useState<string | null>(null);
-  const [impersonating, setImpersonating] = useState<string | null>(null);
-  const [extendDays, setExtendDays] = useState(7);
+  // Date range state
+  const [preset,      setPreset]      = useState<Preset>('30d');
+  const [customStart, setCustomStart] = useState('');
+  const [customEnd,   setCustomEnd]   = useState('');
 
-  const { data: metrics, isLoading: mLoading } =
-    useSWR<MetricsData>('/api/admin/metrics', { refreshInterval: 60_000 });
+  // User table state
+  const [search,       setSearch]       = useState('');
+  const [extending,    setExtending]    = useState<string | null>(null);
+  const [impersonating, setImpersonating] = useState<string | null>(null);
+  const [extendDays,   setExtendDays]   = useState(7);
+
+  // Build query params from current date range
+  const { start, end } = useMemo(
+    () => presetRange(preset, customStart, customEnd),
+    [preset, customStart, customEnd]
+  );
+  const qs = `?start=${encodeURIComponent(start)}&end=${encodeURIComponent(end)}`;
+
+  const { data: metrics, isLoading: mLoading, mutate: mutateMetrics } =
+    useSWR<MetricsData>(`/api/admin/metrics${qs}`, { revalidateOnFocus: false });
 
   const { data: tenantsData, isLoading: tLoading, mutate: mutateTenants } =
-    useSWR<{ tenants: TenantRow[]; count: number }>('/api/admin/tenants', { refreshInterval: 30_000 });
+    useSWR<TenantsData>(`/api/admin/tenants${qs}`, { revalidateOnFocus: false });
 
   const { data: health, isLoading: hLoading, mutate: mutateHealth } =
-    useSWR<HealthData>('/api/admin/health', { refreshInterval: 30_000 });
+    useSWR<HealthData>('/api/admin/health', { refreshInterval: 60_000 });
 
-  // ---- Filtered tenants
+  // Filter tenants by search
   const allTenants = tenantsData?.tenants ?? [];
   const tenants = search.trim()
     ? allTenants.filter(t =>
@@ -115,7 +155,7 @@ export function AdminDashboard() {
         alert(`✅ Trial extended to ${new Date(d.newTrialEndsAt).toLocaleDateString('en-GB')}`);
         mutateTenants();
       } else {
-        alert(`❌ Error: ${d.error}`);
+        alert(`❌ ${d.error}`);
       }
     } finally {
       setExtending(null);
@@ -130,10 +170,9 @@ export function AdminDashboard() {
       const r = await fetch(`/api/admin/tenants/${tenantId}/impersonate`, { method: 'POST' });
       const d = await r.json();
       if (r.ok) {
-        // Navigate to dashboard as that user
         window.location.href = '/dashboard';
       } else {
-        alert(`❌ Error: ${d.error}`);
+        alert(`❌ ${d.error}`);
       }
     } finally {
       setImpersonating(null);
@@ -148,16 +187,71 @@ export function AdminDashboard() {
       ==================================================================== */}
       <div>
         <h1 className="text-2xl font-bold text-white">Owner Admin Panel</h1>
-        <p className="text-gray-400 text-sm mt-1">
-          Platform overview — visible to you only
-        </p>
+        <p className="text-gray-400 text-sm mt-1">Platform overview — visible to you only</p>
+      </div>
+
+      {/* ====================================================================
+          DATE RANGE PICKER
+      ==================================================================== */}
+      <div className="flex flex-wrap items-center gap-2">
+        {(['7d', '14d', '30d'] as Preset[]).map(p => (
+          <button
+            key={p}
+            onClick={() => setPreset(p)}
+            className={`px-4 py-1.5 rounded-lg text-sm font-medium transition-colors ${
+              preset === p
+                ? 'bg-blue-600 text-white'
+                : 'bg-gray-800 text-gray-400 hover:bg-gray-700'
+            }`}
+          >
+            Last {p}
+          </button>
+        ))}
+        <button
+          onClick={() => setPreset('custom')}
+          className={`px-4 py-1.5 rounded-lg text-sm font-medium transition-colors ${
+            preset === 'custom'
+              ? 'bg-blue-600 text-white'
+              : 'bg-gray-800 text-gray-400 hover:bg-gray-700'
+          }`}
+        >
+          Custom
+        </button>
+
+        {preset === 'custom' && (
+          <div className="flex items-center gap-2 ml-2">
+            <input
+              type="date"
+              value={customStart}
+              max={customEnd || toDateInput(new Date().toISOString())}
+              onChange={e => setCustomStart(e.target.value)}
+              className="bg-gray-800 text-gray-200 text-sm px-3 py-1.5 rounded-lg border border-gray-700 focus:outline-none focus:border-blue-500"
+            />
+            <span className="text-gray-500 text-sm">to</span>
+            <input
+              type="date"
+              value={customEnd}
+              min={customStart}
+              max={toDateInput(new Date().toISOString())}
+              onChange={e => setCustomEnd(e.target.value)}
+              className="bg-gray-800 text-gray-200 text-sm px-3 py-1.5 rounded-lg border border-gray-700 focus:outline-none focus:border-blue-500"
+            />
+          </div>
+        )}
+
+        <button
+          onClick={() => { mutateMetrics(); mutateTenants(); }}
+          className="ml-auto text-xs text-gray-500 hover:text-gray-300 transition-colors"
+        >
+          ↻ Refresh all
+        </button>
       </div>
 
       {/* ====================================================================
           1. GLOBAL METRICS
       ==================================================================== */}
       <section>
-        <h2 className="text-sm font-semibold text-gray-400 uppercase tracking-wider mb-3">
+        <h2 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">
           Platform Metrics
         </h2>
         {mLoading ? (
@@ -168,10 +262,28 @@ export function AdminDashboard() {
           </div>
         ) : (
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-            <MetricCard label="Total Users"    value={String(metrics?.tenants?.total ?? 0)} sub={`${metrics?.tenants?.active ?? 0} active · ${metrics?.tenants?.trialing ?? 0} trial`} />
-            <MetricCard label="MRR"            value={`£${fmt(metrics?.mrr ?? 0)}`}          sub="from Stripe active subs" />
-            <MetricCard label="Waste (30d)"    value={`£${fmt(metrics?.waste30d?.total ?? 0)}`} sub={`across ${metrics?.waste30d?.tenantsWithData ?? 0} tenants`} color="red" />
-            <MetricCard label="Inactive"       value={String(metrics?.tenants?.inactive ?? 0)} sub="canceled / no sub" color="gray" />
+            <MetricCard
+              label="Total Users"
+              value={String(metrics?.tenants?.total ?? 0)}
+              sub={`${metrics?.tenants?.active ?? 0} active · ${metrics?.tenants?.trialing ?? 0} trial`}
+            />
+            <MetricCard
+              label="MRR"
+              value={`£${fmt(metrics?.mrr ?? 0)}`}
+              sub="Stripe active subs"
+            />
+            <MetricCard
+              label="Waste (selected period)"
+              value={`£${fmt(metrics?.waste?.total ?? 0)}`}
+              sub={`across ${metrics?.waste?.tenantsWithData ?? 0} tenants`}
+              color="red"
+            />
+            <MetricCard
+              label="Inactive"
+              value={String(metrics?.tenants?.inactive ?? 0)}
+              sub="canceled / no sub"
+              color="gray"
+            />
           </div>
         )}
       </section>
@@ -180,19 +292,20 @@ export function AdminDashboard() {
           2. USER MANAGEMENT
       ==================================================================== */}
       <section>
-        <div className="flex items-center justify-between mb-3">
-          <h2 className="text-sm font-semibold text-gray-400 uppercase tracking-wider">
+        <div className="flex flex-wrap items-center justify-between gap-3 mb-3">
+          <h2 className="text-xs font-semibold text-gray-500 uppercase tracking-wider">
             Users ({tenantsData?.count ?? 0})
+            {tLoading && <span className="ml-2 text-gray-600">loading…</span>}
           </h2>
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-3 flex-wrap">
             <input
               type="text"
               placeholder="Search by email or status…"
               value={search}
               onChange={e => setSearch(e.target.value)}
-              className="bg-gray-800 text-gray-200 text-sm px-3 py-1.5 rounded-lg border border-gray-700 focus:outline-none focus:border-gray-500 w-64"
+              className="bg-gray-800 text-gray-200 text-sm px-3 py-1.5 rounded-lg border border-gray-700 focus:outline-none focus:border-gray-500 w-56"
             />
-            <div className="flex items-center gap-1 text-xs text-gray-500">
+            <div className="flex items-center gap-1.5 text-xs text-gray-500">
               Extend by
               <input
                 type="number"
@@ -219,8 +332,8 @@ export function AdminDashboard() {
                   <tr className="border-b border-gray-800 text-gray-500 text-xs uppercase tracking-wider">
                     <th className="px-4 py-3 text-left">Email</th>
                     <th className="px-4 py-3 text-left">Status</th>
-                    <th className="px-4 py-3 text-right">Sessions 30d</th>
-                    <th className="px-4 py-3 text-right">Waste 30d</th>
+                    <th className="px-4 py-3 text-right">Sessions</th>
+                    <th className="px-4 py-3 text-right">Waste</th>
                     <th className="px-4 py-3 text-right">Campaigns</th>
                     <th className="px-4 py-3 text-left">Last Active</th>
                     <th className="px-4 py-3 text-left">Trial Ends</th>
@@ -240,7 +353,7 @@ export function AdminDashboard() {
                         <td className="px-4 py-3 text-gray-200 font-medium">
                           {t.email}
                           {!t.onboardingCompleted && (
-                            <span className="ml-2 text-xs text-yellow-600">(no onboarding)</span>
+                            <span className="ml-2 text-xs text-yellow-700">(no onboarding)</span>
                           )}
                         </td>
                         <td className="px-4 py-3">
@@ -248,10 +361,12 @@ export function AdminDashboard() {
                             {t.subscriptionStatus}
                           </span>
                         </td>
-                        <td className="px-4 py-3 text-right text-gray-300">{t.sessions30d.toLocaleString()}</td>
+                        <td className="px-4 py-3 text-right text-gray-300">
+                          {t.sessionsInRange.toLocaleString()}
+                        </td>
                         <td className="px-4 py-3 text-right">
-                          <span className={t.waste30d > 0 ? 'text-red-400' : 'text-gray-500'}>
-                            £{fmt(t.waste30d)}
+                          <span className={t.waste > 0 ? 'text-red-400 font-medium' : 'text-gray-500'}>
+                            £{fmt(t.waste)}
                           </span>
                         </td>
                         <td className="px-4 py-3 text-right text-gray-400">{t.campaignCount}</td>
@@ -259,11 +374,7 @@ export function AdminDashboard() {
                         <td className="px-4 py-3 text-xs">
                           {t.trialEndsAt ? (
                             <span className={dl !== null && dl <= 3 ? 'text-red-400' : 'text-gray-400'}>
-                              {dl !== null && dl <= 0
-                                ? 'Expired'
-                                : dl !== null
-                                  ? `${dl}d left`
-                                  : '—'}
+                              {dl === 0 ? 'Expired' : dl !== null ? `${dl}d left` : '—'}
                             </span>
                           ) : (
                             <span className="text-gray-600">—</span>
@@ -304,7 +415,7 @@ export function AdminDashboard() {
       ==================================================================== */}
       <section>
         <div className="flex items-center justify-between mb-3">
-          <h2 className="text-sm font-semibold text-gray-400 uppercase tracking-wider">
+          <h2 className="text-xs font-semibold text-gray-500 uppercase tracking-wider">
             System Health
           </h2>
           <button
@@ -314,6 +425,7 @@ export function AdminDashboard() {
             ↻ Refresh
           </button>
         </div>
+
         {hLoading ? (
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="bg-gray-900 rounded-xl h-28 animate-pulse" />
@@ -327,7 +439,7 @@ export function AdminDashboard() {
                 <div>
                   <p className="text-xs text-gray-500 uppercase tracking-wider mb-1">Queue Depth</p>
                   <p className={`text-3xl font-bold ${
-                    health?.queue?.depth === undefined || health.queue.depth === null
+                    health?.queue?.depth == null
                       ? 'text-gray-600'
                       : health.queue.depth > 1000
                         ? 'text-red-400'
@@ -382,6 +494,7 @@ export function AdminDashboard() {
             </div>
           </div>
         )}
+
         {health?.checkedAt && (
           <p className="text-xs text-gray-700 mt-2 text-right">
             Last checked: {new Date(health.checkedAt).toLocaleTimeString('en-GB')}
@@ -396,26 +509,18 @@ export function AdminDashboard() {
 // Metric Card
 // ---------------------------------------------------------------------------
 function MetricCard({
-  label,
-  value,
-  sub,
-  color = 'white',
+  label, value, sub, color = 'white',
 }: {
-  label: string;
-  value: string;
-  sub: string;
-  color?: 'white' | 'red' | 'gray';
+  label: string; value: string; sub: string; color?: 'white' | 'red' | 'gray';
 }) {
-  const valueColor = color === 'red'
-    ? 'text-red-400'
-    : color === 'gray'
-      ? 'text-gray-400'
-      : 'text-white';
-
   return (
     <div className="bg-gray-900 rounded-xl p-5 border border-gray-800">
       <p className="text-xs text-gray-500 uppercase tracking-wider mb-1">{label}</p>
-      <p className={`text-2xl font-bold ${valueColor}`}>{value}</p>
+      <p className={`text-2xl font-bold ${
+        color === 'red' ? 'text-red-400' : color === 'gray' ? 'text-gray-400' : 'text-white'
+      }`}>
+        {value}
+      </p>
       <p className="text-xs text-gray-600 mt-1">{sub}</p>
     </div>
   );

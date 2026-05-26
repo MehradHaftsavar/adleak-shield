@@ -3,32 +3,38 @@
 // src/app/api/admin/metrics/route.ts
 //
 // Returns global platform metrics: user counts, MRR, total waste detected.
-// Owner-only. Returns 404 for all non-owners (no 401/403).
 //
-// MRR: pulled from Stripe active + trialing subscriptions.
-// Waste: SUM of estimated_waste across ALL tenants (admin DB — no RLS).
+// FIX: Sessions/Campaigns are RLS-protected. withAdminDb has no SESSION_CONTEXT
+// so those tables return 0 rows. We iterate per-tenant using withTenantDb.
+//
+// Accepts ?start=ISO&end=ISO query params (defaults to last 30 days).
 // =============================================================================
 
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { requireOwner, ownerNotFound } from '@/lib/adminAuth';
-import { withAdminDb } from '@/lib/db/client';
+import { withAdminDb, withTenantDb } from '@/lib/db/client';
+import * as mssql from 'mssql';
 
-export async function GET() {
+export async function GET(request: NextRequest) {
   const session = await requireOwner();
   if (!session) return ownerNotFound();
 
+  const { searchParams } = new URL(request.url);
+  const end   = searchParams.get('end')   || new Date().toISOString();
+  const start = searchParams.get('start') || new Date(new Date(end).getTime() - 30 * 24 * 60 * 60 * 1000).toISOString();
+
   try {
     // -------------------------------------------------------------------------
-    // 1. Pull user/tenant stats directly from SQL
+    // 1. Tenant counts — Tenants table has no RLS, withAdminDb is fine
     // -------------------------------------------------------------------------
     const stats = await withAdminDb(async (req) => {
       const r = await req.query(`
         SELECT
-          COUNT(*)                                                        AS total_tenants,
-          SUM(CASE WHEN subscription_status = 'active'   THEN 1 ELSE 0 END) AS active_count,
-          SUM(CASE WHEN subscription_status = 'trialing' THEN 1 ELSE 0 END) AS trialing_count,
-          SUM(CASE WHEN subscription_status = 'canceled'
-               OR  subscription_status IS NULL             THEN 1 ELSE 0 END) AS inactive_count
+          COUNT(*)                                                             AS total_tenants,
+          SUM(CASE WHEN subscription_status = 'active'   THEN 1 ELSE 0 END)  AS active_count,
+          SUM(CASE WHEN subscription_status = 'trialing' THEN 1 ELSE 0 END)  AS trialing_count,
+          SUM(CASE WHEN subscription_status NOT IN ('active','trialing')
+               OR  subscription_status IS NULL                THEN 1 ELSE 0 END) AS inactive_count
         FROM Tenants
         WHERE email_verified = 1
       `);
@@ -36,25 +42,45 @@ export async function GET() {
     });
 
     // -------------------------------------------------------------------------
-    // 2. Total waste detected across ALL tenants (no RLS — admin connection)
-    //    We query Sessions + Campaigns directly.  RLS is off on admin conn.
+    // 2. Waste across all tenants — must use withTenantDb per tenant (RLS fix)
+    //    Get all tenant IDs first, then aggregate with proper RLS context.
     // -------------------------------------------------------------------------
-    const wasteRow = await withAdminDb(async (req) => {
+    const tenantIds = await withAdminDb(async (req) => {
       const r = await req.query(`
-        SELECT
-          ISNULL(SUM(
-            CASE WHEN s.is_bounce = 1
-                 THEN COALESCE(s.session_cpc, c.avg_cpc)
-                 ELSE 0
-            END
-          ), 0) AS total_waste,
-          COUNT(DISTINCT s.tenant_id) AS tenants_with_data
-        FROM Sessions s
-        INNER JOIN Campaigns c ON s.campaign_id = c.campaign_id
-        WHERE s.started_at >= DATEADD(day, -30, GETUTCDATE())
+        SELECT tenant_id FROM Tenants WHERE email_verified = 1
       `);
-      return r.recordset[0] ?? { total_waste: 0, tenants_with_data: 0 };
+      return r.recordset.map(t => t.tenant_id as string);
     });
+
+    let totalWaste      = 0;
+    let tenantsWithData = 0;
+
+    for (const tenantId of tenantIds) {
+      try {
+        const waste = await withTenantDb(tenantId, async (req) => {
+          req.input('start', mssql.DateTime, new Date(start));
+          req.input('end',   mssql.DateTime, new Date(end));
+          const r = await req.query(`
+            SELECT ISNULL(SUM(
+              CASE WHEN s.is_bounce = 1
+                   THEN COALESCE(s.session_cpc, c.avg_cpc)
+                   ELSE 0
+              END
+            ), 0) AS waste
+            FROM Sessions s
+            INNER JOIN Campaigns c ON s.campaign_id = c.campaign_id
+            WHERE s.started_at >= @start
+              AND s.started_at <= @end
+          `);
+          return Number(r.recordset[0]?.waste ?? 0);
+        });
+
+        totalWaste += waste;
+        if (waste > 0) tenantsWithData++;
+      } catch {
+        // Skip tenant on error — don't let one bad tenant block the rest
+      }
+    }
 
     // -------------------------------------------------------------------------
     // 3. MRR from Stripe (optional — skip gracefully if key not set)
@@ -65,7 +91,6 @@ export async function GET() {
         const Stripe = (await import('stripe')).default;
         const stripe = new Stripe(process.env.STRIPE_SECRET_KEY, { apiVersion: '2024-06-20' as never });
 
-        // List active subscriptions and sum up monthly amounts
         const subs = await stripe.subscriptions.list({
           status: 'active',
           limit: 100,
@@ -75,35 +100,32 @@ export async function GET() {
         for (const sub of subs.data) {
           const item = sub.items.data[0];
           if (!item?.price) continue;
-          const amount = item.price.unit_amount ?? 0;
-          const interval = item.price.recurring?.interval;
+          const amount        = item.price.unit_amount ?? 0;
+          const interval      = item.price.recurring?.interval;
           const intervalCount = item.price.recurring?.interval_count ?? 1;
 
-          if (interval === 'month') {
-            mrr += (amount / 100) / intervalCount;
-          } else if (interval === 'year') {
-            mrr += (amount / 100) / (12 * intervalCount);
-          }
+          if (interval === 'month')      mrr += (amount / 100) / intervalCount;
+          else if (interval === 'year')  mrr += (amount / 100) / (12 * intervalCount);
         }
         mrr = Math.round(mrr * 100) / 100;
       } catch (stripeErr) {
         console.warn('[Admin Metrics] Stripe MRR fetch failed:', stripeErr);
-        mrr = 0;
       }
     }
 
     return NextResponse.json({
       tenants: {
-        total:    Number(stats.total_tenants    ?? 0),
-        active:   Number(stats.active_count     ?? 0),
-        trialing: Number(stats.trialing_count   ?? 0),
-        inactive: Number(stats.inactive_count   ?? 0),
+        total:    Number(stats.total_tenants   ?? 0),
+        active:   Number(stats.active_count    ?? 0),
+        trialing: Number(stats.trialing_count  ?? 0),
+        inactive: Number(stats.inactive_count  ?? 0),
       },
       mrr,
-      waste30d: {
-        total:          Math.round(Number(wasteRow.total_waste       ?? 0) * 100) / 100,
-        tenantsWithData: Number(wasteRow.tenants_with_data ?? 0),
+      waste: {
+        total:           Math.round(totalWaste * 100) / 100,
+        tenantsWithData,
       },
+      dateRange: { start, end },
     });
   } catch (err) {
     console.error('[Admin] Metrics error:', err);
