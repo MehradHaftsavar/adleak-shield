@@ -247,9 +247,15 @@ export function AdminDashboard() {
             setRefreshing(false);
           }}
           disabled={refreshing}
-          className="ml-auto text-xs text-gray-500 hover:text-gray-300 transition-colors disabled:opacity-50"
+          className="ml-auto flex items-center gap-1.5 text-xs text-gray-500 hover:text-gray-300 transition-colors disabled:opacity-50"
         >
-          {refreshing ? '↻ Refreshing…' : '↻ Refresh all'}
+          <svg
+            className={`w-3 h-3 ${refreshing ? 'animate-spin' : ''}`}
+            viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"
+          >
+            <path d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" strokeLinecap="round" strokeLinejoin="round"/>
+          </svg>
+          {refreshing ? 'Refreshing…' : 'Refresh all'}
         </button>
       </div>
 
@@ -267,7 +273,7 @@ export function AdminDashboard() {
             ))}
           </div>
         ) : (
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+          <div className={`grid grid-cols-2 sm:grid-cols-4 gap-4 transition-opacity duration-300 ${refreshing ? 'opacity-50' : 'opacity-100'}`}>
             <MetricCard
               label="Total Users"
               value={String(metrics?.tenants?.total ?? 0)}
@@ -326,7 +332,7 @@ export function AdminDashboard() {
           </div>
         </div>
 
-        <div className="bg-gray-900 rounded-xl overflow-hidden border border-gray-800">
+        <div className={`bg-gray-900 rounded-xl overflow-hidden border border-gray-800 transition-opacity duration-300 ${refreshing ? 'opacity-50' : 'opacity-100'}`}>
           {tLoading ? (
             <div className="p-8 text-center text-gray-500 text-sm">Loading…</div>
           ) : tenants.length === 0 ? (

@@ -43,8 +43,8 @@ export async function GET() {
 // Queue depth via Azure Storage SDK
 // ---------------------------------------------------------------------------
 async function getQueueDepth(): Promise<{ depth: number; queueName: string }> {
-  const connStr   = process.env.AZURE_STORAGE_CONNECTION_STRING;
-  const queueName = process.env.AZURE_QUEUE_NAME ?? 'clickevents';
+  const connStr   = process.env.AZURE_QUEUE_CONNECTION_STRING;
+  const queueName = process.env.QUEUE_NAME ?? 'clicklog-ingest';
 
   if (!connStr) {
     return { depth: -1, queueName: 'not-configured' };
