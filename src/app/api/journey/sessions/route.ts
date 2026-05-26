@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@/lib/auth';
 import { withTenantDb } from '@/lib/db/client';
 import * as mssql from 'mssql';
+import { getEffectiveTenantId } from '@/lib/adminAuth';
 
 export async function GET(request: NextRequest) {
   try {
@@ -22,7 +23,12 @@ export async function GET(request: NextRequest) {
     const start = startDate || new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
     const end   = endDate   || new Date().toISOString();
 
-    const result = await withTenantDb(session.user.tenantId, async (req) => {
+    const { tenantId } = await getEffectiveTenantId(
+      session.user.tenantId as string,
+      session.user.isOwner as boolean
+    );
+
+    const result = await withTenantDb(tenantId, async (req) => {
       req.input('keyword',   mssql.NVarChar(255), keyword);
       req.input('startDate', mssql.DateTime,      new Date(start));
       req.input('endDate',   mssql.DateTime,      new Date(end));

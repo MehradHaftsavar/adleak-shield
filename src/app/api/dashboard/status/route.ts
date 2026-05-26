@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@/lib/auth';
 import { withTenantDb, withAdminDb } from '@/lib/db/client';
 import * as mssql from 'mssql';
+import { getEffectiveTenantId } from '@/lib/adminAuth';
 
 export async function GET(request: NextRequest) {
   try {
@@ -10,7 +11,13 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const result = await withTenantDb(session.user.tenantId, async (req) => {
+    // Resolve effective tenant (supports admin impersonation)
+    const { tenantId: effectiveTenantId } = await getEffectiveTenantId(
+      session.user.tenantId as string,
+      session.user.isOwner as boolean
+    );
+
+    const result = await withTenantDb(effectiveTenantId, async (req) => {
       // Self-heal: flip any campaign that has real sessions but is still
       // marked awaiting_data — catches legacy data and any queue worker gaps
       await req.query(`
@@ -82,11 +89,9 @@ export async function GET(request: NextRequest) {
       };
     });
 
-    const tenantId = session.user.tenantId as string;
-
     const tenantRow = await withAdminDb(async (req) => {
       const r = await req
-        .input('tenantId', mssql.UniqueIdentifier, tenantId)
+        .input('tenantId', mssql.UniqueIdentifier, effectiveTenantId)
         .query(`
           SELECT subscription_status, trial_ends_at
           FROM Tenants

@@ -110,10 +110,11 @@ export const authConfig: NextAuthConfig = {
       const isOnOnboarding = nextUrl.pathname.startsWith("/onboarding");
       const isOnSettings = nextUrl.pathname.startsWith("/settings");
 
-      // Admin routes: must be logged in AND be the owner
+      // Admin routes: must be logged in AND be the owner.
+      // Return 404 — never reveal the route exists to non-owners.
       if (isOnAdmin) {
         if (isLoggedIn && auth.user.isOwner) return true;
-        return Response.redirect(new URL("/auth/login", nextUrl));
+        return new Response(null, { status: 404 });
       }
 
       // Dashboard routes: must be logged in AND completed onboarding

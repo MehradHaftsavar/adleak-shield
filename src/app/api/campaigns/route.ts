@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { auth } from '@/lib/auth';
 import { withTenantDb } from '@/lib/db/client';
 import * as mssql from 'mssql';
+import { getEffectiveTenantId, blockedInImpersonation } from '@/lib/adminAuth';
 
 // Validation schema for campaign registration
 const campaignSchema = z.object({
@@ -22,6 +23,13 @@ export async function POST(request: NextRequest) {
     if (!session?.user?.tenantId) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
+
+    // Block writes during admin impersonation
+    const { isImpersonating } = await getEffectiveTenantId(
+      session.user.tenantId as string,
+      session.user.isOwner as boolean
+    );
+    if (isImpersonating) return blockedInImpersonation();
 
     const body = await request.json();
     const { googleCampaignId, avgCpc } = body;
@@ -157,7 +165,12 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const result = await withTenantDb(session.user.tenantId, async (req) => {
+    const { tenantId } = await getEffectiveTenantId(
+      session.user.tenantId as string,
+      session.user.isOwner as boolean
+    );
+
+    const result = await withTenantDb(tenantId, async (req) => {
       // Get all campaigns with avg_cpc (RLS auto-filters by tenant)
       const campaignsResult = await req.query(`
         SELECT campaign_id, google_campaign_id, slot_number, domain_id, created_at, status, avg_cpc
@@ -194,6 +207,12 @@ export async function PATCH(request: NextRequest) {
     if (!session?.user?.tenantId) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
+
+    const { isImpersonating } = await getEffectiveTenantId(
+      session.user.tenantId as string,
+      session.user.isOwner as boolean
+    );
+    if (isImpersonating) return blockedInImpersonation();
 
     const body = await request.json();
     const { campaignId, avgCpc } = body;
@@ -243,6 +262,12 @@ export async function DELETE(request: NextRequest) {
     if (!session?.user?.tenantId) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
+
+    const { isImpersonating } = await getEffectiveTenantId(
+      session.user.tenantId as string,
+      session.user.isOwner as boolean
+    );
+    if (isImpersonating) return blockedInImpersonation();
 
     const { searchParams } = new URL(request.url);
     const campaignDbId = searchParams.get('id');

@@ -3,6 +3,7 @@ import { auth } from '@/lib/auth';
 import { withTenantDb } from '@/lib/db/client';
 import * as mssql from 'mssql';
 import { isPaywalled } from '@/lib/paywallCheck';
+import { getEffectiveTenantId } from '@/lib/adminAuth';
 
 export async function GET(request: NextRequest) {
   try {
@@ -11,7 +12,13 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    if (await isPaywalled(session.user.tenantId as string)) {
+    // Resolve effective tenant (supports admin impersonation)
+    const { tenantId, isImpersonating } = await getEffectiveTenantId(
+      session.user.tenantId as string,
+      session.user.isOwner as boolean
+    );
+
+    if (!isImpersonating && await isPaywalled(tenantId)) {
       return NextResponse.json({ error: 'Subscription required' }, { status: 402 });
     }
 
@@ -22,7 +29,7 @@ export async function GET(request: NextRequest) {
     const start = startDate || new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
     const end = endDate || new Date().toISOString();
 
-    const result = await withTenantDb(session.user.tenantId, async (req) => {
+    const result = await withTenantDb(tenantId, async (req) => {
       req.input('startDate', mssql.DateTime, new Date(start));
       req.input('endDate', mssql.DateTime, new Date(end));
 

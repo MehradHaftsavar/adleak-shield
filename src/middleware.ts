@@ -5,15 +5,18 @@ export default auth((req) => {
   const { nextUrl, auth: session } = req;
   const isLoggedIn = !!session;
   const isOnDashboard = nextUrl.pathname.startsWith("/dashboard");
-  const isOnAdmin = nextUrl.pathname.startsWith("/admin");
+  const isOnAdmin    = nextUrl.pathname.startsWith("/admin");
+  const isOnApiAdmin = nextUrl.pathname.startsWith("/api/admin");
   const isOnAuth = nextUrl.pathname.startsWith("/auth");
   const isOnOnboarding = nextUrl.pathname.startsWith("/onboarding");
   const isOnSettings = nextUrl.pathname.startsWith("/settings");
 
-  // Admin routes: must be logged in AND be the owner
-  if (isOnAdmin) {
+  // Admin UI + API routes — must be authenticated owner.
+  // SECURITY: return 404 (not 401/403/redirect) so pentesters cannot confirm
+  // the route exists. A redirect to /auth/login would reveal the path.
+  if (isOnAdmin || isOnApiAdmin) {
     if (isLoggedIn && session.user.isOwner) return;
-    return Response.redirect(new URL("/auth/login", nextUrl));
+    return new Response(null, { status: 404 });
   }
 
   // Dashboard routes: must be logged in AND completed onboarding
