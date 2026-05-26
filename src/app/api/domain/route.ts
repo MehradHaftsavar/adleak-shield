@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { auth } from '@/lib/auth';
 import { withAdminDb, withTenantDb } from '@/lib/db/client';
 import * as mssql from 'mssql';
+import { getEffectiveTenantId, blockedInImpersonation } from '@/lib/adminAuth';
 
 // Validation schema for domain input
 const domainSchema = z.object({
@@ -26,6 +27,13 @@ export async function POST(request: NextRequest) {
         { status: 401 }
       );
     }
+
+    // Block writes during admin impersonation
+    const { isImpersonating } = await getEffectiveTenantId(
+      session.user.tenantId as string,
+      session.user.isOwner as boolean
+    );
+    if (isImpersonating) return blockedInImpersonation();
 
     // 2. Parse and validate input
     const body = await request.json();
@@ -143,11 +151,16 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    const result = await withTenantDb(session.user.tenantId, async (req) => {
+    const { tenantId } = await getEffectiveTenantId(
+      session.user.tenantId as string,
+      session.user.isOwner as boolean
+    );
+
+    const result = await withTenantDb(tenantId, async (req) => {
       // Get domain for this tenant
       const domainResult = await req.query(`
-        SELECT domain_id, domain_name, verified 
-        FROM Domains 
+        SELECT domain_id, domain_name, verified
+        FROM Domains
       `);
 
       const domain = domainResult.recordset?.[0];
@@ -178,6 +191,13 @@ export async function DELETE(request: NextRequest) {
     if (!session?.user?.tenantId) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
+
+    // CRITICAL: block during impersonation — this deletes ALL tenant data
+    const { isImpersonating } = await getEffectiveTenantId(
+      session.user.tenantId as string,
+      session.user.isOwner as boolean
+    );
+    if (isImpersonating) return blockedInImpersonation();
 
     const result = await withTenantDb(session.user.tenantId, async (req) => {
       // Get campaign IDs and their google_campaign_ids before deletion

@@ -19,6 +19,17 @@ import { SWRConfig } from "swr";
 import { signOut } from "next-auth/react";
 import Link from "next/link";
 
+const IMP_LABEL_COOKIE = 'als_imp_label';
+
+function getImpLabel(): string | null {
+  if (typeof document === 'undefined') return null;
+  const match = document.cookie
+    .split(';')
+    .map(c => c.trim())
+    .find(c => c.startsWith(IMP_LABEL_COOKIE + '='));
+  return match ? decodeURIComponent(match.split('=')[1] ?? '') : null;
+}
+
 interface DashboardShellProps {
   email: string;
   tenantId: string;
@@ -30,8 +41,26 @@ export function DashboardShell({
   tenantId,
   children,
 }: DashboardShellProps) {
-  const [thawVisible, setThawVisible] = useState(false);
-  const [thawProgress, setThawProgress] = useState(0);
+  const [thawVisible,   setThawVisible]   = useState(false);
+  const [thawProgress,  setThawProgress]  = useState(0);
+  const [impLabel,      setImpLabel]      = useState<string | null>(null);
+  const [stoppingImp,   setStoppingImp]   = useState(false);
+
+  // Check for impersonation cookie on mount
+  useEffect(() => {
+    setImpLabel(getImpLabel());
+  }, []);
+
+  async function stopImpersonation() {
+    setStoppingImp(true);
+    try {
+      await fetch('/api/admin/impersonate/stop', { method: 'POST' });
+      // Redirect back to admin panel — not a reload
+      window.location.href = '/admin';
+    } finally {
+      setStoppingImp(false);
+    }
+  }
 
   // ===========================================================================
   // THAW DETECTION
@@ -93,6 +122,22 @@ export function DashboardShell({
                 : "cubic-bezier(0.4, 0, 0.2, 1)",
           }}
         />
+      )}
+
+      {/* Impersonation banner — only shown when admin is viewing as another user */}
+      {impLabel && (
+        <div className="bg-amber-400 text-gray-900 px-4 py-2 text-center text-sm font-medium flex items-center justify-center gap-4">
+          <span>
+            👁 Viewing as <strong>{impLabel}</strong> — read-only, all writes blocked
+          </span>
+          <button
+            onClick={stopImpersonation}
+            disabled={stoppingImp}
+            className="bg-gray-900 text-amber-400 px-3 py-0.5 rounded text-xs font-semibold hover:bg-gray-800 transition-colors disabled:opacity-50"
+          >
+            {stoppingImp ? 'Stopping…' : '← Back to admin'}
+          </button>
+        </div>
       )}
 
       {/* Navigation */}

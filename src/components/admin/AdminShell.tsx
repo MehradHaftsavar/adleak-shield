@@ -9,21 +9,9 @@
 //   - "Stop impersonation" button
 // =============================================================================
 
-import React, { useEffect, useState } from 'react';
+import React from 'react';
 import { SWRConfig } from 'swr';
 import { signOut } from 'next-auth/react';
-
-const LABEL_COOKIE = 'als_imp_label';
-
-function getImpLabel(): string | null {
-  if (typeof document === 'undefined') return null;
-  const match = document.cookie
-    .split(';')
-    .map(c => c.trim())
-    .find(c => c.startsWith(LABEL_COOKIE + '='));
-  if (!match) return null;
-  return decodeURIComponent(match.split('=')[1] ?? '');
-}
 
 const fetcher = (url: string) => fetch(url).then(r => r.json());
 
@@ -33,28 +21,6 @@ interface AdminShellProps {
 }
 
 export function AdminShell({ ownerEmail, children }: AdminShellProps) {
-  const [impLabel, setImpLabel] = useState<string | null>(null);
-  const [stopping, setStopping] = useState(false);
-
-  // Read impersonation label from cookie on mount and every 30s
-  useEffect(() => {
-    const check = () => setImpLabel(getImpLabel());
-    check();
-    const interval = setInterval(check, 30_000);
-    return () => clearInterval(interval);
-  }, []);
-
-  async function stopImpersonation() {
-    setStopping(true);
-    try {
-      await fetch('/api/admin/impersonate/stop', { method: 'POST' });
-      setImpLabel(null);
-      // Reload so all SWR caches reset to the owner's own data
-      window.location.reload();
-    } finally {
-      setStopping(false);
-    }
-  }
 
   return (
     <SWRConfig value={{ fetcher }}>
@@ -88,24 +54,6 @@ export function AdminShell({ ownerEmail, children }: AdminShellProps) {
             </div>
           </div>
         </header>
-
-        {/* ------------------------------------------------------------------ */}
-        {/* IMPERSONATION BANNER                                                */}
-        {/* ------------------------------------------------------------------ */}
-        {impLabel && (
-          <div className="bg-amber-500 text-gray-900 px-4 py-2 text-center text-sm font-medium flex items-center justify-center gap-4">
-            <span>
-              👁 Viewing as <strong>{impLabel}</strong> — read-only mode, all writes blocked
-            </span>
-            <button
-              onClick={stopImpersonation}
-              disabled={stopping}
-              className="bg-gray-900 text-amber-400 px-3 py-0.5 rounded text-xs font-semibold hover:bg-gray-800 transition-colors disabled:opacity-50"
-            >
-              {stopping ? 'Stopping…' : 'Stop viewing'}
-            </button>
-          </div>
-        )}
 
         {/* ------------------------------------------------------------------ */}
         {/* PAGE CONTENT                                                        */}

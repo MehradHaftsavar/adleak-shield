@@ -111,10 +111,11 @@ export function AdminDashboard() {
   const [customEnd,   setCustomEnd]   = useState('');
 
   // User table state
-  const [search,       setSearch]       = useState('');
-  const [extending,    setExtending]    = useState<string | null>(null);
+  const [search,        setSearch]        = useState('');
+  const [extending,     setExtending]     = useState<string | null>(null);
   const [impersonating, setImpersonating] = useState<string | null>(null);
-  const [extendDays,   setExtendDays]   = useState(7);
+  const [extendDays,    setExtendDays]    = useState(7);
+  const [refreshing,    setRefreshing]    = useState(false);
 
   // Build query params from current date range
   const { start, end } = useMemo(
@@ -240,10 +241,15 @@ export function AdminDashboard() {
         )}
 
         <button
-          onClick={() => { mutateMetrics(); mutateTenants(); }}
-          className="ml-auto text-xs text-gray-500 hover:text-gray-300 transition-colors"
+          onClick={async () => {
+            setRefreshing(true);
+            await Promise.all([mutateMetrics(), mutateTenants()]);
+            setRefreshing(false);
+          }}
+          disabled={refreshing}
+          className="ml-auto text-xs text-gray-500 hover:text-gray-300 transition-colors disabled:opacity-50"
         >
-          ↻ Refresh all
+          {refreshing ? '↻ Refreshing…' : '↻ Refresh all'}
         </button>
       </div>
 
@@ -372,7 +378,9 @@ export function AdminDashboard() {
                         <td className="px-4 py-3 text-right text-gray-400">{t.campaignCount}</td>
                         <td className="px-4 py-3 text-gray-400 text-xs">{timeSince(t.lastSessionAt)}</td>
                         <td className="px-4 py-3 text-xs">
-                          {t.trialEndsAt ? (
+                          {t.subscriptionStatus === 'active' ? (
+                            <span className="text-gray-600">—</span>
+                          ) : t.trialEndsAt ? (
                             <span className={dl !== null && dl <= 3 ? 'text-red-400' : 'text-gray-400'}>
                               {dl === 0 ? 'Expired' : dl !== null ? `${dl}d left` : '—'}
                             </span>
