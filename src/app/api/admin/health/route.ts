@@ -2,10 +2,10 @@
 // AdLeak Shield — Admin: System Health
 // src/app/api/admin/health/route.ts
 //
-// Returns three health signals:
-//   1. Azure Queue depth — how many messages are waiting to be processed
+// Returns four health signals:
+//   1. Azure Queue depth — messages waiting to be processed
 //   2. SQL resource usage — CPU% from sys.dm_db_resource_stats (last 5 min)
-//   3. Recent error count — failed queue-worker executions logged in DB
+//   3. Last janitor purge — rows deleted + timestamp from JanitorLog
 //
 // Owner-only. Returns 404 for non-owners.
 // =============================================================================
@@ -18,10 +18,10 @@ export async function GET() {
   const session = await requireOwner();
   if (!session) return ownerNotFound();
 
-  // Run all three checks in parallel — don't let one failure block the others
-  const [queueResult, sqlResult] = await Promise.allSettled([
+  const [queueResult, sqlResult, purgeResult] = await Promise.allSettled([
     getQueueDepth(),
     getSqlHealth(),
+    getLastPurge(),
   ]);
 
   const queue = queueResult.status === 'fulfilled'
@@ -30,11 +30,16 @@ export async function GET() {
 
   const sql = sqlResult.status === 'fulfilled'
     ? sqlResult.value
-    : { avgCpuPercent: null, maxCpuPercent: null, error: String((sqlResult as PromiseRejectedResult).reason) };
+    : { avgCpuPercent: null, maxCpuPercent: null, sampleCount: 0, error: String((sqlResult as PromiseRejectedResult).reason) };
+
+  const lastPurge = purgeResult.status === 'fulfilled'
+    ? purgeResult.value
+    : null;
 
   return NextResponse.json({
     queue,
     sql,
+    lastPurge,
     checkedAt: new Date().toISOString(),
   });
 }
@@ -51,17 +56,15 @@ async function getQueueDepth(): Promise<{ depth: number; queueName: string }> {
   }
 
   const { QueueServiceClient } = await import('@azure/storage-queue');
-  const client       = QueueServiceClient.fromConnectionString(connStr);
-  const queueClient  = client.getQueueClient(queueName);
-  const props        = await queueClient.getProperties();
-  const depth        = props.approximateMessagesCount ?? 0;
+  const client      = QueueServiceClient.fromConnectionString(connStr);
+  const queueClient = client.getQueueClient(queueName);
+  const props       = await queueClient.getProperties();
 
-  return { depth, queueName };
+  return { depth: props.approximateMessagesCount ?? 0, queueName };
 }
 
 // ---------------------------------------------------------------------------
-// SQL resource usage — CPU% from system view
-// Only works on Azure SQL (not local dev SQL Server)
+// SQL CPU from system view (Azure SQL only)
 // ---------------------------------------------------------------------------
 async function getSqlHealth(): Promise<{
   avgCpuPercent: number | null;
@@ -72,9 +75,9 @@ async function getSqlHealth(): Promise<{
     const result = await withAdminDb(async (req) => {
       const r = await req.query(`
         SELECT
-          ROUND(AVG(avg_cpu_percent), 1)  AS avg_cpu,
-          ROUND(MAX(avg_cpu_percent), 1)  AS max_cpu,
-          COUNT(*)                         AS samples
+          ROUND(AVG(avg_cpu_percent), 1) AS avg_cpu,
+          ROUND(MAX(avg_cpu_percent), 1) AS max_cpu,
+          COUNT(*)                        AS samples
         FROM sys.dm_db_resource_stats
         WHERE end_time >= DATEADD(minute, -5, GETUTCDATE())
       `);
@@ -82,12 +85,58 @@ async function getSqlHealth(): Promise<{
     });
 
     return {
-      avgCpuPercent: result?.avg_cpu   ?? null,
-      maxCpuPercent: result?.max_cpu   ?? null,
-      sampleCount:   result?.samples   ?? 0,
+      avgCpuPercent: result?.avg_cpu  ?? null,
+      maxCpuPercent: result?.max_cpu  ?? null,
+      sampleCount:   result?.samples  ?? 0,
     };
   } catch {
-    // sys.dm_db_resource_stats only exists on Azure SQL — silently unavailable locally
     return { avgCpuPercent: null, maxCpuPercent: null, sampleCount: 0 };
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Last janitor purge from JanitorLog
+// Returns null if table doesn't exist yet (before SQL migration runs)
+// ---------------------------------------------------------------------------
+async function getLastPurge(): Promise<{
+  ranAt:                string;
+  deletedSessions:      number;
+  deletedJourneyEvents: number;
+  deletedClickLogs:     number;
+  retentionDays:        number;
+  status:               string;
+  errorMessage:         string | null;
+} | null> {
+  try {
+    const row = await withAdminDb(async (req) => {
+      const r = await req.query(`
+        SELECT TOP 1
+          ran_at,
+          deleted_sessions,
+          deleted_journey_events,
+          deleted_clicklogs,
+          retention_days,
+          status,
+          error_message
+        FROM JanitorLog
+        ORDER BY ran_at DESC
+      `);
+      return r.recordset[0] ?? null;
+    });
+
+    if (!row) return null;
+
+    return {
+      ranAt:                new Date(row.ran_at).toISOString(),
+      deletedSessions:      Number(row.deleted_sessions       ?? 0),
+      deletedJourneyEvents: Number(row.deleted_journey_events ?? 0),
+      deletedClickLogs:     Number(row.deleted_clicklogs      ?? 0),
+      retentionDays:        Number(row.retention_days         ?? 90),
+      status:               row.status        ?? 'unknown',
+      errorMessage:         row.error_message ?? null,
+    };
+  } catch {
+    // JanitorLog table doesn't exist yet — SQL migration hasn't run
+    return null;
   }
 }

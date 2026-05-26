@@ -42,7 +42,7 @@ export async function sendWeeklyReportEmail({
   dashboardUrl,
 }: WeeklyReportParams): Promise<void> {
   const resend = getResendClient();
-  const from = process.env.RESEND_FROM_EMAIL ?? "AdLeak Shield <onboarding@resend.dev>";
+  const from = "AdLeak Shield <notifications@adleakshield.com>";
 
   const wasteFormatted = `£${totalWaste.toFixed(2)}`;
   const cleanWeek = topKeywords.length === 0;
@@ -195,6 +195,164 @@ function weeklyReportTemplate({
               <p style="margin:0;font-size:12px;color:#9ca3af;">
                 AdLeak Shield · Helping UK businesses stop wasting Google Ads budget<br>
                 You're receiving this because you have an active AdLeak Shield account.
+              </p>
+            </td>
+          </tr>
+
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>
+  `.trim();
+}
+
+// =============================================================================
+// DATA DELETION WARNING EMAIL
+// =============================================================================
+
+interface DataDeletionWarningParams {
+  to:            string;
+  daysLeft:      number;
+  deletionDate:  string; // e.g. "15 January 2026"
+  wasSubscriber: boolean; // true = cancelled paid sub, false = expired trial
+  dashboardUrl:  string;
+  billingUrl:    string;  // Stripe billing portal URL
+}
+
+export async function sendDataDeletionWarningEmail({
+  to,
+  daysLeft,
+  deletionDate,
+  wasSubscriber,
+  dashboardUrl,
+  billingUrl,
+}: DataDeletionWarningParams): Promise<void> {
+  const resend = getResendClient();
+  const from   = "AdLeak Shield <notifications@adleakshield.com>";
+
+  const subject = wasSubscriber
+    ? `Your AdLeak Shield data will be deleted in ${daysLeft} day${daysLeft !== 1 ? "s" : ""} — resubscribe to keep it`
+    : `Your AdLeak Shield trial data will be deleted in ${daysLeft} day${daysLeft !== 1 ? "s" : ""}`;
+
+  const { error } = await resend.emails.send({
+    from,
+    to,
+    subject,
+    html: dataDeletionTemplate({ daysLeft, deletionDate, wasSubscriber, dashboardUrl, billingUrl }),
+  });
+
+  if (error) throw new Error(`Resend error: ${error.message}`);
+}
+
+function dataDeletionTemplate({
+  daysLeft,
+  deletionDate,
+  wasSubscriber,
+  dashboardUrl,
+  billingUrl,
+}: Omit<DataDeletionWarningParams, "to">): string {
+  const urgencyColour  = daysLeft <= 3 ? "#b91c1c" : "#d97706";
+  const urgencyBg      = daysLeft <= 3 ? "#fef2f2" : "#fffbeb";
+  const urgencyBorder  = daysLeft <= 3 ? "#fecaca" : "#fde68a";
+
+  return `
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Your AdLeak Shield data will be deleted</title>
+</head>
+<body style="margin:0;padding:0;background:#f9fafb;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;">
+  <table width="100%" cellpadding="0" cellspacing="0" style="background:#f9fafb;padding:40px 20px;">
+    <tr>
+      <td align="center">
+        <table width="560" cellpadding="0" cellspacing="0" style="background:#ffffff;border-radius:8px;border:1px solid #e5e7eb;overflow:hidden;">
+
+          <!-- Header -->
+          <tr>
+            <td style="background:#111827;padding:24px 40px;">
+              <p style="margin:0;color:#ffffff;font-size:18px;font-weight:600;letter-spacing:-0.3px;">AdLeak Shield</p>
+            </td>
+          </tr>
+
+          <!-- Warning banner -->
+          <tr>
+            <td style="padding:32px 40px 0;">
+              <table width="100%" cellpadding="0" cellspacing="0">
+                <tr>
+                  <td style="background:${urgencyBg};border:1px solid ${urgencyBorder};border-radius:8px;padding:20px 24px;">
+                    <p style="margin:0 0 4px;font-size:12px;font-weight:700;color:${urgencyColour};text-transform:uppercase;letter-spacing:0.5px;">
+                      ⚠ Data deletion in ${daysLeft} day${daysLeft !== 1 ? "s" : ""}
+                    </p>
+                    <p style="margin:0;font-size:22px;font-weight:700;color:#111827;">
+                      Scheduled for ${deletionDate}
+                    </p>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+
+          <!-- Body -->
+          <tr>
+            <td style="padding:28px 40px;">
+              ${wasSubscriber ? `
+              <p style="margin:0 0 16px;font-size:15px;color:#374151;line-height:1.6;">
+                Your AdLeak Shield subscription was cancelled. Under our 90-day data retention policy,
+                your keyword tracking history, session data, and visitor journeys will be
+                <strong>permanently deleted on ${deletionDate}</strong>.
+              </p>
+              <p style="margin:0 0 24px;font-size:15px;color:#374151;line-height:1.6;">
+                If you resubscribe before ${deletionDate}, your data will be preserved and you'll
+                have full access immediately.
+              </p>
+              <table cellpadding="0" cellspacing="0" style="margin-bottom:16px;">
+                <tr>
+                  <td style="border-radius:6px;background:#111827;">
+                    <a href="${billingUrl}"
+                       style="display:inline-block;padding:14px 28px;color:#ffffff;font-size:15px;font-weight:500;text-decoration:none;border-radius:6px;">
+                      Resubscribe to keep your data →
+                    </a>
+                  </td>
+                </tr>
+              </table>
+              ` : `
+              <p style="margin:0 0 16px;font-size:15px;color:#374151;line-height:1.6;">
+                Your 7-day AdLeak Shield trial has ended without an active subscription.
+                Under our data retention policy, your trial data — including keyword tracking,
+                session history, and visitor journeys — will be
+                <strong>permanently deleted on ${deletionDate}</strong>.
+              </p>
+              <p style="margin:0 0 24px;font-size:15px;color:#374151;line-height:1.6;">
+                Subscribe before ${deletionDate} to keep your data and continue identifying
+                wasted Google Ads spend.
+              </p>
+              <table cellpadding="0" cellspacing="0" style="margin-bottom:16px;">
+                <tr>
+                  <td style="border-radius:6px;background:#111827;">
+                    <a href="${dashboardUrl}"
+                       style="display:inline-block;padding:14px 28px;color:#ffffff;font-size:15px;font-weight:500;text-decoration:none;border-radius:6px;">
+                      Subscribe now — £12.99/mo →
+                    </a>
+                  </td>
+                </tr>
+              </table>
+              `}
+              <p style="margin:16px 0 0;font-size:13px;color:#9ca3af;">
+                If you don't want to continue, no action is needed — your data will be automatically deleted on ${deletionDate}.
+              </p>
+            </td>
+          </tr>
+
+          <!-- Footer -->
+          <tr>
+            <td style="padding:24px 40px;border-top:1px solid #f3f4f6;">
+              <p style="margin:0;font-size:12px;color:#9ca3af;line-height:1.6;">
+                AdLeak Shield · GDPR-compliant data retention<br>
+                This email was sent because your account data is scheduled for deletion.
               </p>
             </td>
           </tr>

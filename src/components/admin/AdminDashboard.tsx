@@ -42,9 +42,20 @@ interface TenantsData {
   dateRange: { start: string; end: string };
 }
 
+interface LastPurge {
+  ranAt:                string;
+  deletedSessions:      number;
+  deletedJourneyEvents: number;
+  deletedClickLogs:     number;
+  retentionDays:        number;
+  status:               string;
+  errorMessage:         string | null;
+}
+
 interface HealthData {
-  queue: { depth: number; queueName: string; error?: string };
-  sql:   { avgCpuPercent: number | null; maxCpuPercent: number | null; sampleCount: number; error?: string };
+  queue:     { depth: number; queueName: string; error?: string };
+  sql:       { avgCpuPercent: number | null; maxCpuPercent: number | null; sampleCount: number; error?: string };
+  lastPurge: LastPurge | null;
   checkedAt: string;
 }
 
@@ -504,6 +515,47 @@ export function AdminDashboard() {
                   </p>
                 </div>
                 <span className="text-2xl">🗄</span>
+              </div>
+            </div>
+
+            {/* GDPR Janitor — last purge */}
+            <div className="bg-gray-900 rounded-xl p-5 border border-gray-800 sm:col-span-2">
+              <div className="flex items-start justify-between">
+                <div className="flex-1">
+                  <p className="text-xs text-gray-500 uppercase tracking-wider mb-1">
+                    GDPR Janitor — last purge
+                  </p>
+                  {health?.lastPurge == null ? (
+                    <p className="text-gray-600 text-sm mt-1">
+                      No runs yet — SQL migration may not have run
+                    </p>
+                  ) : (
+                    <>
+                      <div className="flex items-center gap-3 mt-1">
+                        <span className={`inline-flex items-center gap-1 text-sm font-semibold ${
+                          health.lastPurge.status === 'success' ? 'text-green-400' : 'text-red-400'
+                        }`}>
+                          {health.lastPurge.status === 'success' ? '✓' : '✗'} {health.lastPurge.status}
+                        </span>
+                        <span className="text-gray-500 text-xs">
+                          {timeSince(health.lastPurge.ranAt)} · {new Date(health.lastPurge.ranAt).toLocaleDateString('en-GB')}
+                        </span>
+                      </div>
+                      {health.lastPurge.status === 'error' && health.lastPurge.errorMessage && (
+                        <p className="text-red-500 text-xs mt-1 font-mono">{health.lastPurge.errorMessage}</p>
+                      )}
+                      {health.lastPurge.status === 'success' && (
+                        <div className="flex gap-4 mt-2 text-xs text-gray-400">
+                          <span>{health.lastPurge.deletedSessions.toLocaleString()} sessions</span>
+                          <span>{health.lastPurge.deletedJourneyEvents.toLocaleString()} events</span>
+                          <span>{health.lastPurge.deletedClickLogs.toLocaleString()} click logs</span>
+                          <span className="text-gray-600">({health.lastPurge.retentionDays}d retention)</span>
+                        </div>
+                      )}
+                    </>
+                  )}
+                </div>
+                <span className="text-2xl">🧹</span>
               </div>
             </div>
           </div>

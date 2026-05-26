@@ -49,8 +49,10 @@ export async function POST(request: NextRequest) {
             .input('tenantId', mssql.UniqueIdentifier, tenantId)
             .query(`
               UPDATE Tenants
-              SET stripe_customer_id = @customerId,
-                  subscription_status = 'active'
+              SET stripe_customer_id        = @customerId,
+                  subscription_status       = 'active',
+                  subscription_cancelled_at = NULL,
+                  data_deletion_warned_at   = NULL
               WHERE tenant_id = @tenantId
             `);
         });
@@ -75,16 +77,42 @@ export async function POST(request: NextRequest) {
         };
 
         const mappedStatus = statusMap[subscription.status] ?? 'canceled';
+        const isCanceled = mappedStatus === 'canceled';
+        const isActive   = mappedStatus === 'active';
 
         await withAdminDb(async (req) => {
-          await req
+          req
             .input('customerId', mssql.NVarChar(50), customerId)
-            .input('status', mssql.NVarChar(20), mappedStatus)
-            .query(`
+            .input('status',     mssql.NVarChar(20), mappedStatus);
+
+          if (isCanceled) {
+            // Stamp cancellation date (once only) + clear any previous warning flag
+            // so they get a fresh 90-day window and a new warning email if they
+            // resubscribe and cancel again.
+            await req.query(`
+              UPDATE Tenants
+              SET subscription_status        = @status,
+                  subscription_cancelled_at  = ISNULL(subscription_cancelled_at, GETUTCDATE()),
+                  data_deletion_warned_at    = NULL
+              WHERE stripe_customer_id = @customerId
+            `);
+          } else if (isActive) {
+            // Resubscribed — clear retention-related stamps so the 90-day clock
+            // resets if they ever cancel again in the future.
+            await req.query(`
+              UPDATE Tenants
+              SET subscription_status        = @status,
+                  subscription_cancelled_at  = NULL,
+                  data_deletion_warned_at    = NULL
+              WHERE stripe_customer_id = @customerId
+            `);
+          } else {
+            await req.query(`
               UPDATE Tenants
               SET subscription_status = @status
               WHERE stripe_customer_id = @customerId
             `);
+          }
         });
 
         console.log(`[stripe/webhook] Subscription updated for ${customerId}: ${subscription.status} → ${mappedStatus}`);
@@ -95,12 +123,17 @@ export async function POST(request: NextRequest) {
         const subscription = event.data.object as Stripe.Subscription;
         const customerId = subscription.customer as string;
 
+        // Stamp cancellation timestamp (ISNULL = only set if not already set,
+        // in case customer.subscription.updated fired first).
+        // Clear data_deletion_warned_at so a fresh warning goes out in 85 days.
         await withAdminDb(async (req) => {
           await req
             .input('customerId', mssql.NVarChar(50), customerId)
             .query(`
               UPDATE Tenants
-              SET subscription_status = 'canceled'
+              SET subscription_status       = 'canceled',
+                  subscription_cancelled_at = ISNULL(subscription_cancelled_at, GETUTCDATE()),
+                  data_deletion_warned_at   = NULL
               WHERE stripe_customer_id = @customerId
             `);
         });
