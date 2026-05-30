@@ -132,21 +132,31 @@ export function AdminDashboard() {
   const USER_PAGE_SIZE = 10;
   const [userPage, setUserPage] = useState(1);
 
+  // Refresh counter — incrementing this busts the SWR cache key, forcing a real fetch
+  const [refreshKey, setRefreshKey] = useState(0);
+
   // Build query params from current date range
   const { start, end } = useMemo(
     () => presetRange(preset, customStart, customEnd),
     [preset, customStart, customEnd]
   );
-  const qs = `?start=${encodeURIComponent(start)}&end=${encodeURIComponent(end)}`;
+  const qs = `?start=${encodeURIComponent(start)}&end=${encodeURIComponent(end)}&_r=${refreshKey}`;
 
-  const { data: metrics, isLoading: mLoading, mutate: mutateMetrics } =
+  const { data: metrics, isLoading: mLoading, isValidating: mValidating } =
     useSWR<MetricsData>(`/api/admin/metrics${qs}`, { revalidateOnFocus: false });
 
-  const { data: tenantsData, isLoading: tLoading, mutate: mutateTenants } =
+  const { data: tenantsData, isLoading: tLoading, isValidating: tValidating } =
     useSWR<TenantsData>(`/api/admin/tenants${qs}`, { revalidateOnFocus: false });
 
-  const { data: health, isLoading: hLoading, mutate: mutateHealth } =
-    useSWR<HealthData>('/api/admin/health', { refreshInterval: 60_000 });
+  const { data: health, isLoading: hLoading } =
+    useSWR<HealthData>(`/api/admin/health?_r=${refreshKey}`, { revalidateOnFocus: false, refreshInterval: 60_000 });
+
+  // Clear the refreshing spinner once all three fetches complete
+  React.useEffect(() => {
+    if (refreshing && !mValidating && !tValidating) {
+      setRefreshing(false);
+    }
+  }, [mValidating, tValidating, refreshing]);
 
   // Filter tenants by search
   const allTenants = tenantsData?.tenants ?? [];
@@ -175,7 +185,7 @@ export function AdminDashboard() {
       const d = await r.json();
       if (r.ok) {
         alert(`✅ Trial extended to ${new Date(d.newTrialEndsAt).toLocaleDateString('en-GB')}`);
-        mutateTenants();
+        setRefreshKey(k => k + 1);
       } else {
         alert(`❌ ${d.error}`);
       }
@@ -262,20 +272,9 @@ export function AdminDashboard() {
         )}
 
         <button
-          onClick={async () => {
+          onClick={() => {
             setRefreshing(true);
-            try {
-              const [freshMetrics, freshTenants] = await Promise.all([
-                fetch(`/api/admin/metrics${qs}`, { cache: 'no-store' }).then(r => r.json()),
-                fetch(`/api/admin/tenants${qs}`, { cache: 'no-store' }).then(r => r.json()),
-              ]);
-              await Promise.all([
-                mutateMetrics(freshMetrics, { revalidate: false }),
-                mutateTenants(freshTenants, { revalidate: false }),
-              ]);
-            } finally {
-              setRefreshing(false);
-            }
+            setRefreshKey(k => k + 1);
           }}
           disabled={refreshing}
           className="ml-auto flex items-center gap-1.5 text-xs text-gray-500 hover:text-gray-300 transition-colors disabled:opacity-50"
@@ -494,10 +493,7 @@ export function AdminDashboard() {
             System Health
           </h2>
           <button
-            onClick={async () => {
-              const fresh = await fetch('/api/admin/health', { cache: 'no-store' }).then(r => r.json());
-              mutateHealth(fresh, { revalidate: false });
-            }}
+            onClick={() => setRefreshKey(k => k + 1)}
             className="text-xs text-gray-500 hover:text-gray-300 transition-colors"
           >
             ↻ Refresh
