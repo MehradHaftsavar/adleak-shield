@@ -82,15 +82,6 @@ function getRange(preset: Preset, customStart: string, customEnd: string) {
   };
 }
 
-async function apiFetch<T>(url: string): Promise<T | null> {
-  try {
-    const res = await fetch(url, { cache: 'no-store' });
-    if (!res.ok) return null;
-    return await res.json() as T;
-  } catch {
-    return null;
-  }
-}
 
 export function AdminDashboard() {
   const [preset,      setPreset]      = useState<Preset>('30d');
@@ -115,47 +106,83 @@ export function AdminDashboard() {
   const USER_PAGE_SIZE = 10;
   const [userPage, setUserPage] = useState(1);
 
-  // ── Load functions — no useCallback, no closures, fresh dates on every call ──
+  // ── Load functions — defined outside render cycle via refs ──
 
-  async function loadMetrics() {
-    const { start, end } = getRange(preset, customStart, customEnd);
+  const presetRef      = React.useRef(preset);
+  const customStartRef = React.useRef(customStart);
+  const customEndRef   = React.useRef(customEnd);
+
+  // Keep refs in sync with state on every render
+  presetRef.current      = preset;
+  customStartRef.current = customStart;
+  customEndRef.current   = customEnd;
+
+  const loadMetrics = React.useRef(async () => {
+    const { start, end } = getRange(presetRef.current, customStartRef.current, customEndRef.current);
     setMLoading(true);
-    const data = await apiFetch<MetricsData>(
-      `/api/admin/metrics?start=${encodeURIComponent(start)}&end=${encodeURIComponent(end)}`
-    );
-    if (data) setMetrics(data);
+    try {
+      const res = await fetch(
+        `/api/admin/metrics?start=${encodeURIComponent(start)}&end=${encodeURIComponent(end)}`,
+        { cache: 'no-store' }
+      );
+      const data = await res.json();
+      console.log('[Admin] metrics data:', data);
+      setMetrics(data);
+    } catch (e) {
+      console.error('[Admin] metrics error:', e);
+    }
     setMLoading(false);
-  }
+  }).current;
 
-  async function loadTenants() {
-    const { start, end } = getRange(preset, customStart, customEnd);
+  const loadTenants = React.useRef(async () => {
+    const { start, end } = getRange(presetRef.current, customStartRef.current, customEndRef.current);
     setTLoading(true);
-    const data = await apiFetch<TenantsData>(
-      `/api/admin/tenants?start=${encodeURIComponent(start)}&end=${encodeURIComponent(end)}`
-    );
-    if (data) setTenantsData(data);
+    try {
+      const res = await fetch(
+        `/api/admin/tenants?start=${encodeURIComponent(start)}&end=${encodeURIComponent(end)}`,
+        { cache: 'no-store' }
+      );
+      const data = await res.json();
+      console.log('[Admin] tenants data:', data);
+      setTenantsData(data);
+    } catch (e) {
+      console.error('[Admin] tenants error:', e);
+    }
     setTLoading(false);
-  }
+  }).current;
 
-  async function loadHealth() {
+  const loadHealth = React.useRef(async () => {
     setHLoading(true);
-    const data = await apiFetch<HealthData>('/api/admin/health');
-    if (data) setHealth(data);
+    try {
+      const res = await fetch('/api/admin/health', { cache: 'no-store' });
+      const data = await res.json();
+      console.log('[Admin] health data:', data);
+      setHealth(data);
+    } catch (e) {
+      console.error('[Admin] health error:', e);
+    }
     setHLoading(false);
-  }
+  }).current;
 
   async function handleRefreshAll() {
+    console.log('[Admin] Refresh all triggered');
     setRefreshing(true);
     await Promise.all([loadMetrics(), loadTenants(), loadHealth()]);
     setLastRefreshed(new Date());
     setRefreshing(false);
+    console.log('[Admin] Refresh all complete');
   }
 
-  // Load on mount and whenever the date range preset changes
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  useEffect(() => { loadMetrics(); loadTenants(); }, [preset, customStart, customEnd]);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  useEffect(() => { loadHealth(); }, []);
+  // Load on mount
+  useEffect(() => { loadMetrics(); loadTenants(); loadHealth(); }, []); // eslint-disable-line
+
+  // Reload metrics+tenants when date range changes (not on mount — handled above)
+  const isFirstRender = React.useRef(true);
+  useEffect(() => {
+    if (isFirstRender.current) { isFirstRender.current = false; return; }
+    loadMetrics();
+    loadTenants();
+  }, [preset, customStart, customEnd]); // eslint-disable-line
 
   const allTenants = tenantsData?.tenants ?? [];
   const tenants = search.trim()
