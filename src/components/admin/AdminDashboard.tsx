@@ -264,8 +264,18 @@ export function AdminDashboard() {
         <button
           onClick={async () => {
             setRefreshing(true);
-            await Promise.all([mutateMetrics(), mutateTenants()]);
-            setRefreshing(false);
+            try {
+              const [freshMetrics, freshTenants] = await Promise.all([
+                fetch(`/api/admin/metrics${qs}`, { cache: 'no-store' }).then(r => r.json()),
+                fetch(`/api/admin/tenants${qs}`, { cache: 'no-store' }).then(r => r.json()),
+              ]);
+              await Promise.all([
+                mutateMetrics(freshMetrics, { revalidate: false }),
+                mutateTenants(freshTenants, { revalidate: false }),
+              ]);
+            } finally {
+              setRefreshing(false);
+            }
           }}
           disabled={refreshing}
           className="ml-auto flex items-center gap-1.5 text-xs text-gray-500 hover:text-gray-300 transition-colors disabled:opacity-50"
@@ -484,7 +494,10 @@ export function AdminDashboard() {
             System Health
           </h2>
           <button
-            onClick={() => mutateHealth()}
+            onClick={async () => {
+              const fresh = await fetch('/api/admin/health', { cache: 'no-store' }).then(r => r.json());
+              mutateHealth(fresh, { revalidate: false });
+            }}
             className="text-xs text-gray-500 hover:text-gray-300 transition-colors"
           >
             ↻ Refresh
