@@ -97,6 +97,7 @@ export function DomainStep({ onComplete, existingDomain }: DomainStepProps) {
   };
 
   return (
+    <>
     <div className="bg-white rounded-lg shadow-lg p-8 relative">
       {/* Loading overlay */}
       {(isFetching || isLoading) && (
@@ -237,5 +238,6 @@ export function DomainStep({ onComplete, existingDomain }: DomainStepProps) {
         </div>
       </div>
     )}
+    </>
   );
 }

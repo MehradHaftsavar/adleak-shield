@@ -134,6 +134,7 @@ export function CampaignStep({ domain, onComplete, onBack }: CampaignStepProps) 
   };
 
   return (
+    <>
     <div className="bg-white rounded-lg shadow-lg p-8 relative">
       {/* Loading overlay */}
       {(isFetching || isLoading) && (
@@ -434,5 +435,6 @@ export function CampaignStep({ domain, onComplete, onBack }: CampaignStepProps) 
         </div>
       );
     })()}
+    </>
   );
 }
