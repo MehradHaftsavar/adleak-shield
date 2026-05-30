@@ -67,13 +67,14 @@ export async function GET(request: NextRequest) {
       // Fallback: Check database for sessions (in case worker is running)
       if (!hasRecentData) {
         const recentDataResult = await req.query(`
-          SELECT TOP 1 
+          SELECT TOP 1
             session_id,
             keyword,
             campaign_id,
             started_at
           FROM Sessions
           WHERE started_at >= DATEADD(second, -60, GETUTCDATE())
+            AND keyword <> 'adleak_test'
           ORDER BY started_at DESC
         `);
 

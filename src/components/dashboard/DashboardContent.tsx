@@ -256,7 +256,10 @@ export function DashboardContent() {
 
       {/* Unregistered Traffic Alert */}
       {status.hasUnregisteredTraffic && (
-        <UnregisteredTrafficAlert traffic={status.unregisteredTraffic} />
+        <UnregisteredTrafficAlert
+          traffic={status.unregisteredTraffic}
+          registeredCount={status.campaigns.length}
+        />
       )}
 
       {/* Campaign Status Cards */}

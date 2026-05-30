@@ -50,8 +50,8 @@ export default function SettingsPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 py-8 px-4">
-      <div className="max-w-4xl mx-auto">
+    <>
+    <div className="max-w-4xl mx-auto">
         {/* Header */}
         <div className="flex items-center gap-3 mb-8">
           <div className="w-12 h-12 bg-purple-100 rounded-full flex items-center justify-center">
@@ -184,6 +184,6 @@ export default function SettingsPage() {
           </div>
         </div>
       )}
-    </div>
+    </>
   );
 }

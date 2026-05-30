@@ -8,7 +8,7 @@ const edgeConfig: NextAuthConfig = {
   },
   session: {
     strategy: "jwt",
-    maxAge: 8 * 60 * 60,
+    maxAge: 60 * 60, // 1 hour in seconds
   },
   callbacks: {
     authorized({ auth, request: { nextUrl } }) {

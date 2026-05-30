@@ -38,11 +38,11 @@ export const authConfig: NextAuthConfig = {
   // SESSION
   // JWT strategy: the session is stored in an encrypted cookie, not the DB.
   // This means no extra database table and no queries on every page load.
-  // maxAge: 8 hours — user is automatically logged out after 8 hours idle.
+  // maxAge: 1 hour — user is automatically logged out after 1 hour.
   // ==========================================================================
   session: {
     strategy: "jwt",
-    maxAge: 8 * 60 * 60, // 8 hours in seconds
+    maxAge: 60 * 60, // 1 hour in seconds
   },
 
   // ==========================================================================

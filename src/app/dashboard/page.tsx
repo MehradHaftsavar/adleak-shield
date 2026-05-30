@@ -29,7 +29,10 @@ export default async function DashboardPage() {
       email={email ?? ""}
       tenantId={tenantId}
     >
-      {/* Phase 3.2: Dashboard content with verification status */}
+      <div className="mb-8">
+        <h1 className="text-2xl font-bold text-gray-900 tracking-tight">Dashboard</h1>
+        <p className="mt-1 text-sm text-gray-500">Monitor your tracking status</p>
+      </div>
       <DashboardContent />
     </DashboardShell>
   );

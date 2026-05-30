@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Globe, Trash2, Plus } from 'lucide-react';
+import { Globe, Trash2, Plus, AlertTriangle } from 'lucide-react';
 
 interface DomainStepProps {
   onComplete: (domain: string) => void;
@@ -14,6 +14,7 @@ export function DomainStep({ onComplete, existingDomain }: DomainStepProps) {
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [isFetching, setIsFetching] = useState(true);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
 
   useEffect(() => {
     const fetchDomain = async () => {
@@ -65,14 +66,12 @@ export function DomainStep({ onComplete, existingDomain }: DomainStepProps) {
   };
 
   const handleDelete = async () => {
+    setShowDeleteModal(false);
     setIsLoading(true);
     setError('');
 
     try {
-      const res = await fetch('/api/domain', {
-        method: 'DELETE',
-      });
-
+      const res = await fetch('/api/domain', { method: 'DELETE' });
       const data = await res.json();
 
       if (!res.ok) {
@@ -81,7 +80,6 @@ export function DomainStep({ onComplete, existingDomain }: DomainStepProps) {
         return;
       }
 
-      // Success - clear the domain
       setDomain('');
       setIsLoading(false);
     } catch (err) {
@@ -136,7 +134,7 @@ export function DomainStep({ onComplete, existingDomain }: DomainStepProps) {
               <p className="text-sm text-gray-600">{domain}</p>
             </div>
             <button
-              onClick={handleDelete}
+              onClick={() => setShowDeleteModal(true)}
               className="text-red-600 hover:text-red-700 p-2"
               title="Remove domain"
               disabled={isFetching || isLoading}
@@ -205,5 +203,39 @@ export function DomainStep({ onComplete, existingDomain }: DomainStepProps) {
         {domain ? '1 / 1 domain registered' : '0 / 1 domain registered'}
       </p>
     </div>
+
+    {/* Delete domain confirmation modal */}
+    {showDeleteModal && (
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4">
+        <div className="bg-white rounded-2xl shadow-xl max-w-md w-full p-8">
+          <div className="flex items-center justify-center w-14 h-14 rounded-full bg-red-100 mx-auto mb-5">
+            <AlertTriangle className="w-7 h-7 text-red-600" />
+          </div>
+          <h2 className="text-xl font-bold text-gray-900 text-center mb-2">
+            Remove domain?
+          </h2>
+          <p className="text-sm text-gray-600 text-center mb-6">
+            This will permanently delete <strong>{domain}</strong> and{' '}
+            <strong>all campaigns and tracking data</strong> associated with it.
+            This cannot be undone.
+          </p>
+          <div className="flex gap-3">
+            <button
+              onClick={() => setShowDeleteModal(false)}
+              className="flex-1 px-4 py-2.5 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={handleDelete}
+              className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 bg-red-600 hover:bg-red-700 text-white text-sm font-semibold rounded-lg transition-colors"
+            >
+              <Trash2 className="w-4 h-4" />
+              Yes, remove it
+            </button>
+          </div>
+        </div>
+      </div>
+    )}
   );
 }

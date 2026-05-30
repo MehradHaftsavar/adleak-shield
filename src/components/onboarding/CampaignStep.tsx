@@ -20,6 +20,7 @@ export function CampaignStep({ domain, onComplete, onBack }: CampaignStepProps) 
   const [editingCpcValue, setEditingCpcValue] = useState('');
   const [cpcSaving, setCpcSaving] = useState(false);
   const [cpcError, setCpcError] = useState('');
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
 
   useEffect(() => {
     loadCampaigns();
@@ -82,11 +83,9 @@ export function CampaignStep({ domain, onComplete, onBack }: CampaignStepProps) 
   };
 
   const handleDeleteCampaign = async (id: string) => {
+    setConfirmDeleteId(null);
     try {
-      const res = await fetch(`/api/campaigns?id=${id}`, {
-        method: 'DELETE',
-      });
-
+      const res = await fetch(`/api/campaigns?id=${id}`, { method: 'DELETE' });
       if (res.ok) {
         setCampaigns(campaigns.filter(c => c.id !== id));
       }
@@ -181,7 +180,7 @@ export function CampaignStep({ domain, onComplete, onBack }: CampaignStepProps) 
                   </p>
                 </div>
                 <button
-                  onClick={() => handleDeleteCampaign(campaign.id)}
+                  onClick={() => setConfirmDeleteId(campaign.id)}
                   className="text-red-600 hover:text-red-700 p-2"
                   title="Remove campaign"
                   disabled={isFetching}
@@ -202,7 +201,10 @@ export function CampaignStep({ domain, onComplete, onBack }: CampaignStepProps) 
                         min="0.01"
                         max="1000"
                         value={editingCpcValue}
-                        onChange={(e) => setEditingCpcValue(e.target.value)}
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          if (/^\d*\.?\d{0,2}$/.test(val)) setEditingCpcValue(val);
+                        }}
                         className="w-full pl-7 pr-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
                         autoFocus
                         disabled={cpcSaving}
@@ -252,6 +254,62 @@ export function CampaignStep({ domain, onComplete, onBack }: CampaignStepProps) 
       )}
 
       {/* Add new campaign form */}
+      {/* Step-by-step guide — always visible */}
+      <div className="bg-blue-50 border border-blue-200 rounded-lg p-5 mb-6">
+        <p className="text-sm text-blue-900 font-semibold mb-3">
+          📋 How to find your Campaign ID in Google Ads
+        </p>
+        <ol className="text-sm text-blue-800 space-y-3 list-none">
+          <li className="flex gap-2">
+            <span className="flex-shrink-0 w-5 h-5 bg-blue-600 text-white rounded-full text-xs flex items-center justify-center font-bold">1</span>
+            <span>Go to <strong>ads.google.com</strong> and sign in to your account.</span>
+          </li>
+          <li className="flex gap-2">
+            <span className="flex-shrink-0 w-5 h-5 bg-blue-600 text-white rounded-full text-xs flex items-center justify-center font-bold">2</span>
+            <span>In the left sidebar, click <strong>Campaigns</strong> then select <strong>Campaigns</strong> from the submenu.</span>
+          </li>
+          <li className="flex gap-2">
+            <span className="flex-shrink-0 w-5 h-5 bg-blue-600 text-white rounded-full text-xs flex items-center justify-center font-bold">3</span>
+            <span>
+              The Campaign ID column is <strong>hidden by default</strong>. To add it:
+              <ol className="mt-1.5 ml-1 space-y-1 list-none">
+                <li className="flex gap-1.5 text-blue-700">
+                  <span>→</span>
+                  <span>Click the <strong>columns icon</strong> (a small grid) at the top right of the table.</span>
+                </li>
+                <li className="flex gap-1.5 text-blue-700">
+                  <span>→</span>
+                  <span>Click <strong>"Modify columns"</strong>.</span>
+                </li>
+                <li className="flex gap-1.5 text-blue-700">
+                  <span>→</span>
+                  <span>In the search box type <strong>"Campaign ID"</strong>.</span>
+                </li>
+                <li className="flex gap-1.5 text-blue-700">
+                  <span>→</span>
+                  <span>Click the <strong>blue arrow ( → )</strong> next to Campaign ID to add it to your columns.</span>
+                </li>
+                <li className="flex gap-1.5 text-blue-700">
+                  <span>→</span>
+                  <span>Click <strong>"Apply"</strong>.</span>
+                </li>
+              </ol>
+            </span>
+          </li>
+          <li className="flex gap-2">
+            <span className="flex-shrink-0 w-5 h-5 bg-blue-600 text-white rounded-full text-xs flex items-center justify-center font-bold">4</span>
+            <span>You'll now see a <strong>Campaign ID</strong> column in your table. Copy the full number next to your campaign — it's typically 8–13 digits (e.g., <span className="font-mono bg-blue-100 px-1 rounded">23698216554</span>).</span>
+          </li>
+          <li className="flex gap-2">
+            <span className="flex-shrink-0 w-5 h-5 bg-blue-600 text-white rounded-full text-xs flex items-center justify-center font-bold">5</span>
+            <span>
+              While you're there, also note your <strong>Avg. CPC</strong> — you'll need it below.
+              If the column isn't visible, add it the same way: Modify columns → search "Avg. CPC" → Apply.
+            </span>
+          </li>
+        </ol>
+      </div>
+
       {campaigns.length < 3 && (
         <form onSubmit={handleAddCampaign} className="space-y-4 mb-6">
           <div>
@@ -263,14 +321,13 @@ export function CampaignStep({ domain, onComplete, onBack }: CampaignStepProps) 
               type="text"
               value={newCampaignId}
               onChange={(e) => setNewCampaignId(e.target.value)}
-              placeholder="e.g., 12345678"
+              placeholder="e.g., 23698216554"
               className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
               required
               disabled={isFetching || isLoading}
             />
           </div>
 
-          {/* NEW: Average CPC input - REQUIRED */}
           <div>
             <label htmlFor="avgCpc" className="block text-sm font-medium text-gray-700 mb-2">
               Average CPC <span className="text-red-500">*</span>
@@ -284,7 +341,11 @@ export function CampaignStep({ domain, onComplete, onBack }: CampaignStepProps) 
                 min="0.01"
                 max="1000"
                 value={newAvgCpc}
-                onChange={(e) => setNewAvgCpc(e.target.value)}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  // Block more than 2 decimal places as the user types
+                  if (/^\d*\.?\d{0,2}$/.test(val)) setNewAvgCpc(val);
+                }}
                 placeholder="2.50"
                 className="w-full pl-8 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
                 required
@@ -292,7 +353,7 @@ export function CampaignStep({ domain, onComplete, onBack }: CampaignStepProps) 
               />
             </div>
             <p className="mt-2 text-xs text-gray-500">
-              💡 Find this in Google Ads → Campaigns → "Avg. CPC" column. You can update this later if your CPC changes.
+              Your average cost-per-click from Google Ads. Used to estimate wasted spend. You can update this later.
             </p>
           </div>
 
@@ -312,19 +373,6 @@ export function CampaignStep({ domain, onComplete, onBack }: CampaignStepProps) 
           <p className="text-sm text-red-600">{error}</p>
         </div>
       )}
-
-      {/* Help box */}
-      <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
-        <p className="text-sm text-blue-900 font-semibold mb-2">
-          Where to find your Campaign ID:
-        </p>
-        <ol className="text-sm text-blue-800 space-y-1 list-decimal list-inside">
-          <li>Open Google Ads dashboard</li>
-          <li>Click on "Campaigns" in the left menu</li>
-          <li>Look for the numeric ID next to your campaign name</li>
-          <li>Copy the full number (e.g., 12345678)</li>
-        </ol>
-      </div>
 
       {/* Navigation buttons */}
       <div className="flex gap-4">
@@ -349,5 +397,42 @@ export function CampaignStep({ domain, onComplete, onBack }: CampaignStepProps) 
         {campaigns.length} / 3 campaigns registered
       </p>
     </div>
+
+    {/* Delete campaign confirmation modal */}
+    {confirmDeleteId && (() => {
+      const c = campaigns.find(c => c.id === confirmDeleteId);
+      return (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4">
+          <div className="bg-white rounded-2xl shadow-xl max-w-sm w-full p-8">
+            <div className="flex items-center justify-center w-14 h-14 rounded-full bg-red-100 mx-auto mb-5">
+              <Trash2 className="w-7 h-7 text-red-600" />
+            </div>
+            <h2 className="text-xl font-bold text-gray-900 text-center mb-2">
+              Remove campaign?
+            </h2>
+            <p className="text-sm text-gray-600 text-center mb-6">
+              Campaign {c?.slotNumber} — ID{' '}
+              <span className="font-mono font-semibold">{c?.googleCampaignId}</span>{' '}
+              will be removed along with all its tracking history.
+            </p>
+            <div className="flex gap-3">
+              <button
+                onClick={() => setConfirmDeleteId(null)}
+                className="flex-1 px-4 py-2.5 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => handleDeleteCampaign(confirmDeleteId)}
+                className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 bg-red-600 hover:bg-red-700 text-white text-sm font-semibold rounded-lg transition-colors"
+              >
+                <Trash2 className="w-4 h-4" />
+                Yes, remove it
+              </button>
+            </div>
+          </div>
+        </div>
+      );
+    })()}
   );
 }
