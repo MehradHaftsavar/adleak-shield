@@ -105,6 +105,10 @@ export function SessionsTable({ campaigns, dateRange, refreshTrigger }: Sessions
   // Journey slide-over
   const [selectedSession, setSelectedSession] = useState<Session | null>(null);
 
+  // Pagination
+  const PAGE_SIZE = 10;
+  const [page, setPage] = useState(1);
+
   const loadSessions = useCallback(async () => {
     setIsLoading(true);
     setError('');
@@ -121,6 +125,7 @@ export function SessionsTable({ campaigns, dateRange, refreshTrigger }: Sessions
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Failed to load sessions');
       setSessions(data.sessions || []);
+      setPage(1);
     } catch (err: any) {
       setError(err.message || 'Network error');
     } finally {
@@ -132,6 +137,9 @@ export function SessionsTable({ campaigns, dateRange, refreshTrigger }: Sessions
     const timer = setTimeout(loadSessions, keyword ? 400 : 0);
     return () => clearTimeout(timer);
   }, [loadSessions]);
+
+  const totalPages = Math.max(1, Math.ceil(sessions.length / PAGE_SIZE));
+  const pageRows = sessions.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
 
   return (
     <>
@@ -213,10 +221,10 @@ export function SessionsTable({ campaigns, dateRange, refreshTrigger }: Sessions
             </select>
           </div>
 
-          {!isLoading && (
+          {!isLoading && sessions.length > 0 && (
             <p className="text-xs text-gray-400 mt-3">
-              {sessions.length} session{sessions.length !== 1 ? 's' : ''}
-              {sessions.length === 100 ? ' (showing first 100)' : ''}
+              Showing {(page - 1) * PAGE_SIZE + 1}–{Math.min(page * PAGE_SIZE, sessions.length)} of {sessions.length} session{sessions.length !== 1 ? 's' : ''}
+              {sessions.length === 100 ? ' (max 100 loaded)' : ''}
             </p>
           )}
         </div>
@@ -273,7 +281,7 @@ export function SessionsTable({ campaigns, dateRange, refreshTrigger }: Sessions
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-100">
-                {sessions.map(s => (
+                {pageRows.map(s => (
                   <tr
                     key={s.sessionId}
                     onClick={() => setSelectedSession(s)}
@@ -315,6 +323,34 @@ export function SessionsTable({ campaigns, dateRange, refreshTrigger }: Sessions
                 ))}
               </tbody>
             </table>
+          </div>
+        )}
+
+        {/* Pagination */}
+        {!isLoading && sessions.length > 0 && (
+          <div className="px-6 py-3 border-t border-gray-200 flex items-center justify-between gap-4 bg-white">
+            <p className="text-xs text-gray-500">
+              Showing {(page - 1) * PAGE_SIZE + 1}–{Math.min(page * PAGE_SIZE, sessions.length)} of {sessions.length} session{sessions.length !== 1 ? 's' : ''}
+            </p>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => setPage(p => Math.max(1, p - 1))}
+                disabled={page === 1}
+                className="px-3 py-1.5 text-xs font-medium border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+              >
+                ← Prev
+              </button>
+              <span className="text-xs text-gray-600 font-medium px-1">
+                Page {page} of {totalPages}
+              </span>
+              <button
+                onClick={() => setPage(p => Math.min(totalPages, p + 1))}
+                disabled={page === totalPages}
+                className="px-3 py-1.5 text-xs font-medium border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+              >
+                Next →
+              </button>
+            </div>
           </div>
         )}
 

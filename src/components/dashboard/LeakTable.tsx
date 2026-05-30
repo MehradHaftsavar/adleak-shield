@@ -59,6 +59,10 @@ export function LeakTable({ dateRange, refreshTrigger }: LeakTableProps) {
   const [sortKey, setSortKey] = useState<SortKey>('estimatedWaste');
   const [sortDir, setSortDir] = useState<SortDir>('desc');
 
+  // Pagination
+  const PAGE_SIZE = 10;
+  const [page, setPage] = useState(1);
+
   useEffect(() => { loadLeaks(); }, [dateRange, refreshTrigger]);
 
   const loadLeaks = async () => {
@@ -93,7 +97,11 @@ export function LeakTable({ dateRange, refreshTrigger }: LeakTableProps) {
       setSortKey(col);
       setSortDir(col === 'keyword' || col === 'matchType' || col === 'googleCampaignId' ? 'asc' : 'desc');
     }
+    setPage(1);
   };
+
+  // Reset page when filters change
+  useEffect(() => { setPage(1); }, [filterMatchType, filterCampaign]);
 
   // Derived filter options
   const matchTypes = useMemo(() => [...new Set(data?.leaks.map(l => l.matchType) ?? [])].sort(), [data]);
@@ -114,6 +122,9 @@ export function LeakTable({ dateRange, refreshTrigger }: LeakTableProps) {
       return sortDir === 'asc' ? cmp : -cmp;
     });
   }, [data, filterMatchType, filterCampaign, sortKey, sortDir]);
+
+  const totalPages = Math.max(1, Math.ceil(rows.length / PAGE_SIZE));
+  const pageRows = rows.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
 
   const thClass = "px-4 sm:px-6 py-3 text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer select-none hover:bg-gray-100 transition-colors";
 
@@ -254,7 +265,7 @@ export function LeakTable({ dateRange, refreshTrigger }: LeakTableProps) {
             </tr>
           </thead>
           <tbody className="bg-white divide-y divide-gray-200">
-            {rows.map((leak, idx) => (
+            {pageRows.map((leak, idx) => (
               <tr
                 key={idx}
                 className="hover:bg-blue-50 transition-colors cursor-pointer group"
@@ -293,6 +304,36 @@ export function LeakTable({ dateRange, refreshTrigger }: LeakTableProps) {
           </tbody>
         </table>
       </div>
+
+      {/* Pagination */}
+      {rows.length > 0 && (
+        <div className="px-6 py-3 border-t border-gray-200 flex items-center justify-between gap-4 bg-white">
+          <p className="text-xs text-gray-500">
+            {rows.length === 0
+              ? 'No results'
+              : `Showing ${(page - 1) * PAGE_SIZE + 1}–${Math.min(page * PAGE_SIZE, rows.length)} of ${rows.length} keyword${rows.length !== 1 ? 's' : ''}`}
+          </p>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setPage(p => Math.max(1, p - 1))}
+              disabled={page === 1}
+              className="px-3 py-1.5 text-xs font-medium border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+            >
+              ← Prev
+            </button>
+            <span className="text-xs text-gray-600 font-medium px-1">
+              Page {page} of {totalPages}
+            </span>
+            <button
+              onClick={() => setPage(p => Math.min(totalPages, p + 1))}
+              disabled={page === totalPages}
+              className="px-3 py-1.5 text-xs font-medium border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+            >
+              Next →
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Footer */}
       <div className="p-4 bg-gray-50 border-t border-gray-200">

@@ -128,6 +128,10 @@ export function AdminDashboard() {
   const [extendDays,    setExtendDays]    = useState(7);
   const [refreshing,    setRefreshing]    = useState(false);
 
+  // Pagination
+  const USER_PAGE_SIZE = 10;
+  const [userPage, setUserPage] = useState(1);
+
   // Build query params from current date range
   const { start, end } = useMemo(
     () => presetRange(preset, customStart, customEnd),
@@ -152,6 +156,12 @@ export function AdminDashboard() {
         t.subscriptionStatus.includes(search.toLowerCase())
       )
     : allTenants;
+
+  // Reset to page 1 when search changes
+  React.useEffect(() => { setUserPage(1); }, [search]);
+
+  const userTotalPages = Math.max(1, Math.ceil(tenants.length / USER_PAGE_SIZE));
+  const pageUsers = tenants.slice((userPage - 1) * USER_PAGE_SIZE, userPage * USER_PAGE_SIZE);
 
   // ---- Extend trial
   async function extendTrial(tenantId: string) {
@@ -349,6 +359,7 @@ export function AdminDashboard() {
           ) : tenants.length === 0 ? (
             <div className="p-8 text-center text-gray-600 text-sm">No users found</div>
           ) : (
+            <>
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
@@ -364,7 +375,7 @@ export function AdminDashboard() {
                   </tr>
                 </thead>
                 <tbody>
-                  {tenants.map((t, i) => {
+                  {pageUsers.map((t, i) => {
                     const dl = daysLeft(t.trialEndsAt);
                     return (
                       <tr
@@ -431,6 +442,35 @@ export function AdminDashboard() {
                 </tbody>
               </table>
             </div>
+
+            {/* Pagination */}
+            {tenants.length > USER_PAGE_SIZE && (
+              <div className="px-4 py-3 border-t border-gray-800 flex items-center justify-between gap-4">
+                <p className="text-xs text-gray-500">
+                  Showing {(userPage - 1) * USER_PAGE_SIZE + 1}–{Math.min(userPage * USER_PAGE_SIZE, tenants.length)} of {tenants.length} user{tenants.length !== 1 ? 's' : ''}
+                </p>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => setUserPage(p => Math.max(1, p - 1))}
+                    disabled={userPage === 1}
+                    className="px-3 py-1 text-xs font-medium border border-gray-700 rounded-lg text-gray-400 hover:bg-gray-800 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                  >
+                    ← Prev
+                  </button>
+                  <span className="text-xs text-gray-500 font-medium px-1">
+                    Page {userPage} of {userTotalPages}
+                  </span>
+                  <button
+                    onClick={() => setUserPage(p => Math.min(userTotalPages, p + 1))}
+                    disabled={userPage === userTotalPages}
+                    className="px-3 py-1 text-xs font-medium border border-gray-700 rounded-lg text-gray-400 hover:bg-gray-800 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                  >
+                    Next →
+                  </button>
+                </div>
+              </div>
+            )}
+            </>
           )}
         </div>
       </section>
