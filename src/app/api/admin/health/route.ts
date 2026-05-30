@@ -14,6 +14,8 @@ import { NextResponse } from 'next/server';
 import { requireOwner, ownerNotFound } from '@/lib/adminAuth';
 import { withAdminDb } from '@/lib/db/client';
 
+export const dynamic = 'force-dynamic';
+
 export async function GET() {
   const session = await requireOwner();
   if (!session) return ownerNotFound();

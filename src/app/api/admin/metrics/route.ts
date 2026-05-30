@@ -15,6 +15,8 @@ import { requireOwner, ownerNotFound } from '@/lib/adminAuth';
 import { withAdminDb, withTenantDb } from '@/lib/db/client';
 import * as mssql from 'mssql';
 
+export const dynamic = 'force-dynamic';
+
 export async function GET(request: NextRequest) {
   const session = await requireOwner();
   if (!session) return ownerNotFound();

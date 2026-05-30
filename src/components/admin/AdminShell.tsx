@@ -13,7 +13,7 @@ import React from 'react';
 import { SWRConfig } from 'swr';
 import { signOut } from 'next-auth/react';
 
-const fetcher = (url: string) => fetch(url).then(r => r.json());
+const fetcher = (url: string) => fetch(url, { cache: 'no-store' }).then(r => r.json());
 
 interface AdminShellProps {
   ownerEmail: string;
