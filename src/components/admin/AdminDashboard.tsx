@@ -2,16 +2,9 @@
 // =============================================================================
 // AdLeak Shield — Admin Dashboard
 // src/components/admin/AdminDashboard.tsx
-//
-// Three sections:
-//   1. Date range picker (Last 7d / 14d / 30d / custom)
-//   2. Global Metrics (users, MRR, waste for selected range)
-//   3. User Management table
-//   4. System Health
 // =============================================================================
 
-import React, { useState, useMemo } from 'react';
-import useSWR from 'swr';
+import React, { useState, useCallback, useEffect, useMemo } from 'react';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -97,16 +90,15 @@ function daysLeft(iso: string | null) {
 }
 
 function toDateInput(iso: string) {
-  return iso.slice(0, 10); // "YYYY-MM-DD"
+  return iso.slice(0, 10);
 }
 
 function presetRange(preset: Preset, customStart: string, customEnd: string) {
-  const now = new Date();
+  const now    = new Date();
   const endISO = now.toISOString();
-  if (preset === '7d')     return { start: new Date(now.getTime() - 7  * 86400_000).toISOString(), end: endISO };
-  if (preset === '14d')    return { start: new Date(now.getTime() - 14 * 86400_000).toISOString(), end: endISO };
-  if (preset === '30d')    return { start: new Date(now.getTime() - 30 * 86400_000).toISOString(), end: endISO };
-  // custom
+  if (preset === '7d')  return { start: new Date(now.getTime() - 7  * 86400_000).toISOString(), end: endISO };
+  if (preset === '14d') return { start: new Date(now.getTime() - 14 * 86400_000).toISOString(), end: endISO };
+  if (preset === '30d') return { start: new Date(now.getTime() - 30 * 86400_000).toISOString(), end: endISO };
   const s = customStart ? new Date(customStart).toISOString() : new Date(now.getTime() - 30 * 86400_000).toISOString();
   const e = customEnd   ? new Date(new Date(customEnd).setHours(23, 59, 59, 999)).toISOString() : endISO;
   return { start: s, end: e };
@@ -116,47 +108,93 @@ function presetRange(preset: Preset, customStart: string, customEnd: string) {
 // Component
 // ---------------------------------------------------------------------------
 export function AdminDashboard() {
-  // Date range state
+  // Date range
   const [preset,      setPreset]      = useState<Preset>('30d');
   const [customStart, setCustomStart] = useState('');
   const [customEnd,   setCustomEnd]   = useState('');
 
-  // User table state
+  // Data
+  const [metrics,     setMetrics]     = useState<MetricsData | null>(null);
+  const [tenantsData, setTenantsData] = useState<TenantsData | null>(null);
+  const [health,      setHealth]      = useState<HealthData | null>(null);
+
+  // Loading states
+  const [mLoading,  setMLoading]  = useState(true);
+  const [tLoading,  setTLoading]  = useState(true);
+  const [hLoading,  setHLoading]  = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+
+  // User table
   const [search,        setSearch]        = useState('');
   const [extending,     setExtending]     = useState<string | null>(null);
   const [impersonating, setImpersonating] = useState<string | null>(null);
   const [extendDays,    setExtendDays]    = useState(7);
-  const [refreshing,    setRefreshing]    = useState(false);
 
   // Pagination
   const USER_PAGE_SIZE = 10;
   const [userPage, setUserPage] = useState(1);
 
-  // Refresh counter — incrementing this busts the SWR cache key, forcing a real fetch
-  const [refreshKey, setRefreshKey] = useState(0);
-
-  // Build query params from current date range
+  // Compute date range
   const { start, end } = useMemo(
     () => presetRange(preset, customStart, customEnd),
     [preset, customStart, customEnd]
   );
-  const qs = `?start=${encodeURIComponent(start)}&end=${encodeURIComponent(end)}&_r=${refreshKey}`;
 
-  const { data: metrics, isLoading: mLoading, isValidating: mValidating } =
-    useSWR<MetricsData>(`/api/admin/metrics${qs}`, { revalidateOnFocus: false });
+  // ---------------------------------------------------------------------------
+  // Fetch functions — always no-store, never cached
+  // ---------------------------------------------------------------------------
+  const loadMetrics = useCallback(async (s: string, e: string) => {
+    setMLoading(true);
+    try {
+      const params = new URLSearchParams({ start: s, end: e });
+      const res  = await fetch(`/api/admin/metrics?${params}`, { cache: 'no-store' });
+      const data = await res.json();
+      if (res.ok) setMetrics(data);
+    } catch { /* silent */ }
+    finally { setMLoading(false); }
+  }, []);
 
-  const { data: tenantsData, isLoading: tLoading, isValidating: tValidating } =
-    useSWR<TenantsData>(`/api/admin/tenants${qs}`, { revalidateOnFocus: false });
+  const loadTenants = useCallback(async (s: string, e: string) => {
+    setTLoading(true);
+    try {
+      const params = new URLSearchParams({ start: s, end: e });
+      const res  = await fetch(`/api/admin/tenants?${params}`, { cache: 'no-store' });
+      const data = await res.json();
+      if (res.ok) setTenantsData(data);
+    } catch { /* silent */ }
+    finally { setTLoading(false); }
+  }, []);
 
-  const { data: health, isLoading: hLoading } =
-    useSWR<HealthData>(`/api/admin/health?_r=${refreshKey}`, { revalidateOnFocus: false, refreshInterval: 60_000 });
+  const loadHealth = useCallback(async () => {
+    setHLoading(true);
+    try {
+      const res  = await fetch('/api/admin/health', { cache: 'no-store' });
+      const data = await res.json();
+      if (res.ok) setHealth(data);
+    } catch { /* silent */ }
+    finally { setHLoading(false); }
+  }, []);
 
-  // Clear the refreshing spinner once all three fetches complete
-  React.useEffect(() => {
-    if (refreshing && !mValidating && !tValidating) {
-      setRefreshing(false);
-    }
-  }, [mValidating, tValidating, refreshing]);
+  // Load on mount + whenever date range changes
+  useEffect(() => {
+    loadMetrics(start, end);
+    loadTenants(start, end);
+  }, [start, end, loadMetrics, loadTenants]);
+
+  useEffect(() => {
+    loadHealth();
+  }, [loadHealth]);
+
+  // Refresh all
+  const handleRefreshAll = useCallback(async () => {
+    setRefreshing(true);
+    await Promise.all([
+      loadMetrics(start, end),
+      loadTenants(start, end),
+      loadHealth(),
+    ]);
+    setRefreshing(false);
+  }, [start, end, loadMetrics, loadTenants, loadHealth]);
 
   // Filter tenants by search
   const allTenants = tenantsData?.tenants ?? [];
@@ -167,25 +205,24 @@ export function AdminDashboard() {
       )
     : allTenants;
 
-  // Reset to page 1 when search changes
-  React.useEffect(() => { setUserPage(1); }, [search]);
+  useEffect(() => { setUserPage(1); }, [search]);
 
   const userTotalPages = Math.max(1, Math.ceil(tenants.length / USER_PAGE_SIZE));
-  const pageUsers = tenants.slice((userPage - 1) * USER_PAGE_SIZE, userPage * USER_PAGE_SIZE);
+  const pageUsers      = tenants.slice((userPage - 1) * USER_PAGE_SIZE, userPage * USER_PAGE_SIZE);
 
   // ---- Extend trial
   async function extendTrial(tenantId: string) {
     setExtending(tenantId);
     try {
       const r = await fetch(`/api/admin/tenants/${tenantId}/extend-trial`, {
-        method: 'POST',
+        method:  'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ days: extendDays }),
+        body:    JSON.stringify({ days: extendDays }),
       });
       const d = await r.json();
       if (r.ok) {
         alert(`✅ Trial extended to ${new Date(d.newTrialEndsAt).toLocaleDateString('en-GB')}`);
-        setRefreshKey(k => k + 1);
+        loadTenants(start, end);
       } else {
         alert(`❌ ${d.error}`);
       }
@@ -214,26 +251,20 @@ export function AdminDashboard() {
   // ---------------------------------------------------------------------------
   return (
     <div className="space-y-8">
-      {/* ====================================================================
-          PAGE HEADER
-      ==================================================================== */}
+      {/* PAGE HEADER */}
       <div>
         <h1 className="text-2xl font-bold text-white">Owner Admin Panel</h1>
         <p className="text-gray-400 text-sm mt-1">Platform overview — visible to you only</p>
       </div>
 
-      {/* ====================================================================
-          DATE RANGE PICKER
-      ==================================================================== */}
+      {/* DATE RANGE PICKER */}
       <div className="flex flex-wrap items-center gap-2">
         {(['7d', '14d', '30d'] as Preset[]).map(p => (
           <button
             key={p}
             onClick={() => setPreset(p)}
             className={`px-4 py-1.5 rounded-lg text-sm font-medium transition-colors ${
-              preset === p
-                ? 'bg-blue-600 text-white'
-                : 'bg-gray-800 text-gray-400 hover:bg-gray-700'
+              preset === p ? 'bg-blue-600 text-white' : 'bg-gray-800 text-gray-400 hover:bg-gray-700'
             }`}
           >
             Last {p}
@@ -242,9 +273,7 @@ export function AdminDashboard() {
         <button
           onClick={() => setPreset('custom')}
           className={`px-4 py-1.5 rounded-lg text-sm font-medium transition-colors ${
-            preset === 'custom'
-              ? 'bg-blue-600 text-white'
-              : 'bg-gray-800 text-gray-400 hover:bg-gray-700'
+            preset === 'custom' ? 'bg-blue-600 text-white' : 'bg-gray-800 text-gray-400 hover:bg-gray-700'
           }`}
         >
           Custom
@@ -272,10 +301,7 @@ export function AdminDashboard() {
         )}
 
         <button
-          onClick={() => {
-            setRefreshing(true);
-            setRefreshKey(k => k + 1);
-          }}
+          onClick={handleRefreshAll}
           disabled={refreshing}
           className="ml-auto flex items-center gap-1.5 text-xs text-gray-500 hover:text-gray-300 transition-colors disabled:opacity-50"
         >
@@ -289,9 +315,7 @@ export function AdminDashboard() {
         </button>
       </div>
 
-      {/* ====================================================================
-          1. GLOBAL METRICS
-      ==================================================================== */}
+      {/* 1. GLOBAL METRICS */}
       <section>
         <h2 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">
           Platform Metrics
@@ -303,7 +327,7 @@ export function AdminDashboard() {
             ))}
           </div>
         ) : (
-          <div className={`grid grid-cols-2 sm:grid-cols-4 gap-4 transition-opacity duration-300 ${refreshing ? 'opacity-50' : 'opacity-100'}`}>
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
             <MetricCard
               label="Total Users"
               value={String(metrics?.tenants?.total ?? 0)}
@@ -330,9 +354,7 @@ export function AdminDashboard() {
         )}
       </section>
 
-      {/* ====================================================================
-          2. USER MANAGEMENT
-      ==================================================================== */}
+      {/* 2. USER MANAGEMENT */}
       <section>
         <div className="flex flex-wrap items-center justify-between gap-3 mb-3">
           <h2 className="text-xs font-semibold text-gray-500 uppercase tracking-wider">
@@ -362,141 +384,140 @@ export function AdminDashboard() {
           </div>
         </div>
 
-        <div className={`bg-gray-900 rounded-xl overflow-hidden border border-gray-800 transition-opacity duration-300 ${refreshing ? 'opacity-50' : 'opacity-100'}`}>
+        <div className="bg-gray-900 rounded-xl overflow-hidden border border-gray-800">
           {tLoading ? (
             <div className="p-8 text-center text-gray-500 text-sm">Loading…</div>
           ) : tenants.length === 0 ? (
             <div className="p-8 text-center text-gray-600 text-sm">No users found</div>
           ) : (
             <>
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b border-gray-800 text-gray-500 text-xs uppercase tracking-wider">
-                    <th className="px-4 py-3 text-left">Email</th>
-                    <th className="px-4 py-3 text-left">Status</th>
-                    <th className="px-4 py-3 text-right">Sessions</th>
-                    <th className="px-4 py-3 text-right">Waste</th>
-                    <th className="px-4 py-3 text-right">Campaigns</th>
-                    <th className="px-4 py-3 text-left">Last Active</th>
-                    <th className="px-4 py-3 text-left">Trial Ends</th>
-                    <th className="px-4 py-3 text-right">Actions</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {pageUsers.map((t, i) => {
-                    const dl = daysLeft(t.trialEndsAt);
-                    return (
-                      <tr
-                        key={t.tenantId}
-                        className={`border-b border-gray-800/50 hover:bg-gray-800/30 transition-colors ${
-                          i % 2 === 0 ? '' : 'bg-gray-900/50'
-                        }`}
-                      >
-                        <td className="px-4 py-3 text-gray-200 font-medium">
-                          {t.email}
-                          {!t.onboardingCompleted && (
-                            <span className="ml-2 text-xs text-yellow-700">(no onboarding)</span>
-                          )}
-                        </td>
-                        <td className="px-4 py-3">
-                          <span className={`inline-flex px-2 py-0.5 rounded-full text-xs font-medium ${statusBadge(t.subscriptionStatus)}`}>
-                            {t.subscriptionStatus}
-                          </span>
-                        </td>
-                        <td className="px-4 py-3 text-right text-gray-300">
-                          {t.sessionsInRange.toLocaleString()}
-                        </td>
-                        <td className="px-4 py-3 text-right">
-                          <span className={t.waste > 0 ? 'text-red-400 font-medium' : 'text-gray-500'}>
-                            £{fmt(t.waste)}
-                          </span>
-                        </td>
-                        <td className="px-4 py-3 text-right text-gray-400">{t.campaignCount}</td>
-                        <td className="px-4 py-3 text-gray-400 text-xs">{timeSince(t.lastSessionAt)}</td>
-                        <td className="px-4 py-3 text-xs">
-                          {t.subscriptionStatus === 'active' ? (
-                            <span className="text-gray-600">—</span>
-                          ) : t.trialEndsAt ? (
-                            <span className={dl !== null && dl <= 3 ? 'text-red-400' : 'text-gray-400'}>
-                              {dl === 0 ? 'Expired' : dl !== null ? `${dl}d left` : '—'}
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b border-gray-800 text-gray-500 text-xs uppercase tracking-wider">
+                      <th className="px-4 py-3 text-left">Email</th>
+                      <th className="px-4 py-3 text-left">Status</th>
+                      <th className="px-4 py-3 text-right">Sessions</th>
+                      <th className="px-4 py-3 text-right">Waste</th>
+                      <th className="px-4 py-3 text-right">Campaigns</th>
+                      <th className="px-4 py-3 text-left">Last Active</th>
+                      <th className="px-4 py-3 text-left">Trial Ends</th>
+                      <th className="px-4 py-3 text-right">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {pageUsers.map((t, i) => {
+                      const dl = daysLeft(t.trialEndsAt);
+                      return (
+                        <tr
+                          key={t.tenantId}
+                          className={`border-b border-gray-800/50 hover:bg-gray-800/30 transition-colors ${
+                            i % 2 === 0 ? '' : 'bg-gray-900/50'
+                          }`}
+                        >
+                          <td className="px-4 py-3 text-gray-200 font-medium">
+                            {t.email}
+                            {!t.onboardingCompleted && (
+                              <span className="ml-2 text-xs text-yellow-700">(no onboarding)</span>
+                            )}
+                          </td>
+                          <td className="px-4 py-3">
+                            <span className={`inline-flex px-2 py-0.5 rounded-full text-xs font-medium ${statusBadge(t.subscriptionStatus)}`}>
+                              {t.subscriptionStatus}
                             </span>
-                          ) : (
-                            <span className="text-gray-600">—</span>
-                          )}
-                        </td>
-                        <td className="px-4 py-3 text-right">
-                          <div className="flex items-center justify-end gap-2">
-                            <button
-                              onClick={() => extendTrial(t.tenantId)}
-                              disabled={extending === t.tenantId}
-                              className="text-xs bg-blue-900/40 text-blue-300 px-2 py-1 rounded hover:bg-blue-800/50 transition-colors disabled:opacity-50"
-                              title={`Extend trial by ${extendDays} days`}
-                            >
-                              {extending === t.tenantId ? '…' : `+${extendDays}d`}
-                            </button>
-                            <button
-                              onClick={() => startImpersonation(t.tenantId, t.email)}
-                              disabled={impersonating === t.tenantId}
-                              className="text-xs bg-amber-900/40 text-amber-300 px-2 py-1 rounded hover:bg-amber-800/50 transition-colors disabled:opacity-50"
-                              title="View dashboard as this user (read-only)"
-                            >
-                              {impersonating === t.tenantId ? '…' : 'View as'}
-                            </button>
-                          </div>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-
-            {/* Pagination */}
-            {tenants.length > USER_PAGE_SIZE && (
-              <div className="px-4 py-3 border-t border-gray-800 flex items-center justify-between gap-4">
-                <p className="text-xs text-gray-500">
-                  Showing {(userPage - 1) * USER_PAGE_SIZE + 1}–{Math.min(userPage * USER_PAGE_SIZE, tenants.length)} of {tenants.length} user{tenants.length !== 1 ? 's' : ''}
-                </p>
-                <div className="flex items-center gap-2">
-                  <button
-                    onClick={() => setUserPage(p => Math.max(1, p - 1))}
-                    disabled={userPage === 1}
-                    className="px-3 py-1 text-xs font-medium border border-gray-700 rounded-lg text-gray-400 hover:bg-gray-800 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
-                  >
-                    ← Prev
-                  </button>
-                  <span className="text-xs text-gray-500 font-medium px-1">
-                    Page {userPage} of {userTotalPages}
-                  </span>
-                  <button
-                    onClick={() => setUserPage(p => Math.min(userTotalPages, p + 1))}
-                    disabled={userPage === userTotalPages}
-                    className="px-3 py-1 text-xs font-medium border border-gray-700 rounded-lg text-gray-400 hover:bg-gray-800 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
-                  >
-                    Next →
-                  </button>
-                </div>
+                          </td>
+                          <td className="px-4 py-3 text-right text-gray-300">
+                            {t.sessionsInRange.toLocaleString()}
+                          </td>
+                          <td className="px-4 py-3 text-right">
+                            <span className={t.waste > 0 ? 'text-red-400 font-medium' : 'text-gray-500'}>
+                              £{fmt(t.waste)}
+                            </span>
+                          </td>
+                          <td className="px-4 py-3 text-right text-gray-400">{t.campaignCount}</td>
+                          <td className="px-4 py-3 text-gray-400 text-xs">{timeSince(t.lastSessionAt)}</td>
+                          <td className="px-4 py-3 text-xs">
+                            {t.subscriptionStatus === 'active' ? (
+                              <span className="text-gray-600">—</span>
+                            ) : t.trialEndsAt ? (
+                              <span className={dl !== null && dl <= 3 ? 'text-red-400' : 'text-gray-400'}>
+                                {dl === 0 ? 'Expired' : dl !== null ? `${dl}d left` : '—'}
+                              </span>
+                            ) : (
+                              <span className="text-gray-600">—</span>
+                            )}
+                          </td>
+                          <td className="px-4 py-3 text-right">
+                            <div className="flex items-center justify-end gap-2">
+                              <button
+                                onClick={() => extendTrial(t.tenantId)}
+                                disabled={extending === t.tenantId}
+                                className="text-xs bg-blue-900/40 text-blue-300 px-2 py-1 rounded hover:bg-blue-800/50 transition-colors disabled:opacity-50"
+                                title={`Extend trial by ${extendDays} days`}
+                              >
+                                {extending === t.tenantId ? '…' : `+${extendDays}d`}
+                              </button>
+                              <button
+                                onClick={() => startImpersonation(t.tenantId, t.email)}
+                                disabled={impersonating === t.tenantId}
+                                className="text-xs bg-amber-900/40 text-amber-300 px-2 py-1 rounded hover:bg-amber-800/50 transition-colors disabled:opacity-50"
+                                title="View dashboard as this user (read-only)"
+                              >
+                                {impersonating === t.tenantId ? '…' : 'View as'}
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
               </div>
-            )}
+
+              {/* Pagination */}
+              {tenants.length > USER_PAGE_SIZE && (
+                <div className="px-4 py-3 border-t border-gray-800 flex items-center justify-between gap-4">
+                  <p className="text-xs text-gray-500">
+                    Showing {(userPage - 1) * USER_PAGE_SIZE + 1}–{Math.min(userPage * USER_PAGE_SIZE, tenants.length)} of {tenants.length} user{tenants.length !== 1 ? 's' : ''}
+                  </p>
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => setUserPage(p => Math.max(1, p - 1))}
+                      disabled={userPage === 1}
+                      className="px-3 py-1 text-xs font-medium border border-gray-700 rounded-lg text-gray-400 hover:bg-gray-800 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                    >
+                      ← Prev
+                    </button>
+                    <span className="text-xs text-gray-500 font-medium px-1">
+                      Page {userPage} of {userTotalPages}
+                    </span>
+                    <button
+                      onClick={() => setUserPage(p => Math.min(userTotalPages, p + 1))}
+                      disabled={userPage === userTotalPages}
+                      className="px-3 py-1 text-xs font-medium border border-gray-700 rounded-lg text-gray-400 hover:bg-gray-800 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                    >
+                      Next →
+                    </button>
+                  </div>
+                </div>
+              )}
             </>
           )}
         </div>
       </section>
 
-      {/* ====================================================================
-          3. SYSTEM HEALTH
-      ==================================================================== */}
+      {/* 3. SYSTEM HEALTH */}
       <section>
         <div className="flex items-center justify-between mb-3">
           <h2 className="text-xs font-semibold text-gray-500 uppercase tracking-wider">
             System Health
           </h2>
           <button
-            onClick={() => setRefreshKey(k => k + 1)}
-            className="text-xs text-gray-500 hover:text-gray-300 transition-colors"
+            onClick={loadHealth}
+            disabled={hLoading}
+            className="text-xs text-gray-500 hover:text-gray-300 transition-colors disabled:opacity-50"
           >
-            ↻ Refresh
+            {hLoading ? '…' : '↻ Refresh'}
           </button>
         </div>
 
@@ -551,9 +572,7 @@ export function AdminDashboard() {
                           ? 'text-yellow-400'
                           : 'text-green-400'
                   }`}>
-                    {health?.sql?.avgCpuPercent != null
-                      ? `${health.sql.avgCpuPercent}%`
-                      : '—'}
+                    {health?.sql?.avgCpuPercent != null ? `${health.sql.avgCpuPercent}%` : '—'}
                   </p>
                   <p className="text-xs text-gray-600 mt-1">
                     {health?.sql?.error
@@ -567,7 +586,7 @@ export function AdminDashboard() {
               </div>
             </div>
 
-            {/* GDPR Janitor — last purge */}
+            {/* GDPR Janitor */}
             <div className="bg-gray-900 rounded-xl p-5 border border-gray-800 sm:col-span-2">
               <div className="flex items-start justify-between">
                 <div className="flex-1">
