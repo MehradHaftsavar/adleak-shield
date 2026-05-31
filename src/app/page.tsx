@@ -98,7 +98,7 @@ function Hero() {
     <section className="pt-32 pb-24 px-6 bg-gradient-to-b from-slate-50 to-white">
       <div className="max-w-4xl mx-auto text-center">
         <span className="inline-block text-xs font-semibold uppercase tracking-widest text-blue-600 bg-blue-50 px-3 py-1 rounded-full mb-6">
-          For UK small businesses
+          For small businesses
         </span>
         <h1 className="text-4xl sm:text-5xl md:text-6xl font-bold text-slate-900 leading-tight mb-6">
           Stop burning your<br />
@@ -179,7 +179,7 @@ const FEATURES = [
   {
     icon: '🔒',
     title: 'Privacy-First by Design',
-    desc: 'Zero cookies. IPs are masked before storage. Session fingerprinting only. Fully compliant with UK GDPR — no consent banner needed for tracking.',
+    desc: 'Zero cookies. IPs are masked before storage. Session fingerprinting only. Fully compliant with GDPR — no consent banner needed for tracking.',
   },
   {
     icon: '🛡️',
@@ -207,7 +207,7 @@ function Features() {
             Everything you need to stop ad waste
           </h2>
           <p className="text-slate-600 max-w-xl mx-auto">
-            Built specifically for small UK businesses running Google Ads — no bloat, no enterprise complexity.
+            Built specifically for small businesses running Google Ads — no bloat, no enterprise complexity.
           </p>
         </div>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
@@ -234,7 +234,7 @@ const PLAN_FEATURES = [
   'Visitor Journey Timeline',
   'Monday morning email report',
   '7-day free trial (no card required)',
-  'Privacy-first, UK GDPR compliant',
+  'Privacy-first, GDPR compliant',
   'Unregistered traffic alerts',
   'Cancel anytime via billing portal',
   'Right to erasure — delete your account instantly',
@@ -371,7 +371,7 @@ function Contact() {
                 type="text"
                 value={form.website}
                 onChange={e => setForm(f => ({ ...f, website: e.target.value }))}
-                placeholder="example.co.uk"
+                placeholder="example.com"
                 className="w-full px-4 py-2.5 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               />
             </div>
@@ -434,7 +434,7 @@ function Footer() {
         </div>
       </div>
       <div className="max-w-6xl mx-auto mt-8 pt-8 border-t border-slate-800 text-center text-xs text-slate-600">
-        © {new Date().getFullYear()} AdLeak Shield · Helping UK businesses stop wasting Google Ads budget
+        © {new Date().getFullYear()} AdLeak Shield · Helping businesses stop wasting Google Ads budget
       </div>
     </footer>
   );

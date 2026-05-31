@@ -12,7 +12,7 @@ export default function AccountDeletedPage() {
         <h1 className="text-2xl font-bold text-gray-900 mb-3">Account deleted</h1>
         <p className="text-gray-600 text-sm mb-2">
           Your account and all associated data have been permanently deleted in
-          accordance with your right to erasure under UK GDPR.
+          accordance with your right to erasure under GDPR.
         </p>
         <p className="text-gray-500 text-sm mb-8">
           If you had an active subscription, it has been cancelled and no further

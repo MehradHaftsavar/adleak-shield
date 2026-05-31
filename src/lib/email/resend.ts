@@ -129,11 +129,11 @@ function passwordResetTemplate(resetUrl: string): string {
           <tr>
             <td style="padding:24px 40px;border-top:1px solid #f3f4f6;">
               <p style="margin:0;font-size:12px;color:#9ca3af;">
-                AdLeak Shield · Helping UK businesses stop wasting Google Ads budget
+                AdLeak Shield · Helping businesses stop wasting Google Ads budget
               </p>
             </td>
           </tr>
-          
+
         </table>
       </td>
     </tr>
@@ -224,7 +224,7 @@ function verificationEmailTemplate(verificationUrl: string): string {
           <tr>
             <td style="padding:24px 40px;border-top:1px solid #f3f4f6;">
               <p style="margin:0;font-size:12px;color:#9ca3af;">
-                AdLeak Shield · Helping UK businesses stop wasting Google Ads budget
+                AdLeak Shield · Helping businesses stop wasting Google Ads budget
               </p>
             </td>
           </tr>

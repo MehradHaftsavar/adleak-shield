@@ -158,13 +158,13 @@ export function DomainStep({ onComplete, existingDomain }: DomainStepProps) {
               type="text"
               value={newDomain}
               onChange={(e) => setNewDomain(e.target.value)}
-              placeholder="e.g., my-plumbing-site.co.uk"
+              placeholder="e.g., my-business-site.com"
               className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               required
               disabled={isFetching || isLoading}
             />
             <p className="mt-2 text-sm text-gray-500">
-              Enter your domain without http:// or www. (e.g., example.co.uk)
+              Enter your domain without http:// or www. (e.g., example.com)
             </p>
           </div>
 

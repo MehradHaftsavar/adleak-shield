@@ -41,7 +41,7 @@ export async function GET() {
   return NextResponse.json({
     queue,
     sql,
-    lastPurge,
+    recentPurges: lastPurge,
     checkedAt: new Date().toISOString(),
   });
 }
@@ -108,11 +108,11 @@ async function getLastPurge(): Promise<{
   retentionDays:        number;
   status:               string;
   errorMessage:         string | null;
-} | null> {
+}[]> {
   try {
-    const row = await withAdminDb(async (req) => {
+    const rows = await withAdminDb(async (req) => {
       const r = await req.query(`
-        SELECT TOP 1
+        SELECT TOP 50
           ran_at,
           deleted_sessions,
           deleted_journey_events,
@@ -123,22 +123,20 @@ async function getLastPurge(): Promise<{
         FROM JanitorLog
         ORDER BY ran_at DESC
       `);
-      return r.recordset[0] ?? null;
+      return r.recordset;
     });
 
-    if (!row) return null;
-
-    return {
+    return rows.map(row => ({
       ranAt:                new Date(row.ran_at).toISOString(),
       deletedSessions:      Number(row.deleted_sessions       ?? 0),
       deletedJourneyEvents: Number(row.deleted_journey_events ?? 0),
       deletedClickLogs:     Number(row.deleted_clicklogs      ?? 0),
-      retentionDays:        Number(row.retention_days         ?? 90),
+      retentionDays:        Number(row.retention_days         ?? 0),
       status:               row.status        ?? 'unknown',
       errorMessage:         row.error_message ?? null,
-    };
+    }));
   } catch {
     // JanitorLog table doesn't exist yet — SQL migration hasn't run
-    return null;
+    return [];
   }
 }

@@ -19,7 +19,7 @@ import "./globals.css";
 export const metadata: Metadata = {
   title: "AdLeak Shield — Stop Wasting Google Ads Budget",
   description:
-    "Identify which Google Ads keywords are burning your budget without generating real engagement. Built for UK small businesses.",
+    "Identify which Google Ads keywords are burning your budget without generating real engagement. Built for small businesses running Google Ads.",
 };
 
 export default async function RootLayout({
