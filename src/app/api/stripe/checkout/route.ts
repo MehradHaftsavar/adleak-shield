@@ -43,6 +43,7 @@ export async function POST(request: NextRequest) {
           quantity: 1,
         },
       ],
+      allow_promotion_codes: true,
       billing_address_collection: 'required',
       success_url: `${process.env.NEXT_PUBLIC_APP_URL}/dashboard?payment=success`,
       cancel_url: `${process.env.NEXT_PUBLIC_APP_URL}/dashboard`,
