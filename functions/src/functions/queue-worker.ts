@@ -15,6 +15,27 @@ import {
 } from "../lib/schemas.js";
 import { withTenantDb, withAdminDb } from "../lib/db.js";
 
+const THANK_YOU_PATHS = [
+  '/thank-you', '/thankyou', '/thank_you', '/thanks',
+  '/order-confirmed', '/order-confirmation', '/order-complete', '/order-completed',
+  '/order-success', '/order-placed',
+  '/checkout/success', '/checkout/order-received', '/checkout/thankyou',
+  '/checkout/thank-you', '/checkout/complete', '/checkout/confirmed',
+  '/payment-success', '/payment-confirmed', '/payment-complete',
+  '/purchase-success', '/purchase-confirmed', '/purchase-complete',
+  '/confirmation', '/confirmed', '/receipt',
+];
+
+function isThankYouPage(path: string | null | undefined): boolean {
+  if (!path) return false;
+  const normalised = path.toLowerCase().replace(/\/+$/, '');
+  return THANK_YOU_PATHS.some(p =>
+    normalised === p ||
+    normalised.startsWith(p + '/') ||
+    normalised.startsWith(p + '?')
+  );
+}
+
 interface CampaignLookup {
   tenantId: string;
   campaignId: string;
@@ -390,6 +411,12 @@ export async function queueWorkerHandler(
             env.eventType
           );
           if (env.eventType === "click" || env.eventType === "success_event") {
+            await new mssql.Request(tx)
+              .input("sessionId", mssql.UniqueIdentifier, sessionId)
+              .query(`UPDATE Sessions SET is_bounce = 0 WHERE session_id = @sessionId AND is_bounce = 1`);
+          }
+          if (env.eventType === "pageview" && isThankYouPage(env.payload.pagePath)) {
+            await insertJourneyEvent(tx, msg, campaign!.tenantId, sessionId, "success_event");
             await new mssql.Request(tx)
               .input("sessionId", mssql.UniqueIdentifier, sessionId)
               .query(`UPDATE Sessions SET is_bounce = 0 WHERE session_id = @sessionId AND is_bounce = 1`);
