@@ -30,9 +30,7 @@ export async function GET(request: NextRequest) {
         slot: c.slot_number,
       }));
 
-      const ingestEndpoint = 'https://adleak-functions-ajbraxdhf4hwgudf.westeurope-01.azurewebsites.net/api/ingest';
-      
-      const trackingSnippet = generateTrackingSnippet(domain.domain_name, ingestEndpoint);
+      const trackingSnippet = generateTrackingSnippet();
       const valueTrackTemplate = generateValueTrackTemplate();
 
       return {
@@ -56,9 +54,8 @@ export async function GET(request: NextRequest) {
   }
 }
 
-function generateTrackingSnippet(domain: string, endpoint: string): string {
-  return `<!-- AdLeak Shield -->
-<script>(function(){var e="${endpoint}",d="${domain}";function p(k){var u=new URL(window.location.href);return u.searchParams.get(k)}var params={k:p('keyword'),c:p('campaignid'),a:p('adgroupid'),m:p('matchtype'),g:p('gclid')};function sh(u){var i=u.indexOf('#');if(i<0)return u;var hv=u.slice(i+1);return(hv.indexOf('@')>-1||/\\d{6,}/.test(hv))?u.slice(0,i):u};if(!params.g||!params.k)return;var s=sessionStorage,sid=s.getItem('als_sid');if(!sid){sid=Date.now()+'-'+Math.random().toString(36).substr(2,9);s.setItem('als_sid',sid)}s.setItem('als_entry',JSON.stringify(params));fetch(e,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({eventType:'session_start',payload:{session:{sessionFingerprint:sid,keyword:params.k,matchType:params.m,campaignId:params.c,adgroupId:params.a,gclid:params.g,device:/Mobi/.test(navigator.userAgent)?'mobile':'desktop',landedAt:Date.now(),landingPath:sh(location.pathname+location.hash)}},domain:d,ts:Date.now()}),keepalive:true});var ts=Date.now(),hb=setInterval(function(){var n=Date.now();if(document.visibilityState==='visible'){navigator.sendBeacon(e,JSON.stringify({eventType:'heartbeat',payload:{session:{sessionFingerprint:sid,campaignId:params.c},dwellMs:n-ts},domain:d,ts:n}))}},15000);document.addEventListener('visibilitychange',function(){if(document.visibilityState==='hidden'){clearInterval(hb);navigator.sendBeacon(e,JSON.stringify({eventType:'page_end',payload:{session:{sessionFingerprint:sid,campaignId:params.c},dwellMs:Date.now()-ts},domain:d,ts:Date.now()}))}});window.addEventListener('scroll',function(){var h=document.documentElement,pct=Math.round((h.scrollTop/(h.scrollHeight-h.clientHeight))*100);s.setItem('als_scroll',pct)},false);window.addEventListener('hashchange',function(){navigator.sendBeacon(e,JSON.stringify({eventType:'pageview',payload:{session:{sessionFingerprint:sid,campaignId:params.c},pagePath:sh(location.pathname+location.hash).substring(0,500)},domain:d,ts:Date.now()}))});document.addEventListener('click',function(ev){var t=ev.target;while(t&&t.tagName!=='A'&&t.tagName!=='BUTTON'&&t.parentElement){t=t.parentElement}if(!t||(!t.href&&t.tagName!=='BUTTON'))return;var hr=(t.href||'').toLowerCase();var isConv=hr.indexOf('tel:')===0||hr.indexOf('mailto:')===0||hr.indexOf('wa.me')!==-1||hr.indexOf('api.whatsapp.com')!==-1;var txt=(t.innerText||t.textContent||t.value||t.getAttribute('aria-label')||'').trim().replace(/\\s+/g,' ').substring(0,100)||null;if(txt&&(txt.indexOf('@')>-1||/\\d{7,}/.test(txt)))txt=null;navigator.sendBeacon(e,JSON.stringify({eventType:isConv?'success_event':'click',payload:{session:{sessionFingerprint:sid,campaignId:params.c},pagePath:location.pathname.substring(0,500),elementTag:t.tagName.toLowerCase(),elementHref:(t.href||'').substring(0,500)||null,elementText:txt},domain:d,ts:Date.now()}))},true);document.addEventListener('submit',function(ev){var f=ev.target;var ftxt=(f.getAttribute('aria-label')||f.getAttribute('name')||f.id||'form').substring(0,100)||null;if(ftxt&&(ftxt.indexOf('@')>-1||/\\d{7,}/.test(ftxt)))ftxt=null;navigator.sendBeacon(e,JSON.stringify({eventType:'success_event',payload:{session:{sessionFingerprint:sid,campaignId:params.c},pagePath:location.pathname.substring(0,500),elementTag:'form',elementHref:null,elementText:ftxt},domain:d,ts:Date.now()}))},true)})();</script>`;
+function generateTrackingSnippet(): string {
+  return `<!-- AdLeak Shield -->\n<script src="https://adleakshield.com/tracker.js" defer></script>`;
 }
 
 function generateValueTrackTemplate(): string {

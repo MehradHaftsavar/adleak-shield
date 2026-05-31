@@ -184,9 +184,19 @@ export function SnippetStep({ domain, onComplete, onBack }: SnippetStepProps) {
 
             <div className="mt-3 bg-blue-50 border border-blue-200 rounded-lg p-3">
               <p className="text-sm text-blue-900">
-                <strong>Where to paste:</strong> Add this to the &lt;head&gt; section of every page on {domain}. 
+                <strong>Where to paste:</strong> Add this to the &lt;head&gt; section of every page on {domain}.
                 If you're using WordPress, use a plugin like "Insert Headers and Footers" or add it to your theme's header.php file.
               </p>
+            </div>
+
+            <div className="mt-3 bg-gray-50 border border-gray-200 rounded-lg p-3">
+              <p className="text-sm text-gray-700 font-medium mb-1">🔒 Using a Content Security Policy (CSP)?</p>
+              <p className="text-sm text-gray-600 mb-2">
+                Most websites don't use CSP — if you're not sure, you can skip this. If you do have one configured, add these two lines to allow the tracking script to load and send data:
+              </p>
+              <pre className="bg-gray-900 text-gray-100 p-3 rounded text-xs overflow-x-auto">
+                <code>{`script-src 'self' https://adleakshield.com;\nconnect-src 'self' https://adleak-functions-ajbraxdhf4hwgudf.westeurope-01.azurewebsites.net;`}</code>
+              </pre>
             </div>
           </div>
 
