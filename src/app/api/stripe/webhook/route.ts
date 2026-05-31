@@ -33,6 +33,35 @@ export async function POST(request: NextRequest) {
 
   try {
     switch (event.type) {
+      case 'customer.subscription.created': {
+        const subscription = event.data.object as Stripe.Subscription;
+        const tenantId = subscription.metadata?.tenantId;
+        const customerId = subscription.customer as string;
+
+        if (!tenantId) {
+          console.log('[stripe/webhook] customer.subscription.created: no tenantId in metadata — skipping');
+          break;
+        }
+
+        if (subscription.status === 'active') {
+          await withAdminDb(async (req) => {
+            await req
+              .input('customerId', mssql.NVarChar(50), customerId)
+              .input('tenantId', mssql.UniqueIdentifier, tenantId)
+              .query(`
+                UPDATE Tenants
+                SET stripe_customer_id        = @customerId,
+                    subscription_status       = 'active',
+                    subscription_cancelled_at = NULL,
+                    data_deletion_warned_at   = NULL
+                WHERE tenant_id = @tenantId
+              `);
+          });
+          console.log(`[stripe/webhook] Tenant ${tenantId} activated via subscription.created`);
+        }
+        break;
+      }
+
       case 'checkout.session.completed': {
         const session = event.data.object as Stripe.Checkout.Session;
         const tenantId = session.metadata?.tenantId;
