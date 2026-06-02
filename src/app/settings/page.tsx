@@ -40,9 +40,9 @@ export default function SettingsPage() {
         setDeleting(false);
         return;
       }
-      // Sign out and redirect to goodbye page
+      // Sign out and redirect to main site
       await signOut({ redirect: false });
-      router.push('/account-deleted');
+      window.location.href = 'https://www.adleakshield.com';
     } catch {
       setDeleteError('Network error. Please try again.');
       setDeleting(false);

@@ -18,16 +18,12 @@ export async function POST(request: NextRequest) {
     const tenantRow = await withAdminDb(async (req) => {
       const result = await req
         .input('tenantId', mssql.UniqueIdentifier, tenantId)
-        .query(`
-          SELECT stripe_customer_id
-          FROM Tenants
-          WHERE tenant_id = @tenantId
-        `);
+        .query(`SELECT stripe_customer_id FROM Tenants WHERE tenant_id = @tenantId`);
       return result.recordset[0] ?? null;
     });
 
     if (!tenantRow?.stripe_customer_id) {
-      return NextResponse.json({ error: 'No active subscription found' }, { status: 400 });
+      return NextResponse.json({ error: 'No subscription found' }, { status: 404 });
     }
 
     const portalSession = await stripe.billingPortal.sessions.create({

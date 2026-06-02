@@ -20,10 +20,10 @@ export default function AccountDeletedPage() {
         </p>
 
         <Link
-          href="/auth/login"
+          href="https://www.adleakshield.com"
           className="inline-flex items-center justify-center px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg transition-colors text-sm"
         >
-          Back to sign in
+          Go to AdLeak Shield
         </Link>
       </div>
     </div>

@@ -21,6 +21,32 @@ import Link from "next/link";
 
 const IMP_LABEL_COOKIE = 'als_imp_label';
 
+function ManageSubscriptionButton() {
+  const [loading, setLoading] = useState(false);
+  async function handlePortal() {
+    setLoading(true);
+    try {
+      const res = await fetch('/api/stripe/portal', { method: 'POST' });
+      const data = await res.json();
+      if (data.url) window.open(data.url, '_blank', 'noopener,noreferrer');
+    } catch (err) {
+      console.error('Portal error:', err);
+    } finally {
+      setLoading(false);
+    }
+  }
+  return (
+    <button
+      onClick={handlePortal}
+      disabled={loading}
+      className="flex items-center gap-1.5 px-3 py-1.5 bg-white border border-gray-300 hover:bg-gray-50 disabled:opacity-60 text-gray-700 text-xs sm:text-sm font-medium rounded-lg transition-colors whitespace-nowrap"
+    >
+      {loading ? <span className="w-3.5 h-3.5 border-2 border-gray-400 border-t-transparent rounded-full animate-spin" /> : null}
+      Manage Subscription
+    </button>
+  );
+}
+
 function getImpLabel(): string | null {
   if (typeof document === 'undefined') return null;
   const match = document.cookie
@@ -198,7 +224,7 @@ export function DashboardShell({
             {/* ── Right: subscribe + desktop extras + hamburger ── */}
             <div className="flex items-center gap-3">
 
-              {/* Subscribe CTA — always visible on all sizes when not active */}
+              {/* Subscribe CTA — shown when not active */}
               {!isActive && (
                 <button
                   onClick={handleSubscribe}
@@ -210,6 +236,11 @@ export function DashboardShell({
                     : null}
                   {isCancelled ? 'Resubscribe' : 'Subscribe — £12.99/mo'}
                 </button>
+              )}
+
+              {/* Manage Subscription — shown when active */}
+              {isActive && (
+                <ManageSubscriptionButton />
               )}
 
               {/* Desktop-only: email + sign out */}

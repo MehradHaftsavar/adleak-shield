@@ -12,6 +12,11 @@ export default function SignupPage() {
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
 
+  // Pre-warm the DB as soon as the page loads so it's ready when they submit
+  useEffect(() => {
+    fetch('/api/wake').catch(() => {});
+  }, []);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
@@ -34,7 +39,8 @@ export default function SignupPage() {
       const data = await res.json();
 
       if (!res.ok) {
-        setError(data.error ?? "Failed to create account. Please try again.");
+        const raw = data.error;
+        setError(typeof raw === 'string' ? raw : "Failed to create account. Please try again.");
         setIsLoading(false);
         return;
       }

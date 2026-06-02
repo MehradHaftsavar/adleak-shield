@@ -22,6 +22,7 @@ import bcrypt from "bcryptjs";
 import { z } from "zod";
 import { withAdminDb } from "@/lib/db/client";
 import { signInSchema } from "@/lib/validators/auth";
+import * as mssql from "mssql";
 
 export const authConfig: NextAuthConfig = {
   // ==========================================================================
@@ -68,20 +69,25 @@ export const authConfig: NextAuthConfig = {
         if (session?.onboardingCompleted !== undefined) {
           token.onboardingCompleted = session.onboardingCompleted;
         }
-        // Re-fetch subscription status from DB so the token reflects Stripe webhook updates
-        try {
-          const fresh = await withAdminDb(async (req) => {
-            const result = await req
-              .input("tenantId", token.tenantId as string)
-              .query(`SELECT subscription_status, trial_ends_at FROM Tenants WHERE tenant_id = @tenantId`);
-            return result.recordset[0] ?? null;
-          });
-          if (fresh) {
-            token.subscriptionStatus = fresh.subscription_status;
-            token.trialEndsAt = fresh.trial_ends_at ? new Date(fresh.trial_ends_at).toISOString() : token.trialEndsAt;
+        // Accept subscription status passed directly from the client (loaded from DB via /api/dashboard/status)
+        if (session?.subscriptionStatus !== undefined) {
+          token.subscriptionStatus = session.subscriptionStatus;
+        } else {
+          // Fallback: re-fetch subscription status from DB
+          try {
+            const fresh = await withAdminDb(async (req) => {
+              const result = await req
+                .input("tenantId", mssql.UniqueIdentifier, token.tenantId as string)
+                .query(`SELECT subscription_status, trial_ends_at FROM Tenants WHERE tenant_id = @tenantId`);
+              return result.recordset[0] ?? null;
+            });
+            if (fresh) {
+              token.subscriptionStatus = fresh.subscription_status;
+              token.trialEndsAt = fresh.trial_ends_at ? new Date(fresh.trial_ends_at).toISOString() : token.trialEndsAt;
+            }
+          } catch {
+            // Non-fatal — keep existing token values
           }
-        } catch {
-          // Non-fatal — keep existing token values
         }
       }
       return token;

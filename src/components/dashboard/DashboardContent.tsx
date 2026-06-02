@@ -84,8 +84,13 @@ export function DashboardContent() {
     if (searchParams.get('payment') === 'success') {
       setPaymentSuccess(true);
       router.replace('/dashboard');
-      // Refresh the JWT so the banner and paywall reflect the new subscription
-      updateSession().then(() => loadStatus());
+      // Load fresh status from DB, then update the JWT with the new subscription status
+      // so the navbar Subscribe button disappears immediately without a full sign-out.
+      loadStatus().then(async (freshStatus) => {
+        if (freshStatus?.subscriptionStatus) {
+          await updateSession({ subscriptionStatus: freshStatus.subscriptionStatus });
+        }
+      });
     }
   }, [searchParams, router]);
 
@@ -93,23 +98,26 @@ export function DashboardContent() {
     loadStatus();
   }, []);
 
-  const loadStatus = async () => {
+  const loadStatus = async (): Promise<DashboardStatus | null> => {
     setError('');
     setIsLoading(true);
-    
+
     try {
       const res = await fetch('/api/dashboard/status');
       if (res.ok) {
         const data = await res.json();
         setStatus(data);
         setError('');
+        return data;
       } else {
         const errorData = await res.json().catch(() => ({}));
         setError(errorData.error || 'Failed to load dashboard');
+        return null;
       }
     } catch (err) {
       console.error('Dashboard load error:', err);
       setError('Network error - please check your connection');
+      return null;
     } finally {
       setIsLoading(false);
     }

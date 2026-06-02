@@ -22,7 +22,7 @@ export async function POST(req: NextRequest) {
     const { email, password } = parsed.data;
     console.log("[Signup] Attempting signup for:", email);
 
-    const passwordHash = await bcrypt.hash(password, 12);
+    const passwordHash = await bcrypt.hash(password, 10);
 
     const rawToken = crypto.randomBytes(32).toString("hex");
     const tokenHash = crypto.createHash("sha256").update(rawToken).digest("hex");

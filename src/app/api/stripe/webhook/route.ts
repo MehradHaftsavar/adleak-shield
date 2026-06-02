@@ -43,22 +43,33 @@ export async function POST(request: NextRequest) {
           break;
         }
 
-        if (subscription.status === 'active') {
-          await withAdminDb(async (req) => {
-            await req
-              .input('customerId', mssql.NVarChar(50), customerId)
-              .input('tenantId', mssql.UniqueIdentifier, tenantId)
-              .query(`
-                UPDATE Tenants
-                SET stripe_customer_id        = @customerId,
-                    subscription_status       = 'active',
-                    subscription_cancelled_at = NULL,
-                    data_deletion_warned_at   = NULL
-                WHERE tenant_id = @tenantId
-              `);
-          });
-          console.log(`[stripe/webhook] Tenant ${tenantId} activated via subscription.created`);
-        }
+        // Always store stripe_customer_id so customer.subscription.updated
+        // can find the tenant by customerId even if status starts as 'incomplete'.
+        await withAdminDb(async (req) => {
+          req
+            .input('customerId', mssql.NVarChar(50), customerId)
+            .input('tenantId', mssql.UniqueIdentifier, tenantId);
+
+          if (subscription.status === 'active') {
+            await req.query(`
+              UPDATE Tenants
+              SET stripe_customer_id        = @customerId,
+                  subscription_status       = 'active',
+                  subscription_cancelled_at = NULL,
+                  data_deletion_warned_at   = NULL
+              WHERE tenant_id = @tenantId
+            `);
+            console.log(`[stripe/webhook] Tenant ${tenantId} activated via subscription.created`);
+          } else {
+            // Not active yet (e.g. incomplete / trialing) — just store the customer ID
+            await req.query(`
+              UPDATE Tenants
+              SET stripe_customer_id = @customerId
+              WHERE tenant_id = @tenantId AND (stripe_customer_id IS NULL OR stripe_customer_id = '')
+            `);
+            console.log(`[stripe/webhook] Tenant ${tenantId} customer ID stored, status=${subscription.status}`);
+          }
+        });
         break;
       }
 
