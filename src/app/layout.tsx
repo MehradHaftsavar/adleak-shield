@@ -33,7 +33,12 @@ export default async function RootLayout({
   return (
     <html lang="en">
       <body className="bg-gray-50 text-gray-900 antialiased">
-        <SessionProvider session={session}>{children}</SessionProvider>
+        {/* refetchOnWindowFocus (default true) re-validates the JWT whenever the
+            user returns to the tab — enough to catch expired sessions without
+            polling. Combined with the unauthenticated redirect in DashboardShell. */}
+        <SessionProvider session={session}>
+          {children}
+        </SessionProvider>
       </body>
     </html>
   );

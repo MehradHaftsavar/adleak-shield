@@ -25,14 +25,19 @@ interface DashboardStatus {
 }
 
 export function DashboardContent() {
-  const [status, setStatus] = useState<DashboardStatus | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState('');
-  const [paymentSuccess, setPaymentSuccess] = useState(false);
-  const [upgrading, setUpgrading] = useState(false);
   const searchParams = useSearchParams();
   const router = useRouter();
   const { update: updateSession } = useSession();
+
+  const [status, setStatus] = useState<DashboardStatus | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState('');
+  // Initialise synchronously from the URL so the banner is visible on the very
+  // first render — before any loading state — regardless of subscribe or resubscribe.
+  const [paymentSuccess, setPaymentSuccess] = useState(
+    () => searchParams.get('payment') === 'success'
+  );
+  const [upgrading, setUpgrading] = useState(false);
 
   // Date range state for Leak Table
   const [leakDateRange, setLeakDateRange] = useState({
@@ -82,10 +87,10 @@ export function DashboardContent() {
 
   useEffect(() => {
     if (searchParams.get('payment') === 'success') {
-      setPaymentSuccess(true);
+      // Strip the query param cleanly without a page reload
       router.replace('/dashboard');
-      // Load fresh status from DB, then update the JWT with the new subscription status
-      // so the navbar Subscribe button disappears immediately without a full sign-out.
+      // Load fresh status from DB, then push the new subscription status into the
+      // JWT so the navbar Subscribe/Manage buttons update without a sign-out.
       loadStatus().then(async (freshStatus) => {
         if (freshStatus?.subscriptionStatus) {
           await updateSession({ subscriptionStatus: freshStatus.subscriptionStatus });

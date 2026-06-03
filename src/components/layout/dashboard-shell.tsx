@@ -17,6 +17,7 @@
 import React, { useState, useEffect } from "react";
 import { SWRConfig } from "swr";
 import { signOut, useSession } from "next-auth/react";
+import { useRouter } from "next/navigation";
 import Link from "next/link";
 
 const IMP_LABEL_COOKIE = 'als_imp_label';
@@ -74,8 +75,16 @@ export function DashboardShell({
   const [checkoutLoading, setCheckoutLoading] = useState(false);
   const [menuOpen,        setMenuOpen]        = useState(false);
 
-  const { data: session, update } = useSession();
+  const router = useRouter();
+  const { data: session, status, update } = useSession();
   const subscriptionStatus = session?.user?.subscriptionStatus as string | undefined;
+
+  // Redirect to login if the session expires while the user is on the page
+  useEffect(() => {
+    if (status === 'unauthenticated') {
+      router.push('/auth/login');
+    }
+  }, [status, router]);
   const isActive = subscriptionStatus === 'active';
   const isCancelled = subscriptionStatus === 'canceled';
 

@@ -223,6 +223,12 @@ export async function withTenantDb<T>(
 // NEVER call this from tenant-facing routes.
 // =============================================================================
 
+// Exported so callers that need manual transaction control (e.g. account delete)
+// can get the pool directly and manage their own mssql.Transaction.
+export async function getAdminPool(): Promise<mssql.ConnectionPool> {
+  return getPool();
+}
+
 export async function withAdminDb<T>(
   callback: (request: mssql.Request) => Promise<T>
 ): Promise<T> {

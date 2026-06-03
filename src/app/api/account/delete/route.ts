@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { auth } from '@/lib/auth';
-import { withAdminDb } from '@/lib/db/client';
+import { getAdminPool } from '@/lib/db/client';
 import { stripe } from '@/lib/stripe';
 import * as mssql from 'mssql';
 
@@ -15,75 +15,110 @@ export async function DELETE() {
 
     const tenantId = session.user.tenantId as string;
 
-    // Cancel Stripe subscription if one exists, before deleting DB records
-    try {
-      const tenantRow = await withAdminDb(async (req) => {
-        const result = await req
-          .input('tenantId', mssql.UniqueIdentifier, tenantId)
-          .query(`SELECT stripe_customer_id FROM Tenants WHERE tenant_id = @tenantId`);
-        return result.recordset[0] ?? null;
-      });
+    // -------------------------------------------------------------------------
+    // Step 1: Read stripe_customer_id BEFORE touching anything
+    // -------------------------------------------------------------------------
+    const pool = await getAdminPool();
+    const tenantRow = await pool.request()
+      .input('tenantId', mssql.UniqueIdentifier, tenantId)
+      .query(`SELECT stripe_customer_id FROM Tenants WHERE tenant_id = @tenantId AND deleted_at IS NULL`);
 
-      if (tenantRow?.stripe_customer_id) {
+    const stripeCustomerId = tenantRow.recordset[0]?.stripe_customer_id ?? null;
+
+    // -------------------------------------------------------------------------
+    // Step 2: Delete all data in a single transaction — all-or-nothing.
+    //         If anything fails here the user's account is untouched and they
+    //         can retry. Stripe is NOT touched yet.
+    // -------------------------------------------------------------------------
+    const transaction = new mssql.Transaction(pool);
+    await transaction.begin();
+
+    try {
+      const req = new mssql.Request(transaction);
+      req.input('tenantId', mssql.UniqueIdentifier, tenantId);
+
+      // FK-safe deletion order
+      await new mssql.Request(transaction)
+        .input('tenantId', mssql.UniqueIdentifier, tenantId)
+        .query(`DELETE FROM JourneyEvents WHERE tenant_id = @tenantId`);
+
+      await new mssql.Request(transaction)
+        .input('tenantId', mssql.UniqueIdentifier, tenantId)
+        .query(`DELETE FROM ClickLogs WHERE tenant_id = @tenantId`);
+
+      await new mssql.Request(transaction)
+        .input('tenantId', mssql.UniqueIdentifier, tenantId)
+        .query(`DELETE FROM Sessions WHERE tenant_id = @tenantId`);
+
+      // UnregisteredTrafficLog has no tenant_id — join via Campaigns
+      await new mssql.Request(transaction)
+        .input('tenantId', mssql.UniqueIdentifier, tenantId)
+        .query(`
+          DELETE FROM UnregisteredTrafficLog
+          WHERE unrecognised_campaign_id IN (
+            SELECT google_campaign_id FROM Campaigns WHERE tenant_id = @tenantId
+          )
+        `);
+
+      await new mssql.Request(transaction)
+        .input('tenantId', mssql.UniqueIdentifier, tenantId)
+        .query(`DELETE FROM Campaigns WHERE tenant_id = @tenantId`);
+
+      await new mssql.Request(transaction)
+        .input('tenantId', mssql.UniqueIdentifier, tenantId)
+        .query(`DELETE FROM Domains WHERE tenant_id = @tenantId`);
+
+      await new mssql.Request(transaction)
+        .input('tenantId', mssql.UniqueIdentifier, tenantId)
+        .query(`DELETE FROM PasswordResetTokens WHERE tenant_id = @tenantId`);
+
+      await new mssql.Request(transaction)
+        .input('tenantId', mssql.UniqueIdentifier, tenantId)
+        .query(`DELETE FROM EmailVerificationTokens WHERE tenant_id = @tenantId`);
+
+      // Soft-delete the Tenants row — strips PII, keeps row for admin audit trail
+      await new mssql.Request(transaction)
+        .input('tenantId', mssql.UniqueIdentifier, tenantId)
+        .query(`
+          UPDATE Tenants
+          SET deleted_at          = GETUTCDATE(),
+              email               = CONCAT('deleted_', tenant_id, '@deleted'),
+              password_hash       = '',
+              subscription_status = 'deleted',
+              stripe_customer_id  = NULL
+          WHERE tenant_id = @tenantId
+        `);
+
+      await transaction.commit();
+      console.log(`[account/delete] DB transaction committed for tenant ${tenantId}`);
+    } catch (dbErr) {
+      await transaction.rollback();
+      console.error('[account/delete] DB transaction rolled back:', dbErr);
+      throw dbErr; // surfaces as 500 — account is fully intact, user can retry
+    }
+
+    // -------------------------------------------------------------------------
+    // Step 3: Cancel Stripe subscription AFTER the DB is clean.
+    //         Non-fatal — if this fails the account is still deleted in DB.
+    //         The subscription will fail to renew naturally, and the webhook
+    //         won't overwrite the 'deleted' status (deleted_at IS NULL guard).
+    // -------------------------------------------------------------------------
+    if (stripeCustomerId) {
+      try {
         const subscriptions = await stripe.subscriptions.list({
-          customer: tenantRow.stripe_customer_id,
+          customer: stripeCustomerId,
           status: 'active',
           limit: 1,
         });
         if (subscriptions.data.length > 0) {
           await stripe.subscriptions.cancel(subscriptions.data[0].id);
+          console.log(`[account/delete] Stripe subscription cancelled for ${stripeCustomerId}`);
         }
+      } catch (stripeErr) {
+        // Log but don't fail — DB is already clean, subscription will lapse
+        console.warn('[account/delete] Stripe cancel warning (non-fatal):', stripeErr);
       }
-    } catch (stripeErr) {
-      // Non-fatal — proceed with DB deletion even if Stripe cancel fails
-      console.warn('[account/delete] Stripe cancel warning:', stripeErr);
     }
-
-    // Hard delete all tenant data in FK-safe order
-    await withAdminDb(async (req) => {
-      req.input('tenantId', mssql.UniqueIdentifier, tenantId);
-
-      // 1. Journey events (linked to Sessions)
-      await req.query(`DELETE FROM JourneyEvents WHERE tenant_id = @tenantId`);
-
-      // 2. Click logs (linked to Sessions/Campaigns)
-      await req.query(`DELETE FROM ClickLogs WHERE tenant_id = @tenantId`);
-
-      // 3. Sessions (linked to Campaigns)
-      await req.query(`DELETE FROM Sessions WHERE tenant_id = @tenantId`);
-
-      // 4. Unregistered traffic log — no tenant_id column, join via Campaigns
-      await req.query(`
-        DELETE FROM UnregisteredTrafficLog
-        WHERE unrecognised_campaign_id IN (
-          SELECT google_campaign_id FROM Campaigns WHERE tenant_id = @tenantId
-        )
-      `);
-
-      // 5. Campaigns (linked to Domains)
-      await req.query(`DELETE FROM Campaigns WHERE tenant_id = @tenantId`);
-
-      // 6. Domains
-      await req.query(`DELETE FROM Domains WHERE tenant_id = @tenantId`);
-
-      // 7. Password reset tokens
-      await req.query(`DELETE FROM PasswordResetTokens WHERE tenant_id = @tenantId`);
-
-      // 8. Email verification tokens
-      await req.query(`DELETE FROM EmailVerificationTokens WHERE tenant_id = @tenantId`);
-
-      // 9. Soft-delete the tenant record — keeps it visible in admin for audit
-      //    but strips all personal data for GDPR compliance.
-      await req.query(`
-        UPDATE Tenants
-        SET deleted_at          = GETUTCDATE(),
-            email               = CONCAT('deleted_', tenant_id, '@deleted'),
-            password_hash       = '',
-            subscription_status = 'deleted',
-            stripe_customer_id  = NULL
-        WHERE tenant_id = @tenantId
-      `);
-    });
 
     console.log(`[account/delete] Tenant ${tenantId} fully deleted.`);
     return NextResponse.json({ success: true });
