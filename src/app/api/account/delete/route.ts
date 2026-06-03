@@ -52,8 +52,13 @@ export async function DELETE() {
       // 3. Sessions (linked to Campaigns)
       await req.query(`DELETE FROM Sessions WHERE tenant_id = @tenantId`);
 
-      // 4. Unregistered traffic log
-      await req.query(`DELETE FROM UnregisteredTrafficLog WHERE tenant_id = @tenantId`);
+      // 4. Unregistered traffic log — no tenant_id column, join via Campaigns
+      await req.query(`
+        DELETE FROM UnregisteredTrafficLog
+        WHERE unrecognised_campaign_id IN (
+          SELECT google_campaign_id FROM Campaigns WHERE tenant_id = @tenantId
+        )
+      `);
 
       // 5. Campaigns (linked to Domains)
       await req.query(`DELETE FROM Campaigns WHERE tenant_id = @tenantId`);

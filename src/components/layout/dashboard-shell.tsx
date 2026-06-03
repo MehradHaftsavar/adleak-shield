@@ -80,17 +80,15 @@ export function DashboardShell({
   const isCancelled = subscriptionStatus === 'canceled';
 
   // After returning from Stripe checkout, force a session refresh so the
-  // subscribe button and banners reflect the new subscription status immediately.
+  // subscribe button reflects the new subscription status immediately.
+  // NOTE: do NOT strip ?payment=success here — DashboardContent reads it via
+  // useSearchParams to show the success banner, then clears it via router.replace.
+  // Calling replaceState here races against that read and can swallow the banner.
   useEffect(() => {
     if (typeof window === 'undefined') return;
     const params = new URLSearchParams(window.location.search);
     if (params.get('payment') === 'success') {
-      update().then(() => {
-        // Remove the query param from the URL without a page reload
-        const url = new URL(window.location.href);
-        url.searchParams.delete('payment');
-        window.history.replaceState({}, '', url.toString());
-      });
+      update();
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);

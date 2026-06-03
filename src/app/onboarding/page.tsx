@@ -81,11 +81,11 @@ export default function OnboardingPage() {
           <div className="max-w-3xl mx-auto">
             {/* Progress indicator skeleton */}
             <div className="mb-8">
-              <div className="flex items-center justify-between mb-2">
+              <div className="relative flex items-center justify-between mb-2">
+                <div className="absolute inset-x-5 top-5 h-1 bg-gray-300 animate-pulse" />
                 {[1, 2, 3].map((step) => (
-                  <div key={step} className="flex items-center">
+                  <div key={step} className="relative z-10">
                     <div className="w-10 h-10 rounded-full bg-gray-300 animate-pulse" />
-                    {step < 3 && <div className="w-24 h-1 mx-2 bg-gray-300 animate-pulse" />}
                   </div>
                 ))}
               </div>
@@ -125,9 +125,19 @@ export default function OnboardingPage() {
       <div className="container mx-auto px-4 py-12">
         {/* Progress indicator */}
         <div className="max-w-3xl mx-auto mb-8">
-          <div className="flex items-center justify-between">
+          <div className="relative flex items-center justify-between">
+            {/* Full-width background track */}
+            <div className="absolute inset-x-5 top-5 h-1 bg-gray-300" />
+            {/* Filled progress track */}
+            <div
+              className="absolute top-5 h-1 bg-blue-600 transition-all duration-300"
+              style={{
+                left: '20px',
+                width: currentStep === 1 ? '0%' : currentStep === 2 ? 'calc(50% - 20px)' : 'calc(100% - 40px)',
+              }}
+            />
             {[1, 2, 3].map((step) => (
-              <div key={step} className="flex items-center">
+              <div key={step} className="relative z-10 flex flex-col items-center">
                 <div
                   className={`w-10 h-10 rounded-full flex items-center justify-center font-semibold transition-colors ${
                     currentStep >= step
@@ -137,13 +147,6 @@ export default function OnboardingPage() {
                 >
                   {step}
                 </div>
-                {step < 3 && (
-                  <div
-                    className={`w-24 h-1 mx-2 transition-colors ${
-                      currentStep > step ? 'bg-blue-600' : 'bg-gray-300'
-                    }`}
-                  />
-                )}
               </div>
             ))}
           </div>

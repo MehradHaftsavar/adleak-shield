@@ -129,12 +129,15 @@ export async function POST(request: NextRequest) {
             // Stamp cancellation date (once only) + clear any previous warning flag
             // so they get a fresh 90-day window and a new warning email if they
             // resubscribe and cancel again.
+            // Skip deleted tenants — account deletion cancels the Stripe sub as a
+            // side-effect; we don't want the webhook to overwrite 'deleted' → 'canceled'.
             await req.query(`
               UPDATE Tenants
               SET subscription_status        = @status,
                   subscription_cancelled_at  = ISNULL(subscription_cancelled_at, GETUTCDATE()),
                   data_deletion_warned_at    = NULL
               WHERE stripe_customer_id = @customerId
+                AND deleted_at IS NULL
             `);
           } else if (isActive) {
             // Resubscribed — clear retention-related stamps so the 90-day clock
@@ -145,12 +148,14 @@ export async function POST(request: NextRequest) {
                   subscription_cancelled_at  = NULL,
                   data_deletion_warned_at    = NULL
               WHERE stripe_customer_id = @customerId
+                AND deleted_at IS NULL
             `);
           } else {
             await req.query(`
               UPDATE Tenants
               SET subscription_status = @status
               WHERE stripe_customer_id = @customerId
+                AND deleted_at IS NULL
             `);
           }
         });
@@ -175,6 +180,7 @@ export async function POST(request: NextRequest) {
                   subscription_cancelled_at = ISNULL(subscription_cancelled_at, GETUTCDATE()),
                   data_deletion_warned_at   = NULL
               WHERE stripe_customer_id = @customerId
+                AND deleted_at IS NULL
             `);
         });
 
@@ -193,6 +199,7 @@ export async function POST(request: NextRequest) {
               UPDATE Tenants
               SET subscription_status = 'past_due'
               WHERE stripe_customer_id = @customerId
+                AND deleted_at IS NULL
             `);
         });
 
