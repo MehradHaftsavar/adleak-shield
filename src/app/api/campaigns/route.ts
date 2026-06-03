@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { auth } from '@/lib/auth';
-import { withTenantDb } from '@/lib/db/client';
+import { withTenantDb, withAdminDb } from '@/lib/db/client';
 import * as mssql from 'mssql';
 import { getEffectiveTenantId, blockedInImpersonation } from '@/lib/adminAuth';
 
@@ -136,6 +136,32 @@ export async function POST(request: NextRequest) {
         message: 'Campaign registered successfully',
       };
     });
+
+    // If this campaign was previously trialled by a deleted account, expire the
+    // trial immediately — they already had their free trial on this campaign.
+    const previouslyTrialled = await withAdminDb(async (req) => {
+      const check = await req
+        .input('val', mssql.NVarChar, validatedData.googleCampaignId)
+        .query(`
+          SELECT 1 FROM TrialledResources
+          WHERE resource_type = 'campaign' AND resource_value = @val
+        `);
+      return check.recordset.length > 0;
+    });
+
+    if (previouslyTrialled) {
+      await withAdminDb(async (req) => {
+        await req
+          .input('tenantId', mssql.UniqueIdentifier, session.user.tenantId)
+          .query(`
+            UPDATE Tenants
+            SET trial_ends_at = GETUTCDATE()
+            WHERE tenant_id = @tenantId
+              AND subscription_status = 'trialing'
+          `);
+      });
+      console.log(`[campaigns] Previously trialled campaign "${validatedData.googleCampaignId}" — trial expired for tenant ${session.user.tenantId}`);
+    }
 
     return NextResponse.json(result);
   } catch (error) {

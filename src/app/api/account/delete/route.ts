@@ -37,6 +37,44 @@ export async function DELETE() {
       const req = new mssql.Request(transaction);
       req.input('tenantId', mssql.UniqueIdentifier, tenantId);
 
+      // -----------------------------------------------------------------------
+      // Record domains + campaigns in TrialledResources BEFORE deleting them
+      // so that re-registration by the same person never gets a new trial.
+      // -----------------------------------------------------------------------
+      const domainsToLog = await new mssql.Request(transaction)
+        .input('tenantId', mssql.UniqueIdentifier, tenantId)
+        .query(`SELECT domain_name FROM Domains WHERE tenant_id = @tenantId`);
+
+      const campaignsToLog = await new mssql.Request(transaction)
+        .input('tenantId', mssql.UniqueIdentifier, tenantId)
+        .query(`SELECT google_campaign_id FROM Campaigns WHERE tenant_id = @tenantId`);
+
+      for (const row of domainsToLog.recordset) {
+        await new mssql.Request(transaction)
+          .input('val', mssql.NVarChar, row.domain_name)
+          .query(`
+            IF NOT EXISTS (
+              SELECT 1 FROM TrialledResources
+              WHERE resource_type = 'domain' AND resource_value = @val
+            )
+              INSERT INTO TrialledResources (resource_type, resource_value)
+              VALUES ('domain', @val)
+          `);
+      }
+
+      for (const row of campaignsToLog.recordset) {
+        await new mssql.Request(transaction)
+          .input('val', mssql.NVarChar, row.google_campaign_id)
+          .query(`
+            IF NOT EXISTS (
+              SELECT 1 FROM TrialledResources
+              WHERE resource_type = 'campaign' AND resource_value = @val
+            )
+              INSERT INTO TrialledResources (resource_type, resource_value)
+              VALUES ('campaign', @val)
+          `);
+      }
+
       // FK-safe deletion order
       await new mssql.Request(transaction)
         .input('tenantId', mssql.UniqueIdentifier, tenantId)

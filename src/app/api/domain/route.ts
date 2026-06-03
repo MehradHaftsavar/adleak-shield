@@ -64,7 +64,20 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // 4. Use withTenantDb to set RLS context
+    // 4. Check if this domain was previously trialled by a deleted account
+    //    If so, allow registration but expire any active trial immediately —
+    //    the person already had their free trial.
+    const previouslyTrialled = await withAdminDb(async (req) => {
+      const result = await req
+        .input('domainName', mssql.NVarChar, domain)
+        .query(`
+          SELECT 1 FROM TrialledResources
+          WHERE resource_type = 'domain' AND resource_value = @domainName
+        `);
+      return result.recordset.length > 0;
+    });
+
+    // 5. Use withTenantDb to set RLS context
     const result = await withTenantDb(session.user.tenantId, async (req) => {
       // Check if tenant already has a domain
       const existingDomainResult = await req.query(`
@@ -111,6 +124,22 @@ export async function POST(request: NextRequest) {
         message: 'Domain registered successfully',
       };
     });
+
+    // If this domain was previously trialled, expire the trial immediately so
+    // the user is paywalled — they already had their free trial on this domain.
+    if (previouslyTrialled) {
+      await withAdminDb(async (req) => {
+        await req
+          .input('tenantId', mssql.UniqueIdentifier, session.user.tenantId)
+          .query(`
+            UPDATE Tenants
+            SET trial_ends_at = GETUTCDATE()
+            WHERE tenant_id = @tenantId
+              AND subscription_status = 'trialing'
+          `);
+      });
+      console.log(`[domain] Previously trialled domain "${domain}" — trial expired for tenant ${session.user.tenantId}`);
+    }
 
     return NextResponse.json(result);
 
