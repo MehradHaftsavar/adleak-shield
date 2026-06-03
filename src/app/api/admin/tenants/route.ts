@@ -38,10 +38,9 @@ export async function GET(request: NextRequest) {
           subscription_status,
           trial_ends_at,
           created_at,
-          onboarding_completed,
-          deleted_at
+          onboarding_completed
         FROM Tenants
-        WHERE email_verified = 1 OR deleted_at IS NOT NULL
+        WHERE email_verified = 1 AND deleted_at IS NULL
         ORDER BY created_at DESC
       `);
       return r.recordset;
@@ -104,7 +103,6 @@ export async function GET(request: NextRequest) {
         trialEndsAt:         t.trial_ends_at ? new Date(t.trial_ends_at).toISOString() : null,
         createdAt:           t.created_at    ? new Date(t.created_at).toISOString()    : null,
         onboardingCompleted: !!t.onboarding_completed,
-        deletedAt:           t.deleted_at ? new Date(t.deleted_at).toISOString() : null,
         ...stats,
       });
     }

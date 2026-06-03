@@ -20,7 +20,6 @@ interface TenantRow {
   lastSessionAt:       string | null;
   waste:               number;
   campaignCount:       number;
-  deletedAt:           string | null;
 }
 
 interface TenantsData {
@@ -61,7 +60,6 @@ function statusBadge(status: string) {
     active:   'bg-green-900 text-green-300',
     trialing: 'bg-blue-900 text-blue-300',
     canceled: 'bg-red-900 text-red-300',
-    deleted:  'bg-gray-800 text-gray-500',
     none:     'bg-gray-800 text-gray-400',
   };
   return map[status] ?? map.none;
@@ -346,31 +344,19 @@ export function AdminDashboard() {
                   </thead>
                   <tbody>
                     {pageUsers.map((t, i) => {
-                      const isDeleted = !!t.deletedAt;
                       const dl = daysLeft(t.trialEndsAt);
                       return (
                         <tr key={t.tenantId}
-                          className={`border-b border-gray-800/50 transition-colors ${
-                            isDeleted
-                              ? 'opacity-50'
-                              : `hover:bg-gray-800/30 ${i % 2 === 0 ? '' : 'bg-gray-900/50'}`
-                          }`}>
+                          className={`border-b border-gray-800/50 hover:bg-gray-800/30 transition-colors ${i % 2 === 0 ? '' : 'bg-gray-900/50'}`}>
                           <td className="px-4 py-3 font-medium">
-                            <span className={isDeleted ? 'text-gray-500 line-through' : 'text-gray-200'}>
-                              {t.email}
-                            </span>
-                            {isDeleted && (
-                              <span className="ml-2 text-xs text-gray-600">
-                                deleted {new Date(t.deletedAt!).toLocaleDateString('en-GB')}
-                              </span>
-                            )}
-                            {!isDeleted && !t.onboardingCompleted && (
+                            <span className="text-gray-200">{t.email}</span>
+                            {!t.onboardingCompleted && (
                               <span className="ml-2 text-xs text-yellow-700">(no onboarding)</span>
                             )}
                           </td>
                           <td className="px-4 py-3">
-                            <span className={`inline-flex px-2 py-0.5 rounded-full text-xs font-medium ${statusBadge(isDeleted ? 'deleted' : t.subscriptionStatus)}`}>
-                              {isDeleted ? 'deleted' : t.subscriptionStatus}
+                            <span className={`inline-flex px-2 py-0.5 rounded-full text-xs font-medium ${statusBadge(t.subscriptionStatus)}`}>
+                              {t.subscriptionStatus}
                             </span>
                           </td>
                           <td className="px-4 py-3 text-right text-gray-300">{t.sessionsInRange.toLocaleString()}</td>
@@ -382,9 +368,7 @@ export function AdminDashboard() {
                           <td className="px-4 py-3 text-right text-gray-400">{t.campaignCount}</td>
                           <td className="px-4 py-3 text-gray-400 text-xs">{timeSince(t.lastSessionAt)}</td>
                           <td className="px-4 py-3 text-xs">
-                            {isDeleted ? (
-                              <span className="text-gray-600">—</span>
-                            ) : t.subscriptionStatus === 'active' ? (
+                            {t.subscriptionStatus === 'active' ? (
                               <span className="text-gray-600">—</span>
                             ) : t.trialEndsAt ? (
                               <span className={dl !== null && dl <= 3 ? 'text-red-400' : 'text-gray-400'}>
@@ -395,22 +379,18 @@ export function AdminDashboard() {
                             )}
                           </td>
                           <td className="px-4 py-3 text-right">
-                            {isDeleted ? (
-                              <span className="text-xs text-gray-700">—</span>
-                            ) : (
-                              <div className="flex items-center justify-end gap-2">
-                                <button onClick={() => extendTrial(t.tenantId)} disabled={extending === t.tenantId}
-                                  className="text-xs bg-blue-900/40 text-blue-300 px-2 py-1 rounded hover:bg-blue-800/50 transition-colors disabled:opacity-50"
-                                  title={`Extend trial by ${extendDays} days`}>
-                                  {extending === t.tenantId ? '…' : `+${extendDays}d`}
-                                </button>
-                                <button onClick={() => startImpersonation(t.tenantId, t.email)} disabled={impersonating === t.tenantId}
-                                  className="text-xs bg-amber-900/40 text-amber-300 px-2 py-1 rounded hover:bg-amber-800/50 transition-colors disabled:opacity-50"
-                                  title="View dashboard as this user (read-only)">
-                                  {impersonating === t.tenantId ? '…' : 'View as'}
-                                </button>
-                              </div>
-                            )}
+                            <div className="flex items-center justify-end gap-2">
+                              <button onClick={() => extendTrial(t.tenantId)} disabled={extending === t.tenantId}
+                                className="text-xs bg-blue-900/40 text-blue-300 px-2 py-1 rounded hover:bg-blue-800/50 transition-colors disabled:opacity-50"
+                                title={`Extend trial by ${extendDays} days`}>
+                                {extending === t.tenantId ? '…' : `+${extendDays}d`}
+                              </button>
+                              <button onClick={() => startImpersonation(t.tenantId, t.email)} disabled={impersonating === t.tenantId}
+                                className="text-xs bg-amber-900/40 text-amber-300 px-2 py-1 rounded hover:bg-amber-800/50 transition-colors disabled:opacity-50"
+                                title="View dashboard as this user (read-only)">
+                                {impersonating === t.tenantId ? '…' : 'View as'}
+                              </button>
+                            </div>
                           </td>
                         </tr>
                       );
