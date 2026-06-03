@@ -64,8 +64,20 @@ export async function DELETE() {
       // 7. Password reset tokens
       await req.query(`DELETE FROM PasswordResetTokens WHERE tenant_id = @tenantId`);
 
-      // 8. Finally delete the tenant record itself
-      await req.query(`DELETE FROM Tenants WHERE tenant_id = @tenantId`);
+      // 8. Email verification tokens
+      await req.query(`DELETE FROM EmailVerificationTokens WHERE tenant_id = @tenantId`);
+
+      // 9. Soft-delete the tenant record — keeps it visible in admin for audit
+      //    but strips all personal data for GDPR compliance.
+      await req.query(`
+        UPDATE Tenants
+        SET deleted_at          = GETUTCDATE(),
+            email               = CONCAT('deleted_', tenant_id, '@deleted'),
+            password_hash       = '',
+            subscription_status = 'deleted',
+            stripe_customer_id  = NULL
+        WHERE tenant_id = @tenantId
+      `);
     });
 
     console.log(`[account/delete] Tenant ${tenantId} fully deleted.`);
