@@ -187,10 +187,12 @@ function TimelineView({
   detail,
   isLoading,
   error,
+  domain,
 }: {
   detail:    JourneyDetail | null;
   isLoading: boolean;
   error:     string;
+  domain:    string | null;
 }) {
   if (isLoading) {
     return (
@@ -261,7 +263,7 @@ function TimelineView({
             <div className="absolute left-[1.85rem] top-4 bottom-4 w-0.5 bg-gray-200" />
             <div className="space-y-3">
               {events.map((event, idx) => (
-                <TimelineEventRow key={event.eventId} event={event} index={idx} />
+                <TimelineEventRow key={event.eventId} event={event} index={idx} domain={domain} />
               ))}
             </div>
           </div>
@@ -271,7 +273,7 @@ function TimelineView({
   );
 }
 
-function TimelineEventRow({ event, index }: { event: JourneyEvent; index: number }) {
+function TimelineEventRow({ event, index, domain }: { event: JourneyEvent; index: number; domain: string | null }) {
   const isSuccess  = event.eventType === 'success_event';
   const isPageview = event.eventType === 'pageview';
 
@@ -281,9 +283,14 @@ function TimelineEventRow({ event, index }: { event: JourneyEvent; index: number
     ? 'bg-blue-400 ring-blue-200'
     : 'bg-gray-400 ring-gray-200';
 
+  const pagePath = event.pagePath || '/';
+  const pageLabel = domain
+    ? `${domain}${pagePath === '/' ? '' : pagePath}`  // myshop.com or myshop.com/contact-us
+    : pagePath;
+
   let label = '';
   if (isPageview) {
-    label = `Visited ${event.pagePath || '/'}`;
+    label = `Visited ${pageLabel}`;
   } else if (isSuccess) {
     label = `✅ ${event.elementText || event.elementHref || event.elementTag || 'Success event'}`;
   } else {
@@ -324,6 +331,14 @@ function TimelineEventRow({ event, index }: { event: JourneyEvent; index: number
 export function JourneyTimeline({ keyword, matchType, dateRange, onClose, sessionId }: JourneyTimelineProps) {
   const directMode = !!sessionId;
   const [view, setView] = useState<'sessions' | 'timeline'>(directMode ? 'timeline' : 'sessions');
+
+  const [domain, setDomain] = useState<string | null>(null);
+  useEffect(() => {
+    fetch('/api/domain')
+      .then(r => r.json())
+      .then(data => { if (data.domain) setDomain(data.domain); })
+      .catch(() => {/* non-critical, falls back to path only */});
+  }, []);
 
   const [sessions,        setSessions]        = useState<SessionSummary[]>([]);
   const [sessionsLoading, setSessionsLoading] = useState(!directMode);
@@ -462,6 +477,7 @@ export function JourneyTimeline({ keyword, matchType, dateRange, onClose, sessio
               detail={journeyDetail}
               isLoading={journeyLoading}
               error={journeyError}
+              domain={domain}
             />
           )}
         </div>
