@@ -369,8 +369,8 @@ export function AdminDashboard() {
                             )}
                           </td>
                           <td className="px-4 py-3">
-                            <span className={`inline-flex px-2 py-0.5 rounded-full text-xs font-medium ${statusBadge(t.subscriptionStatus)}`}>
-                              {t.subscriptionStatus}
+                            <span className={`inline-flex px-2 py-0.5 rounded-full text-xs font-medium ${statusBadge(isDeleted ? 'deleted' : t.subscriptionStatus)}`}>
+                              {isDeleted ? 'deleted' : t.subscriptionStatus}
                             </span>
                           </td>
                           <td className="px-4 py-3 text-right text-gray-300">{t.sessionsInRange.toLocaleString()}</td>

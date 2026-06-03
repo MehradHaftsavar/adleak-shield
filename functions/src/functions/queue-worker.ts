@@ -50,9 +50,9 @@ async function lookupCampaign(
     const result = await request
       .input("googleCampaignId", mssql.NVarChar, googleCampaignId)
       .execute('sp_LookupCampaignForWorker');
-    
+
     if (result.recordset.length === 0) return null;
-    
+
     const row = result.recordset[0];
     return {
       tenantId: row.tenant_id,
@@ -60,6 +60,35 @@ async function lookupCampaign(
       domainName: row.domain_name,
       googleCampaignId: row.google_campaign_id,
     };
+  });
+}
+
+/**
+ * Returns true only if the tenant has an active subscription OR is within
+ * their free trial window. Everything else (expired trial, cancelled,
+ * deleted) returns false and the caller should drop the event without
+ * writing to the DB.
+ */
+async function isTenantEligible(tenantId: string): Promise<boolean> {
+  return withAdminDb(async (request) => {
+    const result = await request
+      .input('tenantId', mssql.UniqueIdentifier, tenantId)
+      .query(`
+        SELECT subscription_status, trial_ends_at, deleted_at
+        FROM Tenants
+        WHERE tenant_id = @tenantId
+      `);
+
+    const row = result.recordset[0];
+    if (!row || row.deleted_at !== null) return false;
+
+    if (row.subscription_status === 'active') return true;
+
+    if (row.subscription_status === 'trialing' && row.trial_ends_at) {
+      return new Date(row.trial_ends_at) > new Date();
+    }
+
+    return false;
   });
 }
 
@@ -320,6 +349,18 @@ export async function queueWorkerHandler(
           err: err instanceof Error ? err.message : String(err),
         });
       }
+      return;
+    }
+
+    // Gate: only write data for tenants on an active subscription or within
+    // their free trial. Expired, cancelled, and deleted tenants are dropped
+    // silently — no DB writes, no queue poison, no error.
+    const eligible = await isTenantEligible(campaign.tenantId);
+    if (!eligible) {
+      context.log("[Worker] Tenant not eligible — dropping event", {
+        tenantId: campaign.tenantId,
+        eventType: env.eventType,
+      });
       return;
     }
   }

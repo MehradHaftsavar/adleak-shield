@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { Lock } from 'lucide-react';
+import { Lock, PauseCircle } from 'lucide-react';
 
 interface PaywallOverlayProps {
   onUpgrade: () => Promise<void>;
@@ -30,9 +30,16 @@ export default function PaywallOverlay({ onUpgrade }: PaywallOverlayProps) {
           Your free trial has ended
         </h2>
 
-        <p className="text-sm text-gray-500 mb-6">
+        <p className="text-sm text-gray-500 mb-4">
           Subscribe to continue seeing your keyword data and wasted spend analysis.
         </p>
+
+        <div className="flex items-start gap-2 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2.5 mb-6 text-left">
+          <PauseCircle className="w-4 h-4 text-amber-600 flex-shrink-0 mt-0.5" />
+          <p className="text-xs text-amber-800">
+            <span className="font-semibold">Data collection is paused.</span> No click or keyword data is being recorded for your campaigns while your subscription is inactive.
+          </p>
+        </div>
 
         <div className="mb-1">
           <span className="text-3xl font-bold text-gray-900">£12.99</span>

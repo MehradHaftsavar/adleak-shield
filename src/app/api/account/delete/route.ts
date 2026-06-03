@@ -84,7 +84,7 @@ export async function DELETE() {
           SET deleted_at          = GETUTCDATE(),
               email               = CONCAT('deleted_', tenant_id, '@deleted'),
               password_hash       = '',
-              subscription_status = 'deleted',
+              subscription_status = 'canceled',
               stripe_customer_id  = NULL
           WHERE tenant_id = @tenantId
         `);
