@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 
 interface MetricsData {
-  tenants:   { total: number; active: number; trialing: number; inactive: number };
+  tenants:   { total: number; active: number; trialing: number; inactive: number; deleted: number };
   mrr:       number;
   waste:     { total: number; tenantsWithData: number };
   dateRange: { start: string; end: string };
@@ -288,14 +288,16 @@ export function AdminDashboard() {
             {[...Array(4)].map((_, i) => <div key={i} className="bg-gray-900 rounded-xl h-24 animate-pulse" />)}
           </div>
         ) : (
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+          <div className="grid grid-cols-2 sm:grid-cols-5 gap-4">
             <MetricCard label="Total Users" value={String(metrics?.tenants?.total ?? 0)}
               sub={`${metrics?.tenants?.active ?? 0} active · ${metrics?.tenants?.trialing ?? 0} trial`} />
             <MetricCard label="MRR" value={`£${fmt(metrics?.mrr ?? 0)}`} sub="Stripe active subs" />
             <MetricCard label="Waste (selected period)" value={`£${fmt(metrics?.waste?.total ?? 0)}`}
               sub={`across ${metrics?.waste?.tenantsWithData ?? 0} tenants`} color="red" />
             <MetricCard label="Inactive" value={String(metrics?.tenants?.inactive ?? 0)}
-              sub="canceled / no sub" color="gray" />
+              sub="expired trial / canceled" color="gray" />
+            <MetricCard label="Deleted" value={String(metrics?.tenants?.deleted ?? 0)}
+              sub="accounts deleted" color="gray" />
           </div>
         )}
       </section>
@@ -337,7 +339,7 @@ export function AdminDashboard() {
                       <th className="px-4 py-3 text-right">Sessions</th>
                       <th className="px-4 py-3 text-right">Waste</th>
                       <th className="px-4 py-3 text-right">Campaigns</th>
-                      <th className="px-4 py-3 text-left">Last Active</th>
+                      <th className="px-4 py-3 text-left">Last Ad Click</th>
                       <th className="px-4 py-3 text-left">Trial Ends</th>
                       <th className="px-4 py-3 text-right">Actions</th>
                     </tr>

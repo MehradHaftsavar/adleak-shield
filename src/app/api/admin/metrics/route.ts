@@ -32,11 +32,14 @@ export async function GET(request: NextRequest) {
     const stats = await withAdminDb(async (req) => {
       const r = await req.query(`
         SELECT
-          COUNT(*)                                                             AS total_tenants,
-          SUM(CASE WHEN subscription_status = 'active'   THEN 1 ELSE 0 END)  AS active_count,
-          SUM(CASE WHEN subscription_status = 'trialing' THEN 1 ELSE 0 END)  AS trialing_count,
-          SUM(CASE WHEN subscription_status NOT IN ('active','trialing')
-               OR  subscription_status IS NULL                THEN 1 ELSE 0 END) AS inactive_count
+          SUM(CASE WHEN deleted_at IS NULL                                                                                    THEN 1 ELSE 0 END) AS total_tenants,
+          SUM(CASE WHEN deleted_at IS NULL AND subscription_status = 'active'                                                 THEN 1 ELSE 0 END) AS active_count,
+          SUM(CASE WHEN deleted_at IS NULL AND subscription_status = 'trialing' AND trial_ends_at > GETUTCDATE()              THEN 1 ELSE 0 END) AS trialing_count,
+          SUM(CASE WHEN deleted_at IS NULL AND (
+                subscription_status NOT IN ('active','trialing')
+                OR (subscription_status = 'trialing' AND trial_ends_at <= GETUTCDATE())
+              )                                                                                                                THEN 1 ELSE 0 END) AS inactive_count,
+          SUM(CASE WHEN deleted_at IS NOT NULL                                                                                THEN 1 ELSE 0 END) AS deleted_count
         FROM Tenants
         WHERE email_verified = 1
       `);
@@ -49,7 +52,7 @@ export async function GET(request: NextRequest) {
     // -------------------------------------------------------------------------
     const tenantIds = await withAdminDb(async (req) => {
       const r = await req.query(`
-        SELECT tenant_id FROM Tenants WHERE email_verified = 1
+        SELECT tenant_id FROM Tenants WHERE email_verified = 1 AND deleted_at IS NULL
       `);
       return r.recordset.map(t => t.tenant_id as string);
     });
@@ -121,6 +124,7 @@ export async function GET(request: NextRequest) {
         active:   Number(stats.active_count    ?? 0),
         trialing: Number(stats.trialing_count  ?? 0),
         inactive: Number(stats.inactive_count  ?? 0),
+        deleted:  Number(stats.deleted_count   ?? 0),
       },
       mrr,
       waste: {
