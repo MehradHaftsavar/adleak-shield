@@ -406,10 +406,8 @@ export default function SetupGuidePage() {
           </div>
         </section>
 
-        {/* Footer */}
-        <footer className="border-t border-gray-200 pt-8 pb-12 text-sm text-gray-400 text-center">
-          AdLeak Shield — <a href="/dashboard" className="hover:text-gray-600 transition-colors">Back to dashboard</a>
-        </footer>
+        {/* Footer spacing */}
+        <div className="pb-4" />
 
       </main>
     </div>
