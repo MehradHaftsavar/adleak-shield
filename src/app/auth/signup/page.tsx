@@ -11,6 +11,7 @@ export default function SignupPage() {
   const [confirmPassword, setConfirmPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [agreedToTerms, setAgreedToTerms] = useState(false);
 
   // Pre-warm the DB as soon as the page loads so it's ready when they submit
   useEffect(() => {
@@ -21,6 +22,12 @@ export default function SignupPage() {
     e.preventDefault();
     setError(null);
     setIsLoading(true);
+
+    if (!agreedToTerms) {
+      setError("You must agree to the Terms of Service and Privacy Policy to create an account.");
+      setIsLoading(false);
+      return;
+    }
 
     const parsed = signUpSchema.safeParse({ email, password, confirmPassword });
     if (!parsed.success) {
@@ -91,11 +98,33 @@ export default function SignupPage() {
                 className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-transparent disabled:bg-gray-50 disabled:text-gray-500"
                 placeholder="••••••••" />
             </div>
-            <button type="submit" disabled={isLoading}
+            {/* Terms + Privacy consent checkbox */}
+            <div className="flex items-start gap-3">
+              <input
+                id="agreeToTerms"
+                type="checkbox"
+                checked={agreedToTerms}
+                onChange={(e) => setAgreedToTerms(e.target.checked)}
+                disabled={isLoading}
+                className="mt-0.5 h-4 w-4 rounded border-gray-300 text-gray-900 focus:ring-gray-900 flex-shrink-0 cursor-pointer disabled:cursor-not-allowed"
+              />
+              <label htmlFor="agreeToTerms" className="text-xs text-gray-600 leading-relaxed cursor-pointer">
+                I agree to AdLeak Shield's{' '}
+                <Link href="/terms" target="_blank" rel="noopener noreferrer" className="font-medium text-gray-900 hover:underline underline-offset-2">
+                  Terms of Service
+                </Link>{' '}
+                and{' '}
+                <Link href="/privacy" target="_blank" rel="noopener noreferrer" className="font-medium text-gray-900 hover:underline underline-offset-2">
+                  Privacy Policy
+                </Link>
+                . I understand that by installing the tracking snippet I take on responsibilities as a data controller for my visitors' data.
+              </label>
+            </div>
+
+            <button type="submit" disabled={isLoading || !agreedToTerms}
               className="w-full flex justify-center py-2.5 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-gray-900 hover:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-900 disabled:opacity-50 disabled:cursor-not-allowed transition-colors duration-150">
               {isLoading ? "Creating account..." : "Create free account"}
             </button>
-            <p className="text-xs text-gray-400 text-center">By creating an account you agree to our Terms of Service and Privacy Policy.</p>
           </form>
           <p className="mt-6 text-center text-sm text-gray-500">
             Already have an account?{" "}

@@ -95,6 +95,114 @@ export function StatsCardsSkeleton() {
 }
 
 // =============================================================================
+// DASHBOARD SKELETON
+// Full-page placeholder that mirrors the real DashboardContent layout exactly:
+//   1. Header row (icon + title + buttons)
+//   2. Status indicator bar
+//   3. "Campaign Status" heading + 3 campaign cards (responsive grid)
+//   4. "Wasted Spend Analysis" heading + table skeleton
+//   5. "Visitor Journeys" heading + table skeleton
+// =============================================================================
+export function DashboardSkeleton() {
+  return (
+    <div className="space-y-6">
+
+      {/* ── 1. Header row ── */}
+      <div className="flex items-center justify-between">
+        {/* Left: icon circle + title/subtitle */}
+        <div className="flex items-center gap-3">
+          <Shimmer className="w-12 h-12 rounded-full flex-shrink-0" />
+          <div className="space-y-2">
+            <Shimmer className="h-7 w-36" />
+            <Shimmer className="h-4 w-48" />
+          </div>
+        </div>
+        {/* Right: action buttons */}
+        <div className="flex items-center gap-2">
+          <Shimmer className="h-9 w-44 rounded-lg hidden sm:block" />
+          <Shimmer className="h-9 w-32 rounded-lg" />
+        </div>
+      </div>
+
+      {/* ── 2. Status indicator bar ── */}
+      <div className="rounded-lg border border-gray-200 p-4">
+        <div className="flex items-center gap-3">
+          <Shimmer className="w-3 h-3 rounded-full flex-shrink-0" />
+          <Shimmer className="h-4 w-48" />
+          <Shimmer className="h-4 w-32 ml-auto hidden sm:block" />
+        </div>
+      </div>
+
+      {/* ── 3. Campaign Status ── */}
+      <div>
+        <Shimmer className="h-6 w-40 mb-4" />
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {Array.from({ length: 3 }).map((_, i) => (
+            <div key={i} className="rounded-lg border border-gray-200 p-5 space-y-3">
+              {/* Campaign name + status badge */}
+              <div className="flex items-center justify-between">
+                <Shimmer className="h-4 w-32" />
+                <Shimmer className="h-5 w-16 rounded-full" />
+              </div>
+              {/* Campaign ID row */}
+              <Shimmer className="h-3 w-24" />
+              {/* Stats row */}
+              <div className="flex gap-4 pt-1">
+                <div className="space-y-1.5">
+                  <Shimmer className="h-3 w-16" />
+                  <Shimmer className="h-5 w-10" />
+                </div>
+                <div className="space-y-1.5">
+                  <Shimmer className="h-3 w-16" />
+                  <Shimmer className="h-5 w-10" />
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* ── 4. Wasted Spend Analysis ── */}
+      <div>
+        {/* Section heading row with date picker + refresh button */}
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-4">
+          <Shimmer className="h-6 w-52" />
+          <div className="flex items-center gap-3">
+            <Shimmer className="h-9 w-44 rounded-lg" />
+            <Shimmer className="h-9 w-24 rounded-lg" />
+          </div>
+        </div>
+        {/* Table */}
+        <LeakTableSkeleton />
+      </div>
+
+      {/* ── 5. Visitor Journeys ── */}
+      <div>
+        <Shimmer className="h-6 w-40 mb-4" />
+        {/* Sessions table: header + rows */}
+        <div className="w-full overflow-hidden rounded-lg border border-gray-200">
+          <div className="flex gap-4 border-b border-gray-200 bg-gray-50 px-4 py-3">
+            <Shimmer className="h-4 w-24" />
+            <Shimmer className="h-4 w-20" />
+            <Shimmer className="h-4 w-28" />
+            <Shimmer className="h-4 w-16 ml-auto" />
+          </div>
+          {Array.from({ length: 5 }).map((_, i) => (
+            <div key={i} className="flex gap-4 border-b border-gray-100 px-4 py-3 last:border-0">
+              <Shimmer className="h-4 w-20" />
+              <Shimmer className="h-4 w-16" />
+              <Shimmer className="h-4 w-32" />
+              <Shimmer className="h-4 w-14 ml-auto" />
+            </div>
+          ))}
+        </div>
+      </div>
+
+    </div>
+  );
+}
+
+// =============================================================================
 // CAMPAIGN STATUS SKELETON
 // Mirrors the per-campaign status indicators in the verification panel.
 // =============================================================================

@@ -138,6 +138,29 @@ export function SnippetStep({ domain, onComplete, onBack }: SnippetStepProps) {
         </div>
       </div>
 
+      {/* Merchant privacy obligations notice */}
+      <div className="mb-6 flex gap-3 rounded-lg border border-amber-200 bg-amber-50 p-4">
+        <span className="text-lg leading-none flex-shrink-0">⚖️</span>
+        <div className="text-sm text-amber-900 space-y-1">
+          <p className="font-semibold">Your privacy obligations as a data controller</p>
+          <p>
+            By installing this snippet, you become a <strong>data controller</strong> for your visitors' data under UK/EU GDPR.
+            Before going live you must:
+          </p>
+          <ul className="list-disc list-inside ml-1 space-y-0.5 text-amber-800">
+            <li>Add AdLeak Shield to your website's <strong>Privacy Policy</strong></li>
+            <li>Ensure you have a lawful basis for collecting visitor analytics (legitimate interest is common)</li>
+            <li>If you use a consent/cookie banner, configure it to load this snippet only for consenting visitors</li>
+          </ul>
+          <p className="text-xs text-amber-700 pt-1">
+            Full details in our{' '}
+            <a href="/terms#merchant" target="_blank" rel="noopener noreferrer" className="underline font-medium">Terms of Service (Section 6)</a>
+            {' '}and{' '}
+            <a href="/privacy#merchant" target="_blank" rel="noopener noreferrer" className="underline font-medium">Privacy Policy (Section 8)</a>.
+          </p>
+        </div>
+      </div>
+
       {isLoading ? (
         <div className="text-center py-8">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-600 mx-auto"></div>

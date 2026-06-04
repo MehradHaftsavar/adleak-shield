@@ -201,7 +201,7 @@ export default function PrivacyPage() {
           </section>
 
           {/* 8 */}
-          <section>
+          <section id="merchant">
             <h2 className="text-lg font-semibold text-gray-900 mb-3">8. Your Responsibilities as a Merchant</h2>
             <p>
               By using AdLeak Shield, you install a tracking script on your website. As the operator of that

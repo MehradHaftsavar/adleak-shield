@@ -106,7 +106,7 @@ export default function TermsPage() {
             </ul>
           </section>
 
-          <section>
+          <section id="merchant">
             <h2 className="text-lg font-semibold text-gray-900 mb-3">6. Your Responsibilities as a Merchant</h2>
             <p className="mb-3">
               By installing the AdLeak Shield tracking snippet on your website, you take on certain legal
