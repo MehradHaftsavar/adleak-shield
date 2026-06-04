@@ -185,8 +185,29 @@ export function SnippetStep({ domain, onComplete, onBack }: SnippetStepProps) {
             <div className="mt-3 bg-blue-50 border border-blue-200 rounded-lg p-3">
               <p className="text-sm text-blue-900">
                 <strong>Where to paste:</strong> Add this to the &lt;head&gt; section of every page on {domain}.
-                If you're using WordPress, use a plugin like "Insert Headers and Footers" or add it to your theme's header.php file.
               </p>
+            </div>
+
+            {/* Extra instructions — platform-specific */}
+            <div className="mt-3 flex items-center gap-2 flex-wrap">
+              <span className="text-xs text-gray-500 font-medium">Extra instructions for:</span>
+              {[
+                { label: 'WordPress',  hash: 'wordpress' },
+                { label: 'Shopify',    hash: 'shopify' },
+                { label: 'Wix',        hash: 'wix' },
+                { label: 'Hand-coded', hash: 'html' },
+              ].map(({ label, hash }) => (
+                <a
+                  key={hash}
+                  href={`/setup-guide#${hash}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-medium text-purple-700 bg-purple-50 border border-purple-200 rounded-full hover:bg-purple-100 transition-colors"
+                >
+                  {label}
+                  <ExternalLink className="w-3 h-3" />
+                </a>
+              ))}
             </div>
 
             <div className="mt-3 bg-gray-50 border border-gray-200 rounded-lg p-3">
