@@ -437,9 +437,9 @@ function Footer() {
         <div className="flex flex-col sm:flex-row items-center justify-between gap-3">
           <span>© {new Date().getFullYear()} AdLeak Shield · Helping businesses stop wasting Google Ads budget</span>
           <nav className="flex items-center gap-4">
-            <a href="/privacy" className="hover:text-slate-400 transition-colors">Privacy Policy</a>
-            <a href="/terms"   className="hover:text-slate-400 transition-colors">Terms of Service</a>
-            <a href="/cookies" className="hover:text-slate-400 transition-colors">Cookie Policy</a>
+            <a href="/privacy" target="_blank" rel="noopener noreferrer" className="hover:text-slate-400 transition-colors">Privacy Policy</a>
+            <a href="/terms"   target="_blank" rel="noopener noreferrer" className="hover:text-slate-400 transition-colors">Terms of Service</a>
+            <a href="/cookies" target="_blank" rel="noopener noreferrer" className="hover:text-slate-400 transition-colors">Cookie Policy</a>
           </nav>
         </div>
       </div>

@@ -7,9 +7,9 @@ export function LegalFooter() {
         <div className="flex flex-col sm:flex-row items-center justify-between gap-2 text-xs text-gray-400">
           <span>© {new Date().getFullYear()} AdLeak Shield. All rights reserved.</span>
           <nav className="flex items-center gap-4">
-            <Link href="/privacy" className="hover:text-gray-600 transition-colors">Privacy Policy</Link>
-            <Link href="/terms"   className="hover:text-gray-600 transition-colors">Terms of Service</Link>
-            <Link href="/cookies" className="hover:text-gray-600 transition-colors">Cookie Policy</Link>
+            <Link href="/privacy" target="_blank" rel="noopener noreferrer" className="hover:text-gray-600 transition-colors">Privacy Policy</Link>
+            <Link href="/terms"   target="_blank" rel="noopener noreferrer" className="hover:text-gray-600 transition-colors">Terms of Service</Link>
+            <Link href="/cookies" target="_blank" rel="noopener noreferrer" className="hover:text-gray-600 transition-colors">Cookie Policy</Link>
           </nav>
         </div>
       </div>
