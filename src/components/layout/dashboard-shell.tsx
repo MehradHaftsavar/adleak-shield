@@ -19,6 +19,7 @@ import { SWRConfig } from "swr";
 import { signOut, useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import { LegalFooter } from "@/components/layout/LegalFooter";
 
 const IMP_LABEL_COOKIE = 'als_imp_label';
 
@@ -321,6 +322,8 @@ export function DashboardShell({
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {children}
       </main>
+
+      <LegalFooter />
     </SWRConfig>
   );
 }

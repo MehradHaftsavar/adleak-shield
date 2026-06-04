@@ -433,8 +433,15 @@ function Footer() {
           </Link>
         </div>
       </div>
-      <div className="max-w-6xl mx-auto mt-8 pt-8 border-t border-slate-800 text-center text-xs text-slate-600">
-        © {new Date().getFullYear()} AdLeak Shield · Helping businesses stop wasting Google Ads budget
+      <div className="max-w-6xl mx-auto mt-8 pt-8 border-t border-slate-800 text-xs text-slate-600">
+        <div className="flex flex-col sm:flex-row items-center justify-between gap-3">
+          <span>© {new Date().getFullYear()} AdLeak Shield · Helping businesses stop wasting Google Ads budget</span>
+          <nav className="flex items-center gap-4">
+            <a href="/privacy" className="hover:text-slate-400 transition-colors">Privacy Policy</a>
+            <a href="/terms"   className="hover:text-slate-400 transition-colors">Terms of Service</a>
+            <a href="/cookies" className="hover:text-slate-400 transition-colors">Cookie Policy</a>
+          </nav>
+        </div>
       </div>
     </footer>
   );

@@ -14,7 +14,6 @@
 import type { Metadata } from "next";
 import { SessionProvider } from "next-auth/react";
 import { auth } from "@/lib/auth";
-import { LegalFooter } from "@/components/layout/LegalFooter";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -38,10 +37,7 @@ export default async function RootLayout({
             user returns to the tab — enough to catch expired sessions without
             polling. Combined with the unauthenticated redirect in DashboardShell. */}
         <SessionProvider session={session}>
-          <div className="flex flex-col min-h-screen">
-            {children}
-            <LegalFooter />
-          </div>
+          {children}
         </SessionProvider>
       </body>
     </html>
