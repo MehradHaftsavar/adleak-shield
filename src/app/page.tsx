@@ -142,29 +142,6 @@ function Hero() {
   );
 }
 
-// =============================================================================
-// STATS BAR
-// =============================================================================
-function StatsBar() {
-  const stats = [
-    { value: '< 5KB', label: 'Tracking script size' },
-    { value: '7 days', label: 'Free trial' },
-    { value: '0',     label: 'Cookies set on your visitors' },
-    { value: '£12.99', label: 'Per month' },
-  ];
-  return (
-    <section className="border-y border-slate-100 bg-white py-8">
-      <div className="max-w-6xl mx-auto px-6 grid grid-cols-2 md:grid-cols-4 gap-8">
-        {stats.map(s => (
-          <div key={s.label} className="text-center">
-            <p className="text-2xl font-bold text-slate-900">{s.value}</p>
-            <p className="text-sm text-slate-500 mt-1">{s.label}</p>
-          </div>
-        ))}
-      </div>
-    </section>
-  );
-}
 
 // =============================================================================
 // FEATURES
@@ -471,7 +448,6 @@ export default function HomePage() {
       <Navbar />
       <main>
         <Hero />
-        <StatsBar />
         <Features />
         <Pricing />
         <Contact />
