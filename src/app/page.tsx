@@ -105,9 +105,23 @@ function Hero() {
           <span className="text-blue-600">Google Ads budget</span><br />
           on junk clicks
         </h1>
-        <p className="text-lg text-slate-600 max-w-2xl mx-auto mb-10 leading-relaxed">
+        <p className="text-lg text-slate-600 max-w-2xl mx-auto mb-8 leading-relaxed">
           AdLeak Shield tracks every visitor from your Google Ads campaigns and shows you exactly which keywords are wasting your money — so you can pause them and get your budget back.
         </p>
+
+        {/* Privacy trust badges */}
+        <div className="flex flex-wrap items-center justify-center gap-2 mb-10">
+          <span className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-green-50 border border-green-200 text-green-800 text-xs font-semibold rounded-full">
+            🍪 Zero cookies
+          </span>
+          <span className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-green-50 border border-green-200 text-green-800 text-xs font-semibold rounded-full">
+            ✓ No consent banner required
+          </span>
+          <span className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-green-50 border border-green-200 text-green-800 text-xs font-semibold rounded-full">
+            🔒 GDPR compliant by design
+          </span>
+        </div>
+
         <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
           <Link
             href="/auth/signup"
@@ -135,7 +149,7 @@ function StatsBar() {
   const stats = [
     { value: '< 5KB', label: 'Tracking script size' },
     { value: '7 days', label: 'Free trial' },
-    { value: '3', label: 'Campaigns monitored' },
+    { value: '0',     label: 'Cookies set on your visitors' },
     { value: '£12.99', label: 'Per month' },
   ];
   return (
@@ -234,7 +248,8 @@ const PLAN_FEATURES = [
   'Visitor Journey Timeline',
   'Monday morning email report',
   '7-day free trial (no card required)',
-  'Privacy-first, GDPR compliant',
+  'Cookieless tracking — no consent banner required',
+  'GDPR compliant by design',
   'Unregistered traffic alerts',
   'Cancel anytime via billing portal',
   'Right to erasure — delete your account instantly',

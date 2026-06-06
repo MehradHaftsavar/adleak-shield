@@ -45,6 +45,15 @@ export async function POST(request: NextRequest) {
       ],
       allow_promotion_codes: true,
       billing_address_collection: 'required',
+      // Show terms + privacy links on the Stripe checkout page
+      consent_collection: {
+        terms_of_service: 'required',
+      },
+      custom_text: {
+        terms_of_service_acceptance: {
+          message: `I agree to the [Terms of Service](${process.env.NEXT_PUBLIC_APP_URL}/terms) and [Privacy Policy](${process.env.NEXT_PUBLIC_APP_URL}/privacy).`,
+        },
+      },
       success_url: `${process.env.NEXT_PUBLIC_APP_URL}/dashboard?payment=success`,
       cancel_url: `${process.env.NEXT_PUBLIC_APP_URL}/dashboard`,
       metadata: { tenantId },
