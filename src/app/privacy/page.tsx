@@ -277,6 +277,13 @@ export default function PrivacyPage() {
               </address>
             </section>
 
+            {/* ICO registration */}
+            <section className="border-t border-gray-200 pt-6">
+              <p className="text-xs text-gray-500">
+                AdLeak Shield is registered with the Information Commissioner's Office (ICO) under registration number <strong>C1953337</strong>.
+              </p>
+            </section>
+
           </div>
         </div>
       </div>

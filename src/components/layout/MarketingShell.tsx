@@ -13,6 +13,7 @@
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
+import Script from 'next/script';
 
 const NAV_LINKS = [
   { label: 'Features', href: '/#features' },
@@ -169,6 +170,12 @@ export function MarketingShell({ children }: { children: React.ReactNode }) {
         {children}
       </main>
       <MarketingFooter />
+      {/* Umami analytics — cookieless, no consent banner required */}
+      <Script
+        src="https://umami-five-rho-99.vercel.app/script.js"
+        data-website-id="b04d6612-6e8a-444f-90fd-7a74f0133857"
+        strategy="afterInteractive"
+      />
     </div>
   );
 }

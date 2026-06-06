@@ -2,6 +2,7 @@
 import React, { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import Script from "next/script";
 import { signUpSchema } from "@/lib/validators/auth";
 
 export default function SignupPage() {
@@ -62,6 +63,11 @@ export default function SignupPage() {
 
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col justify-center py-12 sm:px-6 lg:px-8">
+      <Script
+        src="https://umami-five-rho-99.vercel.app/script.js"
+        data-website-id="b04d6612-6e8a-444f-90fd-7a74f0133857"
+        strategy="afterInteractive"
+      />
       <div className="sm:mx-auto sm:w-full sm:max-w-md">
         <div className="text-center">
           <h1 className="text-2xl font-bold text-gray-900 tracking-tight">AdLeak Shield</h1>

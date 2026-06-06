@@ -16,6 +16,7 @@ import React, { useState } from "react";
 import { signIn } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import Script from "next/script";
 import { signInSchema } from "@/lib/validators/auth";
 
 export default function LoginPage() {
@@ -85,6 +86,11 @@ export default function LoginPage() {
 
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col justify-center py-12 sm:px-6 lg:px-8">
+      <Script
+        src="https://umami-five-rho-99.vercel.app/script.js"
+        data-website-id="b04d6612-6e8a-444f-90fd-7a74f0133857"
+        strategy="afterInteractive"
+      />
       <div className="sm:mx-auto sm:w-full sm:max-w-md">
         {/* Logo / Brand */}
         <div className="text-center">
