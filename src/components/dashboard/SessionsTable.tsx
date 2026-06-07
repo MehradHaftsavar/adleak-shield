@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import {
   Users,
   Search,
@@ -99,12 +99,23 @@ export function SessionsTable({ campaigns, dateRange, refreshTrigger }: Sessions
   const [isLoading,  setIsLoading]  = useState(true);
   const [error,      setError]      = useState('');
 
-  // Filters
+  // Filters — main
   const [keyword,    setKeyword]    = useState('');
   const [campaignId, setCampaignId] = useState('');
   const [matchType,  setMatchType]  = useState('');
   const [device,     setDevice]     = useState('');
   const [outcome,    setOutcome]    = useState('');
+  // Filters — ad detail
+  const [adGroupId,   setAdGroupId]   = useState('');
+  const [adId,        setAdId]        = useState('');
+  const [adPosition,  setAdPosition]  = useState('');
+  const [showAdFilters, setShowAdFilters] = useState(false);
+
+  // Cached dropdown options — populated from sessions when no ad filter is active,
+  // so selecting a value doesn't collapse the dropdown to a single item.
+  const [adGroupOptions,   setAdGroupOptions]   = useState<string[]>([]);
+  const [adIdOptions,      setAdIdOptions]      = useState<string[]>([]);
+  const [adPositionOptions, setAdPositionOptions] = useState<string[]>([]);
   // Journey slide-over
   const [selectedSession, setSelectedSession] = useState<Session | null>(null);
 
@@ -123,6 +134,9 @@ export function SessionsTable({ campaigns, dateRange, refreshTrigger }: Sessions
       if (matchType)  params.set('matchType',  matchType);
       if (device)     params.set('device',     device);
       if (outcome)    params.set('outcome',    outcome);
+      if (adGroupId)  params.set('adGroupId',  adGroupId);
+      if (adId)       params.set('adId',       adId);
+      if (adPosition) params.set('adPosition', adPosition);
 
       const res  = await fetch(`/api/sessions?${params}`, { cache: 'no-store' });
       const data = await res.json();
@@ -134,12 +148,27 @@ export function SessionsTable({ campaigns, dateRange, refreshTrigger }: Sessions
     } finally {
       setIsLoading(false);
     }
-  }, [keyword, campaignId, matchType, device, outcome, dateRange, refreshTrigger]);
+  }, [keyword, campaignId, matchType, device, outcome, adGroupId, adId, adPosition, dateRange, refreshTrigger]);
 
   useEffect(() => {
-    const timer = setTimeout(loadSessions, keyword ? 400 : 0);
+    const hasText = keyword || adGroupId || adId || adPosition;
+    const timer = setTimeout(loadSessions, hasText ? 400 : 0);
     return () => clearTimeout(timer);
   }, [loadSessions]);
+
+  // Refresh dropdown option lists whenever sessions reload with no ad filter active.
+  // Keeping them frozen while a filter IS active prevents the selected value from
+  // disappearing from its own dropdown.
+  useEffect(() => {
+    if (!adGroupId && !adId && !adPosition) {
+      const groups = [...new Set(sessions.map(s => s.adGroupId).filter((v): v is string => !!v))].sort();
+      const ids    = [...new Set(sessions.map(s => s.adId).filter((v): v is string => !!v))].sort();
+      const pos    = [...new Set(sessions.map(s => s.adPosition).filter((v): v is string => !!v))].sort();
+      if (groups.length) setAdGroupOptions(groups);
+      if (ids.length)    setAdIdOptions(ids);
+      if (pos.length)    setAdPositionOptions(pos);
+    }
+  }, [sessions]);
 
   const totalPages = Math.max(1, Math.ceil(sessions.length / PAGE_SIZE));
   const pageRows = sessions.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
@@ -224,6 +253,73 @@ export function SessionsTable({ campaigns, dateRange, refreshTrigger }: Sessions
             </select>
           </div>
 
+          {/* Ad-detail filters — collapsed by default */}
+          <div className="mt-2">
+            <button
+              type="button"
+              onClick={() => setShowAdFilters(v => !v)}
+              className="text-xs text-blue-600 hover:text-blue-700 font-medium flex items-center gap-1"
+            >
+              {showAdFilters ? '▲ Hide' : '▼ Show'} ad filters (Ad Group, Ad ID, Position)
+              {(adGroupId || adId || adPosition) && (
+                <span className="ml-1 inline-flex items-center justify-center w-4 h-4 rounded-full bg-blue-600 text-white text-[10px]">
+                  {[adGroupId, adId, adPosition].filter(Boolean).length}
+                </span>
+              )}
+            </button>
+
+            {showAdFilters && (
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mt-3">
+                {/* Ad Group ID */}
+                <select
+                  value={adGroupId}
+                  onChange={e => setAdGroupId(e.target.value)}
+                  className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                >
+                  <option value="">All Ad Groups</option>
+                  {adGroupOptions.length === 0 && (
+                    <option disabled value="">No data yet</option>
+                  )}
+                  {adGroupOptions.map(v => (
+                    <option key={v} value={v}>{v}</option>
+                  ))}
+                </select>
+
+                {/* Ad ID */}
+                <select
+                  value={adId}
+                  onChange={e => setAdId(e.target.value)}
+                  className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                >
+                  <option value="">All Ads</option>
+                  {adIdOptions.length === 0 && (
+                    <option disabled value="">No data yet</option>
+                  )}
+                  {adIdOptions.map(v => (
+                    <option key={v} value={v}>{v}</option>
+                  ))}
+                </select>
+
+                {/* Ad Position — shows actual values e.g. 1t1, 1t2 */}
+                <select
+                  value={adPosition}
+                  onChange={e => setAdPosition(e.target.value)}
+                  className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                >
+                  <option value="">All Positions</option>
+                  {adPositionOptions.length === 0 && (
+                    <option disabled value="">No data yet</option>
+                  )}
+                  {adPositionOptions.map(v => (
+                    <option key={v} value={v}>
+                      {v}{v.includes('t') ? ' — top of page' : v === 'none' ? ' — display network' : ' — other'}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
+          </div>
+
           {!isLoading && sessions.length > 0 && (
             <p className="text-xs text-gray-400 mt-3">
               Showing {(page - 1) * PAGE_SIZE + 1}–{Math.min(page * PAGE_SIZE, sessions.length)} of {sessions.length} session{sessions.length !== 1 ? 's' : ''}
@@ -251,7 +347,7 @@ export function SessionsTable({ campaigns, dateRange, refreshTrigger }: Sessions
           </div>
         ) : sessions.length === 0 ? (
           (() => {
-            const hasFilters = !!(keyword || campaignId || matchType || device || outcome);
+            const hasFilters = !!(keyword || campaignId || matchType || device || outcome || adGroupId || adId || adPosition);
             return hasFilters ? (
               /* Filters active — nothing matched */
               <div className="p-10 text-center">
@@ -261,7 +357,7 @@ export function SessionsTable({ campaigns, dateRange, refreshTrigger }: Sessions
                 <p className="text-gray-700 font-medium">No sessions match your filters</p>
                 <p className="text-gray-400 text-sm mt-1">Try clearing a filter or widening the date range</p>
                 <button
-                  onClick={() => { setKeyword(''); setCampaignId(''); setMatchType(''); setDevice(''); setOutcome(''); }}
+                  onClick={() => { setKeyword(''); setCampaignId(''); setMatchType(''); setDevice(''); setOutcome(''); setAdGroupId(''); setAdId(''); setAdPosition(''); }}
                   className="mt-4 px-4 py-2 text-sm font-medium text-blue-600 border border-blue-200 rounded-lg hover:bg-blue-50 transition-colors"
                 >
                   Clear all filters

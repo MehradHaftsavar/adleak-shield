@@ -29,6 +29,9 @@ export async function GET(request: NextRequest) {
     const matchType  = searchParams.get('matchType')  || '';
     const device     = searchParams.get('device')     || '';
     const outcome    = searchParams.get('outcome')    || '';
+    const adGroupId  = searchParams.get('adGroupId')  || '';
+    const adId       = searchParams.get('adId')       || '';
+    const adPosition = searchParams.get('adPosition') || ''; // exact value e.g. "1t1"
     const startDate  = searchParams.get('start');
     const endDate    = searchParams.get('end');
 
@@ -78,6 +81,21 @@ export async function GET(request: NextRequest) {
           SELECT 1 FROM JourneyEvents je
           WHERE je.session_id = s.session_id AND je.event_type = 'success_event'
         )`);
+      }
+
+      if (adGroupId) {
+        req.input('adGroupId', mssql.NVarChar(20), adGroupId);
+        conditions.push("s.ad_group_id LIKE '%' + @adGroupId + '%'");
+      }
+
+      if (adId) {
+        req.input('adId', mssql.NVarChar(50), adId);
+        conditions.push("s.ad_id LIKE '%' + @adId + '%'");
+      }
+
+      if (adPosition) {
+        req.input('adPosition', mssql.NVarChar(20), adPosition);
+        conditions.push('s.ad_position = @adPosition');
       }
 
       const where = conditions.join(' AND ');

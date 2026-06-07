@@ -5,18 +5,22 @@ import { Download, TrendingDown, AlertTriangle, ExternalLink, ChevronUp, Chevron
 import { JourneyTimeline } from './JourneyTimeline';
 import { generateNegativeKeywordCSV, downloadCSV } from '@/lib/utils/csv-export';
 
-// Simple hover tooltip — placement="center" (default) centres above trigger;
-// placement="left" anchors to the right edge so it doesn't overflow the table.
-function Tooltip({ text, placement = 'center' }: { text: string; placement?: 'center' | 'left' }) {
-  const boxClass =
-    placement === 'left'
-      ? 'absolute bottom-full right-0 mb-2 w-64 px-3 py-2 bg-gray-900 text-white text-xs rounded-lg opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-50 leading-relaxed shadow-lg'
-      : 'absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-64 px-3 py-2 bg-gray-900 text-white text-xs rounded-lg opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-50 leading-relaxed shadow-lg';
+// Tooltip placements:
+//   "center"    — above, centred  (default, for non-table use)
+//   "down"      — below, centred  (use in table headers so overflow-x-auto doesn't clip)
+//   "down-left" — below, right-aligned (right-edge table headers)
+function Tooltip({ text, placement = 'center' }: { text: string; placement?: 'center' | 'down' | 'down-left' }) {
+  const boxClass = {
+    'center':    'absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-64 px-3 py-2 bg-gray-900 text-white text-xs rounded-lg opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-50 leading-relaxed shadow-lg',
+    'down':      'absolute top-full left-1/2 -translate-x-1/2 mt-2 w-64 px-3 py-2 bg-gray-900 text-white text-xs rounded-lg opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-50 leading-relaxed shadow-lg',
+    'down-left': 'absolute top-full right-0 mt-2 w-64 px-3 py-2 bg-gray-900 text-white text-xs rounded-lg opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-50 leading-relaxed shadow-lg',
+  }[placement];
 
-  const arrowClass =
-    placement === 'left'
-      ? 'absolute top-full right-3 border-4 border-transparent border-t-gray-900'
-      : 'absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-gray-900';
+  const arrowClass = {
+    'center':    'absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-gray-900',
+    'down':      'absolute -top-2 left-1/2 -translate-x-1/2 border-4 border-transparent border-b-gray-900',
+    'down-left': 'absolute -top-2 right-3 border-4 border-transparent border-b-gray-900',
+  }[placement];
 
   return (
     <span className="relative group inline-flex items-center">
@@ -228,7 +232,7 @@ export function LeakTable({ dateRange, refreshTrigger }: LeakTableProps) {
             <div>
               <h2 className="text-xl font-bold text-gray-900">
                 Leak Table
-                <Tooltip text="Keywords that are burning your budget. A 'leak' is any keyword where visitors click your ad but leave immediately without engaging — you paid for that click and got nothing back." />
+                <Tooltip placement="down" text="Keywords that are burning your budget. A 'leak' is any keyword where visitors click your ad but leave immediately without engaging — you paid for that click and got nothing back." />
               </h2>
               <p className="text-sm text-gray-600">Keywords wasting your ad spend</p>
             </div>
@@ -313,12 +317,12 @@ export function LeakTable({ dateRange, refreshTrigger }: LeakTableProps) {
               </th>
               <th className={`${thClass} text-right`} onClick={() => handleSort('bounceRate')}>
                 Bounce Rate
-                <Tooltip placement="left" text="% of clicks on this keyword where the visitor left within 5 seconds without taking any action. Any scroll, click, or interaction within 5 seconds marks the session as engaged, not a bounce. Above 70% is a strong signal to add as a negative keyword." />
+                <Tooltip placement="down-left" text="% of clicks on this keyword where the visitor left within 5 seconds without taking any action. Any scroll, click, or interaction within 5 seconds marks the session as engaged, not a bounce. Above 70% is a strong signal to add as a negative keyword." />
                 {' '}<SortIcon col="bounceRate" sortKey={sortKey} sortDir={sortDir} />
               </th>
               <th className={`${thClass} text-right`} onClick={() => handleSort('estimatedWaste')}>
                 Est. Wasted Spend
-                <Tooltip placement="left" text="Bounce Clicks × your average CPC for this keyword. This is the minimum you've already lost — the actual figure may be higher if those visitors also triggered retargeting." />
+                <Tooltip placement="down-left" text="Bounce Clicks × your average CPC for this keyword. This is the minimum you've already lost — the actual figure may be higher if those visitors also triggered retargeting." />
                 {' '}<SortIcon col="estimatedWaste" sortKey={sortKey} sortDir={sortDir} />
               </th>
             </tr>
