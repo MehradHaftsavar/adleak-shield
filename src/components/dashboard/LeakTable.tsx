@@ -1,20 +1,33 @@
 'use client';
 
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { Download, TrendingDown, AlertTriangle, ExternalLink, ChevronUp, ChevronDown, ChevronsUpDown, HelpCircle } from 'lucide-react';
 import { JourneyTimeline } from './JourneyTimeline';
 import { generateNegativeKeywordCSV, downloadCSV } from '@/lib/utils/csv-export';
 
-// Tooltip placements:
-//   "center"    — above, centred  (default, for non-table use)
-//   "down"      — below, centred  (use in table headers so overflow-x-auto doesn't clip)
-//   "down-left" — below, right-aligned (right-edge table headers)
+// Tooltip — uses position:fixed so it escapes overflow-x-auto clipping.
+// placement="down-left"  → opens below, right-aligned to trigger (right-edge columns)
+// placement="down"       → opens below, centred on trigger
+// placement="center"     → opens above, centred (for use outside the table)
 function Tooltip({ text, placement = 'center' }: { text: string; placement?: 'center' | 'down' | 'down-left' }) {
-  const boxClass = {
-    'center':    'absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-64 px-3 py-2 bg-gray-900 text-white text-xs rounded-lg opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-50 leading-relaxed shadow-lg',
-    'down':      'absolute top-full left-1/2 -translate-x-1/2 mt-2 w-64 px-3 py-2 bg-gray-900 text-white text-xs rounded-lg opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-50 leading-relaxed shadow-lg',
-    'down-left': 'absolute top-full right-0 mt-2 w-64 px-3 py-2 bg-gray-900 text-white text-xs rounded-lg opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-50 leading-relaxed shadow-lg',
-  }[placement];
+  const [visible, setVisible] = useState(false);
+  const [style, setStyle]     = useState<React.CSSProperties>({});
+  const ref = useRef<HTMLSpanElement>(null);
+
+  const show = () => {
+    const rect = ref.current?.getBoundingClientRect();
+    if (!rect) return;
+
+    const BOX_W = 256; // w-64
+    if (placement === 'down-left') {
+      setStyle({ top: rect.bottom + 8, right: window.innerWidth - rect.right });
+    } else if (placement === 'down') {
+      setStyle({ top: rect.bottom + 8, left: Math.max(8, rect.left + rect.width / 2 - BOX_W / 2) });
+    } else {
+      setStyle({ bottom: window.innerHeight - rect.top + 8, left: Math.max(8, rect.left + rect.width / 2 - BOX_W / 2) });
+    }
+    setVisible(true);
+  };
 
   const arrowClass = {
     'center':    'absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-gray-900',
@@ -23,12 +36,22 @@ function Tooltip({ text, placement = 'center' }: { text: string; placement?: 'ce
   }[placement];
 
   return (
-    <span className="relative group inline-flex items-center">
+    <span
+      ref={ref}
+      className="inline-flex items-center"
+      onMouseEnter={show}
+      onMouseLeave={() => setVisible(false)}
+    >
       <HelpCircle className="w-3.5 h-3.5 text-gray-400 hover:text-gray-600 cursor-help ml-1 inline" />
-      <span className={boxClass}>
-        {text}
-        <span className={arrowClass} />
-      </span>
+      {visible && (
+        <span
+          style={{ position: 'fixed', zIndex: 9999, width: 256, ...style }}
+          className="px-3 py-2 bg-gray-900 text-white text-xs rounded-lg pointer-events-none leading-relaxed shadow-lg"
+        >
+          {text}
+          <span className={arrowClass} />
+        </span>
+      )}
     </span>
   );
 }
