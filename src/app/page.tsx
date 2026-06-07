@@ -21,7 +21,7 @@ const NAV_LINKS = [
 // =============================================================================
 function Hero() {
   return (
-    <section className="pt-24 pb-24 px-6 bg-gradient-to-b from-slate-50 to-white">
+    <section className="pt-16 pb-12 px-6 bg-gradient-to-b from-slate-50 to-white">
       <div className="max-w-4xl mx-auto text-center">
         <span className="inline-block text-xs font-semibold uppercase tracking-widest text-blue-600 bg-blue-50 px-3 py-1 rounded-full mb-6">
           For small businesses
@@ -82,7 +82,7 @@ function PainSection() {
   ];
 
   return (
-    <section className="py-20 px-6 bg-white">
+    <section className="py-12 px-6 bg-white">
       <div className="max-w-3xl mx-auto">
         <div className="text-center mb-10">
           <span className="inline-block text-xs font-semibold uppercase tracking-widest text-red-500 bg-red-50 px-3 py-1 rounded-full mb-4">
@@ -164,9 +164,9 @@ const FEATURES = [
 
 function Features() {
   return (
-    <section id="features" className="py-24 px-6 bg-slate-50">
+    <section id="features" className="py-14 px-6 bg-slate-50">
       <div className="max-w-6xl mx-auto">
-        <div className="text-center mb-14">
+        <div className="text-center mb-10">
           <h2 className="text-3xl md:text-4xl font-bold text-slate-900 mb-4">
             Everything you need to stop ad waste
           </h2>
@@ -207,9 +207,9 @@ const PLAN_FEATURES = [
 
 function Pricing() {
   return (
-    <section id="pricing" className="py-24 px-6 bg-white">
+    <section id="pricing" className="py-14 px-6 bg-white">
       <div className="max-w-6xl mx-auto">
-        <div className="text-center mb-14">
+        <div className="text-center mb-10">
           <h2 className="text-3xl md:text-4xl font-bold text-slate-900 mb-4">
             Simple, transparent pricing
           </h2>
@@ -301,7 +301,7 @@ const FAQ_JSON_LD = {
 
 function FAQSection() {
   return (
-    <section id="faq" className="py-24 px-6 bg-slate-50">
+    <section id="faq" className="py-14 px-6 bg-slate-50">
       {/* JSON-LD structured data — tells Google to show rich snippets */}
       <script
         type="application/ld+json"

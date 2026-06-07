@@ -33,7 +33,7 @@ export function ContactSection() {
   };
 
   return (
-    <section id="contact" className="py-24 px-6 bg-slate-50">
+    <section id="contact" className="py-14 px-6 bg-slate-50">
       <div className="max-w-2xl mx-auto">
         <div className="text-center mb-12">
           <h2 className="text-3xl md:text-4xl font-bold text-slate-900 mb-4">Get in touch</h2>
