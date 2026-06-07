@@ -59,5 +59,5 @@ function generateTrackingSnippet(): string {
 }
 
 function generateValueTrackTemplate(): string {
-  return '{lpurl}?keyword={keyword}&campaignid={campaignid}&matchtype={matchtype}&adgroupid={adgroupid}&gclid={gclid}';
+  return '{lpurl}?keyword={keyword}&campaignid={campaignid}&matchtype={matchtype}&adgroupid={adgroupid}&adid={creative}&adposition={adposition}&gclid={gclid}';
 }

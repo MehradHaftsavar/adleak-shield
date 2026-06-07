@@ -59,6 +59,8 @@
       matchType: (params.get("matchtype") || "").substring(0, 20),
       campaignId: (params.get("campaignid") || "").substring(0, 20),
       adgroupId: (params.get("adgroupid") || "").substring(0, 20),
+      adId: (params.get("adid") || "").substring(0, 50),         // {creative}
+      adPosition: (params.get("adposition") || "").substring(0, 20), // {adposition}
       gclid: gclid.substring(0, 100),
       device: detectDevice(),
       landedAt: Date.now(),

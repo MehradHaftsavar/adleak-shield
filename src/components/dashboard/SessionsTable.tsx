@@ -22,6 +22,9 @@ interface Session {
   startedAt:        string;
   totalDurationMs:  number | null;
   isBounce:         boolean;
+  adGroupId:        string | null;
+  adId:             string | null;
+  adPosition:       string | null;
   googleCampaignId: string;
   campaignId:       string;
   eventCount:       number;
@@ -308,6 +311,15 @@ export function SessionsTable({ campaigns, dateRange, refreshTrigger }: Sessions
                   <th className="px-4 sm:px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider hidden md:table-cell">
                     Duration
                   </th>
+                  <th className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider hidden xl:table-cell">
+                    Ad Group
+                  </th>
+                  <th className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider hidden xl:table-cell">
+                    Ad ID
+                  </th>
+                  <th className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider hidden xl:table-cell">
+                    Position
+                  </th>
                   <th className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Outcome
                   </th>
@@ -348,6 +360,15 @@ export function SessionsTable({ campaigns, dateRange, refreshTrigger }: Sessions
                         <Clock className="w-3.5 h-3.5 text-gray-400" />
                         {formatDuration(s.totalDurationMs)}
                       </span>
+                    </td>
+                    <td className="px-4 sm:px-6 py-3 whitespace-nowrap hidden xl:table-cell">
+                      <span className="text-sm text-gray-500 font-mono">{s.adGroupId ?? '—'}</span>
+                    </td>
+                    <td className="px-4 sm:px-6 py-3 whitespace-nowrap hidden xl:table-cell">
+                      <span className="text-sm text-gray-500 font-mono">{s.adId ?? '—'}</span>
+                    </td>
+                    <td className="px-4 sm:px-6 py-3 whitespace-nowrap hidden xl:table-cell">
+                      <span className="text-sm text-gray-500">{s.adPosition ?? '—'}</span>
                     </td>
                     <td className="px-4 sm:px-6 py-3 whitespace-nowrap">
                       <OutcomeBadge isBounce={s.isBounce} hasSuccessEvent={s.hasSuccessEvent} />

@@ -5,15 +5,25 @@ import { Download, TrendingDown, AlertTriangle, ExternalLink, ChevronUp, Chevron
 import { JourneyTimeline } from './JourneyTimeline';
 import { generateNegativeKeywordCSV, downloadCSV } from '@/lib/utils/csv-export';
 
-// Simple hover tooltip
-function Tooltip({ text }: { text: string }) {
+// Simple hover tooltip — placement="center" (default) centres above trigger;
+// placement="left" anchors to the right edge so it doesn't overflow the table.
+function Tooltip({ text, placement = 'center' }: { text: string; placement?: 'center' | 'left' }) {
+  const boxClass =
+    placement === 'left'
+      ? 'absolute bottom-full right-0 mb-2 w-64 px-3 py-2 bg-gray-900 text-white text-xs rounded-lg opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-50 leading-relaxed shadow-lg'
+      : 'absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-64 px-3 py-2 bg-gray-900 text-white text-xs rounded-lg opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-50 leading-relaxed shadow-lg';
+
+  const arrowClass =
+    placement === 'left'
+      ? 'absolute top-full right-3 border-4 border-transparent border-t-gray-900'
+      : 'absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-gray-900';
+
   return (
     <span className="relative group inline-flex items-center">
       <HelpCircle className="w-3.5 h-3.5 text-gray-400 hover:text-gray-600 cursor-help ml-1 inline" />
-      <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-64 px-3 py-2 bg-gray-900 text-white text-xs rounded-lg opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-20 leading-relaxed shadow-lg">
+      <span className={boxClass}>
         {text}
-        {/* Arrow */}
-        <span className="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-gray-900" />
+        <span className={arrowClass} />
       </span>
     </span>
   );
@@ -303,12 +313,12 @@ export function LeakTable({ dateRange, refreshTrigger }: LeakTableProps) {
               </th>
               <th className={`${thClass} text-right`} onClick={() => handleSort('bounceRate')}>
                 Bounce Rate
-                <Tooltip text="% of clicks on this keyword where the visitor left within 5 seconds without taking any action. Any scroll, click, or interaction within 5 seconds marks the session as engaged, not a bounce. Above 70% is a strong signal to add as a negative keyword." />
+                <Tooltip placement="left" text="% of clicks on this keyword where the visitor left within 5 seconds without taking any action. Any scroll, click, or interaction within 5 seconds marks the session as engaged, not a bounce. Above 70% is a strong signal to add as a negative keyword." />
                 {' '}<SortIcon col="bounceRate" sortKey={sortKey} sortDir={sortDir} />
               </th>
               <th className={`${thClass} text-right`} onClick={() => handleSort('estimatedWaste')}>
                 Est. Wasted Spend
-                <Tooltip text="Bounce Clicks × your average CPC for this keyword. This is the minimum you've already lost — the actual figure may be higher if those visitors also triggered retargeting." />
+                <Tooltip placement="left" text="Bounce Clicks × your average CPC for this keyword. This is the minimum you've already lost — the actual figure may be higher if those visitors also triggered retargeting." />
                 {' '}<SortIcon col="estimatedWaste" sortKey={sortKey} sortDir={sortDir} />
               </th>
             </tr>

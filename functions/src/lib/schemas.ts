@@ -27,7 +27,9 @@ const SessionSchema = z.object({
   keyword: z.string().max(255).optional().nullable(),
   matchType: z.string().max(20).optional().nullable(),
   campaignId: z.string().max(20).optional().nullable(),
-  adgroupId: z.string().max(20).optional().nullable(),
+  adgroupId: z.string().max(20).optional().nullable(),  // {adgroupid}
+  adId: z.string().max(50).optional().nullable(),       // {creative} — the individual ad ID
+  adPosition: z.string().max(20).optional().nullable(), // {adposition} — e.g. "1t2"
   gclid: z.string().max(100).optional().nullable(),
   device: z.enum(["desktop", "mobile", "tablet"]).optional().nullable(),
   landedAt: z.number().int().positive().optional(),
