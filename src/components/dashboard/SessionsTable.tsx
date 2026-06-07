@@ -247,11 +247,44 @@ export function SessionsTable({ campaigns, dateRange, refreshTrigger }: Sessions
             </button>
           </div>
         ) : sessions.length === 0 ? (
-          <div className="p-10 text-center">
-            <Users className="w-10 h-10 text-gray-300 mx-auto mb-3" />
-            <p className="text-gray-500 font-medium">No sessions found</p>
-            <p className="text-gray-400 text-sm mt-1">Try adjusting your filters or date range</p>
-          </div>
+          (() => {
+            const hasFilters = !!(keyword || campaignId || matchType || device || outcome);
+            return hasFilters ? (
+              /* Filters active — nothing matched */
+              <div className="p-10 text-center">
+                <div className="w-12 h-12 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-3">
+                  <Search className="w-5 h-5 text-gray-400" />
+                </div>
+                <p className="text-gray-700 font-medium">No sessions match your filters</p>
+                <p className="text-gray-400 text-sm mt-1">Try clearing a filter or widening the date range</p>
+                <button
+                  onClick={() => { setKeyword(''); setCampaignId(''); setMatchType(''); setDevice(''); setOutcome(''); }}
+                  className="mt-4 px-4 py-2 text-sm font-medium text-blue-600 border border-blue-200 rounded-lg hover:bg-blue-50 transition-colors"
+                >
+                  Clear all filters
+                </button>
+              </div>
+            ) : (
+              /* No filters — new user waiting for first data */
+              <div className="p-10 text-center">
+                <div className="w-14 h-14 bg-blue-50 rounded-full flex items-center justify-center mx-auto mb-4">
+                  <Users className="w-7 h-7 text-blue-400" />
+                </div>
+                <p className="text-gray-700 font-semibold mb-1">No sessions yet</p>
+                <p className="text-gray-500 text-sm mb-5">
+                  Sessions will appear here as soon as your first Google Ads visitor arrives.
+                </p>
+                <div className="max-w-xs mx-auto bg-gray-50 rounded-lg border border-gray-200 p-4 text-left text-sm text-gray-600 space-y-2">
+                  <p className="font-medium text-gray-700">Checklist:</p>
+                  <ul className="space-y-1.5">
+                    <li className="flex items-start gap-2"><span className="text-blue-500 mt-0.5">①</span> Snippet installed on every page of your site</li>
+                    <li className="flex items-start gap-2"><span className="text-blue-500 mt-0.5">②</span> Google Ads campaigns are live</li>
+                    <li className="flex items-start gap-2"><span className="text-blue-500 mt-0.5">③</span> ValueTrack <code className="bg-gray-100 px-1 rounded">&#123;keyword&#125;</code> in your final URL suffix</li>
+                  </ul>
+                </div>
+              </div>
+            );
+          })()
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full">

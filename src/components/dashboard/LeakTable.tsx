@@ -1,9 +1,23 @@
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
-import { Download, TrendingDown, AlertTriangle, ExternalLink, ChevronUp, ChevronDown, ChevronsUpDown } from 'lucide-react';
+import { Download, TrendingDown, AlertTriangle, ExternalLink, ChevronUp, ChevronDown, ChevronsUpDown, HelpCircle } from 'lucide-react';
 import { JourneyTimeline } from './JourneyTimeline';
 import { generateNegativeKeywordCSV, downloadCSV } from '@/lib/utils/csv-export';
+
+// Simple hover tooltip
+function Tooltip({ text }: { text: string }) {
+  return (
+    <span className="relative group inline-flex items-center">
+      <HelpCircle className="w-3.5 h-3.5 text-gray-400 hover:text-gray-600 cursor-help ml-1 inline" />
+      <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-64 px-3 py-2 bg-gray-900 text-white text-xs rounded-lg opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-20 leading-relaxed shadow-lg">
+        {text}
+        {/* Arrow */}
+        <span className="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-gray-900" />
+      </span>
+    </span>
+  );
+}
 
 interface Leak {
   keyword: string;
@@ -154,11 +168,39 @@ export function LeakTable({ dateRange, refreshTrigger }: LeakTableProps) {
   }
 
   if (!data || data.leaks.length === 0) {
+    const hasAnySessions = data && data.summary.totalBounceClicks > 0;
     return (
-      <div className="bg-white rounded-lg border border-gray-200 p-8 text-center">
-        <TrendingDown className="w-12 h-12 text-gray-400 mx-auto mb-4" />
-        <h3 className="text-lg font-semibold text-gray-900 mb-2">No Leaks Detected</h3>
-        <p className="text-gray-600">Great news! No wasted spend found in the selected date range.</p>
+      <div className="bg-white rounded-lg border border-gray-200 p-10 text-center">
+        <div className="w-14 h-14 bg-green-50 rounded-full flex items-center justify-center mx-auto mb-4">
+          <TrendingDown className="w-7 h-7 text-green-500" />
+        </div>
+        <h3 className="text-lg font-semibold text-gray-900 mb-2">
+          {hasAnySessions ? '🎉 No Leaks Detected' : 'No Data Yet'}
+        </h3>
+        {hasAnySessions ? (
+          <>
+            <p className="text-gray-600 mb-4">
+              Your campaigns look clean for this date range — no keywords with high bounce rates found.
+            </p>
+            <p className="text-sm text-gray-400">
+              Try widening the date range if you were expecting to see results here.
+            </p>
+          </>
+        ) : (
+          <>
+            <p className="text-gray-600 mb-4">
+              Waiting for your first Google Ads clicks to come through.
+            </p>
+            <div className="max-w-sm mx-auto bg-gray-50 rounded-lg border border-gray-200 p-4 text-left text-sm text-gray-600 space-y-2">
+              <p className="font-medium text-gray-700">What to check:</p>
+              <ul className="space-y-1.5 list-none">
+                <li className="flex items-start gap-2"><span className="text-blue-500 mt-0.5">①</span> Your tracking snippet is installed on every page</li>
+                <li className="flex items-start gap-2"><span className="text-blue-500 mt-0.5">②</span> Your Google Ads are active and generating clicks</li>
+                <li className="flex items-start gap-2"><span className="text-blue-500 mt-0.5">③</span> Data appears within minutes of the first tracked click</li>
+              </ul>
+            </div>
+          </>
+        )}
       </div>
     );
   }
@@ -174,7 +216,10 @@ export function LeakTable({ dateRange, refreshTrigger }: LeakTableProps) {
               <AlertTriangle className="w-5 h-5 text-red-600" />
             </div>
             <div>
-              <h2 className="text-xl font-bold text-gray-900">Leak Table</h2>
+              <h2 className="text-xl font-bold text-gray-900">
+                Leak Table
+                <Tooltip text="Keywords that are burning your budget. A 'leak' is any keyword where visitors click your ad but leave immediately without engaging — you paid for that click and got nothing back." />
+              </h2>
               <p className="text-sm text-gray-600">Keywords wasting your ad spend</p>
             </div>
           </div>
@@ -257,10 +302,14 @@ export function LeakTable({ dateRange, refreshTrigger }: LeakTableProps) {
                 Bounce Clicks <SortIcon col="bounceClicks" sortKey={sortKey} sortDir={sortDir} />
               </th>
               <th className={`${thClass} text-right`} onClick={() => handleSort('bounceRate')}>
-                Bounce Rate <SortIcon col="bounceRate" sortKey={sortKey} sortDir={sortDir} />
+                Bounce Rate
+                <Tooltip text="% of clicks on this keyword where the visitor left within 5 seconds without taking any action. Any scroll, click, or interaction within 5 seconds marks the session as engaged, not a bounce. Above 70% is a strong signal to add as a negative keyword." />
+                {' '}<SortIcon col="bounceRate" sortKey={sortKey} sortDir={sortDir} />
               </th>
               <th className={`${thClass} text-right`} onClick={() => handleSort('estimatedWaste')}>
-                Est. Wasted Spend <SortIcon col="estimatedWaste" sortKey={sortKey} sortDir={sortDir} />
+                Est. Wasted Spend
+                <Tooltip text="Bounce Clicks × your average CPC for this keyword. This is the minimum you've already lost — the actual figure may be higher if those visitors also triggered retargeting." />
+                {' '}<SortIcon col="estimatedWaste" sortKey={sortKey} sortDir={sortDir} />
               </th>
             </tr>
           </thead>

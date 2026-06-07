@@ -421,10 +421,47 @@ export function SnippetStep({ domain, onComplete, onBack }: SnippetStepProps) {
           {/* Important notes */}
           <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
             <p className="text-sm text-yellow-900">
-              <strong>⚠️ Important:</strong> Data will only appear in your dashboard once both steps are complete 
-              and a visitor clicks one of your ads. The "Live" status indicator will turn green once we receive 
+              <strong>⚠️ Important:</strong> Data will only appear in your dashboard once both steps are complete
+              and a visitor clicks one of your ads. The "Live" status indicator will turn green once we receive
               the first data.
             </p>
+          </div>
+
+          {/* What happens next */}
+          <div className="rounded-lg border border-gray-200 bg-gray-50 p-5">
+            <h4 className="text-sm font-semibold text-gray-900 mb-3 flex items-center gap-2">
+              <span className="text-base">🚀</span> What happens after you click "Go to Dashboard"
+            </h4>
+            <ol className="space-y-3">
+              <li className="flex gap-3 text-sm text-gray-700">
+                <span className="flex-shrink-0 w-5 h-5 rounded-full bg-purple-100 text-purple-700 flex items-center justify-center text-xs font-bold">1</span>
+                <div>
+                  <span className="font-medium">You'll land on your dashboard.</span>
+                  {' '}Everything will look empty — that's normal. Sessions and leak data only appear once real Google Ads clicks come through with the ValueTrack parameters active.
+                </div>
+              </li>
+              <li className="flex gap-3 text-sm text-gray-700">
+                <span className="flex-shrink-0 w-5 h-5 rounded-full bg-purple-100 text-purple-700 flex items-center justify-center text-xs font-bold">2</span>
+                <div>
+                  <span className="font-medium">The Live indicator turns green</span>
+                  {' '}(top of dashboard) the moment we receive your first tracked session — usually within seconds of a real ad click.
+                </div>
+              </li>
+              <li className="flex gap-3 text-sm text-gray-700">
+                <span className="flex-shrink-0 w-5 h-5 rounded-full bg-purple-100 text-purple-700 flex items-center justify-center text-xs font-bold">3</span>
+                <div>
+                  <span className="font-medium">Leak Table fills up over time.</span>
+                  {' '}Keywords only appear there if they have a high bounce rate — if your campaigns are performing well, it may stay empty (that's a good thing!).
+                </div>
+              </li>
+              <li className="flex gap-3 text-sm text-gray-700">
+                <span className="flex-shrink-0 w-5 h-5 rounded-full bg-purple-100 text-purple-700 flex items-center justify-center text-xs font-bold">4</span>
+                <div>
+                  <span className="font-medium">Nothing showing after 24 hours?</span>
+                  {' '}Check the All Sessions tab first — if sessions appear there but not in the Leak Table, your keywords are performing well. If sessions are also empty, recheck your snippet installation and ValueTrack template.
+                </div>
+              </li>
+            </ol>
           </div>
 
           {/* Navigation */}
