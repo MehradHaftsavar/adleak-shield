@@ -21,7 +21,7 @@ const NAV_LINKS = [
 // =============================================================================
 function Hero() {
   return (
-    <section className="pt-16 pb-12 px-6 bg-gradient-to-b from-slate-50 to-white">
+    <section className="pt-28 pb-12 px-6 bg-gradient-to-b from-slate-50 to-white">
       <div className="max-w-4xl mx-auto text-center">
         <span className="inline-block text-xs font-semibold uppercase tracking-widest text-blue-600 bg-blue-50 px-3 py-1 rounded-full mb-6">
           For small businesses
