@@ -40,39 +40,58 @@ export async function DELETE() {
       // -----------------------------------------------------------------------
       // Record domains + campaigns in TrialledResources BEFORE deleting them
       // so that re-registration by the same person never gets a new trial.
+      //
+      // IMPORTANT: only lock resources if the tenant actually received real
+      // Google Ads sessions. Test events (keyword = 'adleak_test') are dropped
+      // by the queue-worker before touching the DB, so any row in Sessions is
+      // a genuine paid click. If the count is zero the tenant never benefited
+      // from the trial — don't penalise their domain (avoids locking a domain
+      // that was misspelled or set up but never actually used).
       // -----------------------------------------------------------------------
-      const domainsToLog = await new mssql.Request(transaction)
+      const realSessionResult = await new mssql.Request(transaction)
         .input('tenantId', mssql.UniqueIdentifier, tenantId)
-        .query(`SELECT domain_name FROM Domains WHERE tenant_id = @tenantId`);
+        .query(`SELECT COUNT(*) AS cnt FROM Sessions WHERE tenant_id = @tenantId`);
 
-      const campaignsToLog = await new mssql.Request(transaction)
-        .input('tenantId', mssql.UniqueIdentifier, tenantId)
-        .query(`SELECT google_campaign_id FROM Campaigns WHERE tenant_id = @tenantId`);
+      const hadRealSessions = (realSessionResult.recordset[0]?.cnt ?? 0) > 0;
 
-      for (const row of domainsToLog.recordset) {
-        await new mssql.Request(transaction)
-          .input('val', mssql.NVarChar, row.domain_name)
-          .query(`
-            IF NOT EXISTS (
-              SELECT 1 FROM TrialledResources
-              WHERE resource_type = 'domain' AND resource_value = @val
-            )
-              INSERT INTO TrialledResources (resource_type, resource_value)
-              VALUES ('domain', @val)
-          `);
-      }
+      if (hadRealSessions) {
+        const domainsToLog = await new mssql.Request(transaction)
+          .input('tenantId', mssql.UniqueIdentifier, tenantId)
+          .query(`SELECT domain_name FROM Domains WHERE tenant_id = @tenantId`);
 
-      for (const row of campaignsToLog.recordset) {
-        await new mssql.Request(transaction)
-          .input('val', mssql.NVarChar, row.google_campaign_id)
-          .query(`
-            IF NOT EXISTS (
-              SELECT 1 FROM TrialledResources
-              WHERE resource_type = 'campaign' AND resource_value = @val
-            )
-              INSERT INTO TrialledResources (resource_type, resource_value)
-              VALUES ('campaign', @val)
-          `);
+        const campaignsToLog = await new mssql.Request(transaction)
+          .input('tenantId', mssql.UniqueIdentifier, tenantId)
+          .query(`SELECT google_campaign_id FROM Campaigns WHERE tenant_id = @tenantId`);
+
+        for (const row of domainsToLog.recordset) {
+          await new mssql.Request(transaction)
+            .input('val', mssql.NVarChar, row.domain_name)
+            .query(`
+              IF NOT EXISTS (
+                SELECT 1 FROM TrialledResources
+                WHERE resource_type = 'domain' AND resource_value = @val
+              )
+                INSERT INTO TrialledResources (resource_type, resource_value)
+                VALUES ('domain', @val)
+            `);
+        }
+
+        for (const row of campaignsToLog.recordset) {
+          await new mssql.Request(transaction)
+            .input('val', mssql.NVarChar, row.google_campaign_id)
+            .query(`
+              IF NOT EXISTS (
+                SELECT 1 FROM TrialledResources
+                WHERE resource_type = 'campaign' AND resource_value = @val
+              )
+                INSERT INTO TrialledResources (resource_type, resource_value)
+                VALUES ('campaign', @val)
+            `);
+        }
+
+        console.log(`[account/delete] Tenant ${tenantId} had real sessions — domains/campaigns recorded in TrialledResources.`);
+      } else {
+        console.log(`[account/delete] Tenant ${tenantId} had zero real sessions — skipping TrialledResources (no trial benefit received).`);
       }
 
       // FK-safe deletion order
