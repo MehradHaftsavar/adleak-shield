@@ -1,95 +1,20 @@
-'use client';
+// Server component — no 'use client'.
+// Only the three interactive parts (Navbar, FAQAccordion, ContactSection) are
+// client components. Everything else is pure static HTML, so the browser paints
+// the hero text the moment the CSS arrives — no JS hydration delay.
 
-import { useState, useEffect } from 'react';
-import Link from 'next/link';
+import Link   from 'next/link';
 import Script from 'next/script';
+import { Navbar }         from '@/components/marketing/Navbar';
+import { FAQAccordion }   from '@/components/marketing/FAQAccordion';
+import { ContactSection } from '@/components/marketing/ContactSection';
 
 const NAV_LINKS = [
   { label: 'Features', href: '#features' },
-  { label: 'Pricing', href: '#pricing' },
-  { label: 'Contact', href: '#contact' },
+  { label: 'Pricing',  href: '#pricing'  },
+  { label: 'FAQ',      href: '#faq'      },
+  { label: 'Contact',  href: '#contact'  },
 ];
-
-function scrollTo(id: string) {
-  document.getElementById(id)?.scrollIntoView({ behavior: 'smooth' });
-}
-
-// =============================================================================
-// NAVBAR
-// =============================================================================
-function Navbar() {
-  const [scrolled, setScrolled] = useState(false);
-  const [menuOpen, setMenuOpen] = useState(false);
-
-  useEffect(() => {
-    const onScroll = () => setScrolled(window.scrollY > 20);
-    window.addEventListener('scroll', onScroll);
-    return () => window.removeEventListener('scroll', onScroll);
-  }, []);
-
-  return (
-    <header className={`fixed top-0 left-0 right-0 z-50 transition-all duration-200 ${scrolled ? 'bg-white/95 backdrop-blur-sm shadow-sm' : 'bg-transparent'}`}>
-      <div className="max-w-6xl mx-auto px-6 h-16 flex items-center justify-between">
-        <span className="text-xl font-bold text-slate-900 tracking-tight">
-          AdLeak<span className="text-blue-600">Shield</span>
-        </span>
-
-        {/* Desktop nav */}
-        <nav className="hidden md:flex items-center gap-8">
-          {NAV_LINKS.map(l => (
-            <button
-              key={l.label}
-              onClick={() => scrollTo(l.href.slice(1))}
-              className="text-sm font-medium text-slate-600 hover:text-slate-900 transition-colors"
-            >
-              {l.label}
-            </button>
-          ))}
-        </nav>
-
-        <div className="hidden md:flex items-center gap-3">
-          <Link href="/auth/login" className="text-sm font-medium text-slate-600 hover:text-slate-900 transition-colors">
-            Log in
-          </Link>
-          <Link
-            href="/auth/signup"
-            className="text-sm font-semibold bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg transition-colors"
-          >
-            Start free trial
-          </Link>
-        </div>
-
-        {/* Mobile menu button */}
-        <button className="md:hidden p-2" onClick={() => setMenuOpen(o => !o)}>
-          <div className={`w-5 h-0.5 bg-slate-800 transition-all ${menuOpen ? 'rotate-45 translate-y-1' : ''}`} />
-          <div className={`w-5 h-0.5 bg-slate-800 mt-1 ${menuOpen ? 'opacity-0' : ''}`} />
-          <div className={`w-5 h-0.5 bg-slate-800 mt-1 transition-all ${menuOpen ? '-rotate-45 -translate-y-1.5' : ''}`} />
-        </button>
-      </div>
-
-      {/* Mobile dropdown */}
-      {menuOpen && (
-        <div className="md:hidden bg-white border-t border-slate-100 px-6 py-4 space-y-3">
-          {NAV_LINKS.map(l => (
-            <button
-              key={l.label}
-              onClick={() => { scrollTo(l.href.slice(1)); setMenuOpen(false); }}
-              className="block w-full text-left text-sm font-medium text-slate-700 py-1"
-            >
-              {l.label}
-            </button>
-          ))}
-          <div className="pt-2 flex flex-col gap-2">
-            <Link href="/auth/login" className="text-sm font-medium text-slate-600 py-1">Log in</Link>
-            <Link href="/auth/signup" className="text-sm font-semibold bg-blue-600 text-white px-4 py-2 rounded-lg text-center">
-              Start free trial
-            </Link>
-          </div>
-        </div>
-      )}
-    </header>
-  );
-}
 
 // =============================================================================
 // HERO
@@ -130,19 +55,66 @@ function Hero() {
           >
             Start your free 7-day trial
           </Link>
-          <button
-            onClick={() => scrollTo('features')}
-            className="w-full sm:w-auto px-8 py-3.5 border border-slate-300 hover:border-slate-400 text-slate-700 font-semibold rounded-lg transition-colors text-base"
+          {/* Anchor link — smooth scroll handled by CSS scroll-behavior in globals.css */}
+          <a
+            href="#features"
+            className="w-full sm:w-auto px-8 py-3.5 border border-slate-300 hover:border-slate-400 text-slate-700 font-semibold rounded-lg transition-colors text-base text-center"
           >
             See how it works
-          </button>
+          </a>
         </div>
-        <p className="mt-4 text-sm text-slate-400">No credit card required · Cancel anytime</p>
+        <p className="mt-4 text-sm text-slate-500">No credit card required · Cancel anytime</p>
       </div>
     </section>
   );
 }
 
+// =============================================================================
+// PAIN SECTION
+// =============================================================================
+function PainSection() {
+  const pains = [
+    "You're getting clicks on your Google Ads but the phone never rings.",
+    "You've spent hundreds this month and got only a handful of leads — if any.",
+    "You can see your budget disappearing in Google Ads but can't tell which keywords are the problem.",
+    "Your ads attract clicks from people who clearly weren't looking for what you sell.",
+    "You've been told to \"add negative keywords\" but have no idea which ones.",
+  ];
+
+  return (
+    <section className="py-20 px-6 bg-white">
+      <div className="max-w-3xl mx-auto">
+        <div className="text-center mb-10">
+          <span className="inline-block text-xs font-semibold uppercase tracking-widest text-red-500 bg-red-50 px-3 py-1 rounded-full mb-4">
+            Sound familiar?
+          </span>
+          <h2 className="text-3xl md:text-4xl font-bold text-slate-900 mb-4">
+            Getting clicks on Google Ads<br className="hidden sm:block" /> but no calls, leads, or sales?
+          </h2>
+          <p className="text-slate-600">
+            You're not alone. Most small businesses running Google Ads are silently bleeding budget on keywords that will never convert — and Google won't tell you which ones.
+          </p>
+        </div>
+
+        <div className="space-y-3 mb-10">
+          {pains.map((pain, i) => (
+            <div key={i} className="flex items-start gap-3 bg-red-50 border border-red-100 rounded-xl px-5 py-4">
+              <span className="text-red-400 font-bold text-lg leading-tight flex-shrink-0 mt-0.5">✕</span>
+              <p className="text-slate-700 text-sm leading-relaxed">{pain}</p>
+            </div>
+          ))}
+        </div>
+
+        <div className="bg-blue-600 rounded-2xl px-8 py-7 text-center text-white">
+          <p className="text-lg font-semibold mb-1">The problem isn't your ads — it's the keywords triggering them.</p>
+          <p className="text-blue-100 text-sm">
+            AdLeak Shield tracks every Google Ads click, identifies which keywords produce nothing but bounces, and gives you a one-click export to block them in Google Ads — stopping the waste permanently.
+          </p>
+        </div>
+      </div>
+    </section>
+  );
+}
 
 // =============================================================================
 // FEATURES
@@ -181,12 +153,12 @@ const FEATURES = [
   {
     icon: '🚨',
     title: 'Unregistered Traffic Alerts',
-    desc: 'If we detect clicks from campaign IDs not in your account, you\'ll see an alert on your dashboard — useful for spotting misconfigurations early.',
+    desc: "If we detect clicks from campaign IDs not in your account, you'll see an alert on your dashboard — useful for spotting misconfigurations early.",
   },
   {
     icon: '📅',
     title: '7-Day Free Trial',
-    desc: 'Full access for 7 days, no credit card required. See real data from your campaigns before you decide. Cancel in one click if it\'s not for you.',
+    desc: "Full access for 7 days, no credit card required. See real data from your campaigns before you decide. Cancel in one click if it's not for you.",
   },
 ];
 
@@ -248,9 +220,10 @@ function Pricing() {
           <div className="bg-white border-2 border-blue-600 rounded-2xl p-8 shadow-lg">
             <div className="flex items-baseline gap-1 mb-1">
               <span className="text-4xl font-bold text-slate-900">£12.99</span>
-              <span className="text-slate-500">/month</span>
+              {/* text-slate-600 passes contrast on white (6.6:1) */}
+              <span className="text-slate-600">/month</span>
             </div>
-            <p className="text-sm text-slate-500 mb-6">per month</p>
+            <p className="text-sm text-slate-600 mb-6">per month</p>
 
             <div className="space-y-3 mb-8">
               {PLAN_FEATURES.map(f => (
@@ -269,7 +242,8 @@ function Pricing() {
             >
               Start free 7-day trial
             </Link>
-            <p className="text-center text-xs text-slate-400 mt-3">No credit card required to start</p>
+            {/* text-slate-500 still slightly fails; use text-slate-600 for safe contrast */}
+            <p className="text-center text-xs text-slate-600 mt-3">No credit card required to start</p>
           </div>
         </div>
       </div>
@@ -278,125 +252,71 @@ function Pricing() {
 }
 
 // =============================================================================
-// CONTACT
+// FAQ — section wrapper is server; accordion interaction is client
 // =============================================================================
-function Contact() {
-  const [form, setForm] = useState({ name: '', email: '', website: '', message: '' });
-  const [status, setStatus] = useState<'idle' | 'sending' | 'sent' | 'error'>('idle');
-  const [errorMsg, setErrorMsg] = useState('');
+const FAQS = [
+  {
+    q: "Why am I getting Google Ads clicks but no calls, leads, or sales?",
+    a: "The most common cause is keyword leaks — search terms that trigger your ads but attract visitors with no intention to buy. For example, a plumber bidding on 'plumbing' might attract people searching for DIY plumbing guides rather than an emergency plumber. AdLeak Shield identifies exactly which keywords are causing this by tracking whether visitors engage with your site or leave within seconds of arriving.",
+  },
+  {
+    q: "How do I find out which Google Ads keywords are wasting my budget?",
+    a: "Google Ads shows you clicks and costs per keyword, but not what visitors actually did on your website after clicking. AdLeak Shield bridges that gap — it tracks every ad click on your site, measures session quality (time on site, pages visited, scroll depth), and flags keywords where a high percentage of visitors bounce immediately. You get a ranked table of every leaking keyword alongside the estimated money already wasted on each one.",
+  },
+  {
+    q: "What are negative keywords and how do they help?",
+    a: "Negative keywords are words you tell Google Ads to never trigger your ads for. For example, if you're a plumber and you keep attracting people searching for 'plumbing courses', you'd add 'courses' as a negative keyword. Once added, those searches will never match your ads again — stopping that wasted spend permanently. AdLeak Shield exports your worst-performing keywords as a negative keyword list ready to upload directly into Google Ads.",
+  },
+  {
+    q: "Does AdLeak Shield work for any type of business?",
+    a: "Yes — if you run Google Ads and have a website, AdLeak Shield works for you. It's been designed for small and medium businesses: tradespeople, local service businesses, e-commerce stores, consultants, solicitors, dentists, accountants — any business paying per click on Google Ads who wants to know whether those clicks are turning into real opportunities.",
+  },
+  {
+    q: "How long does it take to set up?",
+    a: "About 15 minutes. You paste a small code snippet into your website's header (works on any platform — WordPress, Shopify, Wix, or custom code), add a tracking template to your Google Ads campaigns, and you're done. Data starts appearing in your dashboard as soon as the first ad click comes through.",
+  },
+  {
+    q: "Will it slow down my website or affect my visitors?",
+    a: "No. The tracking snippet is under 5KB and loads asynchronously — meaning it never blocks your page from loading. Your visitors won't notice any difference. It also uses zero cookies, so you don't need to update your cookie banner or consent mechanism.",
+  },
+  {
+    q: "Is AdLeak Shield GDPR compliant?",
+    a: "Yes, and by design. We don't use cookies. IP addresses are masked before storage (last octet removed). No personally identifiable information about your visitors is collected or stored. You don't need a consent banner to run the tracking snippet. AdLeak Shield is registered with the UK Information Commissioner's Office (ICO) under registration number C1953337.",
+  },
+  {
+    q: "How much does it cost and is there a free trial?",
+    a: "AdLeak Shield is £12.99 per month, with everything included — no feature tiers, no per-click charges. You get a full 7-day free trial with no credit card required. You'll see real data from your campaigns before you decide whether to continue.",
+  },
+];
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setStatus('sending');
-    setErrorMsg('');
+const FAQ_JSON_LD = {
+  "@context": "https://schema.org",
+  "@type": "FAQPage",
+  mainEntity: FAQS.map(({ q, a }) => ({
+    "@type": "Question",
+    name: q,
+    acceptedAnswer: { "@type": "Answer", text: a },
+  })),
+};
 
-    try {
-      const res = await fetch('/api/contact', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(form),
-      });
-      const data = await res.json();
-      if (!res.ok) {
-        setErrorMsg(data.error || 'Failed to send message');
-        setStatus('error');
-        return;
-      }
-      setStatus('sent');
-      setForm({ name: '', email: '', website: '', message: '' });
-    } catch {
-      setErrorMsg('Network error. Please try again.');
-      setStatus('error');
-    }
-  };
-
+function FAQSection() {
   return (
-    <section id="contact" className="py-24 px-6 bg-slate-50">
-      <div className="max-w-2xl mx-auto">
+    <section id="faq" className="py-24 px-6 bg-slate-50">
+      {/* JSON-LD structured data — tells Google to show rich snippets */}
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(FAQ_JSON_LD) }}
+      />
+      <div className="max-w-3xl mx-auto">
         <div className="text-center mb-12">
-          <h2 className="text-3xl md:text-4xl font-bold text-slate-900 mb-4">Get in touch</h2>
-          <p className="text-slate-600">Have a question or want to know more? Send us a message and we'll get back to you.</p>
+          <h2 className="text-3xl md:text-4xl font-bold text-slate-900 mb-4">
+            Frequently asked questions
+          </h2>
+          <p className="text-slate-600">
+            Everything you need to know about stopping wasted Google Ads spend.
+          </p>
         </div>
-
-        {status === 'sent' ? (
-          <div className="bg-green-50 border border-green-200 rounded-xl p-8 text-center">
-            <div className="w-12 h-12 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
-              <svg className="w-6 h-6 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-              </svg>
-            </div>
-            <h3 className="font-semibold text-slate-900 mb-1">Message sent</h3>
-            <p className="text-sm text-slate-600">Thanks for reaching out. We'll get back to you shortly.</p>
-            <button onClick={() => setStatus('idle')} className="mt-4 text-sm text-blue-600 hover:underline">
-              Send another message
-            </button>
-          </div>
-        ) : (
-          <form onSubmit={handleSubmit} className="bg-white rounded-xl border border-slate-100 p-8 space-y-5">
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1.5">Name <span className="text-red-500">*</span></label>
-                <input
-                  type="text"
-                  required
-                  value={form.name}
-                  onChange={e => setForm(f => ({ ...f, name: e.target.value }))}
-                  placeholder="Jane Smith"
-                  className="w-full px-4 py-2.5 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1.5">Email <span className="text-red-500">*</span></label>
-                <input
-                  type="email"
-                  required
-                  value={form.email}
-                  onChange={e => setForm(f => ({ ...f, email: e.target.value }))}
-                  placeholder="jane@example.com"
-                  className="w-full px-4 py-2.5 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                />
-              </div>
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1.5">Website</label>
-              <input
-                type="text"
-                value={form.website}
-                onChange={e => setForm(f => ({ ...f, website: e.target.value }))}
-                placeholder="example.com"
-                className="w-full px-4 py-2.5 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1.5">Message <span className="text-red-500">*</span></label>
-              <textarea
-                required
-                rows={5}
-                value={form.message}
-                onChange={e => setForm(f => ({ ...f, message: e.target.value }))}
-                placeholder="Tell us what you'd like to know..."
-                className="w-full px-4 py-2.5 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
-              />
-            </div>
-
-            {status === 'error' && (
-              <p className="text-sm text-red-600">{errorMsg}</p>
-            )}
-
-            <button
-              type="submit"
-              disabled={status === 'sending'}
-              className="w-full px-6 py-3 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white font-semibold rounded-lg transition-colors text-sm flex items-center justify-center gap-2"
-            >
-              {status === 'sending' && (
-                <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-              )}
-              {status === 'sending' ? 'Sending…' : 'Send message'}
-            </button>
-          </form>
-        )}
+        <FAQAccordion faqs={FAQS} />
       </div>
     </section>
   );
@@ -412,27 +332,31 @@ function Footer() {
         <span className="text-white font-bold text-lg">
           AdLeak<span className="text-blue-400">Shield</span>
         </span>
-        <div className="flex items-center gap-6 text-sm">
+        <nav className="flex items-center gap-6 text-sm">
           {NAV_LINKS.map(l => (
-            <button key={l.label} onClick={() => scrollTo(l.href.slice(1))} className="hover:text-white transition-colors">
+            <a key={l.label} href={l.href} className="hover:text-white transition-colors">
               {l.label}
-            </button>
+            </a>
           ))}
-        </div>
+        </nav>
         <div className="flex items-center gap-4 text-sm">
           <Link href="/auth/login" className="hover:text-white transition-colors">Log in</Link>
-          <Link href="/auth/signup" className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-1.5 rounded-lg transition-colors font-medium">
+          <Link
+            href="/auth/signup"
+            className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-1.5 rounded-lg transition-colors font-medium"
+          >
             Get started
           </Link>
         </div>
       </div>
-      <div className="max-w-6xl mx-auto mt-8 pt-8 border-t border-slate-800 text-xs text-slate-600">
+      {/* text-slate-400 on slate-900 = 6.6:1 contrast ratio — passes */}
+      <div className="max-w-6xl mx-auto mt-8 pt-8 border-t border-slate-800 text-xs text-slate-400">
         <div className="flex flex-col sm:flex-row items-center justify-between gap-3">
           <span>© {new Date().getFullYear()} AdLeak Shield · Helping businesses stop wasting Google Ads budget</span>
           <nav className="flex items-center gap-4">
-            <a href="/privacy" target="_blank" rel="noopener noreferrer" className="hover:text-slate-400 transition-colors">Privacy Policy</a>
-            <a href="/terms"   target="_blank" rel="noopener noreferrer" className="hover:text-slate-400 transition-colors">Terms of Service</a>
-            <a href="/cookies" target="_blank" rel="noopener noreferrer" className="hover:text-slate-400 transition-colors">Cookie Policy</a>
+            <a href="/privacy" target="_blank" rel="noopener noreferrer" className="hover:text-white transition-colors">Privacy Policy</a>
+            <a href="/terms"   target="_blank" rel="noopener noreferrer" className="hover:text-white transition-colors">Terms of Service</a>
+            <a href="/cookies" target="_blank" rel="noopener noreferrer" className="hover:text-white transition-colors">Cookie Policy</a>
           </nav>
         </div>
       </div>
@@ -441,7 +365,7 @@ function Footer() {
 }
 
 // =============================================================================
-// PAGE
+// PAGE — server component, no JS hydration for static sections
 // =============================================================================
 export default function HomePage() {
   return (
@@ -449,9 +373,11 @@ export default function HomePage() {
       <Navbar />
       <main>
         <Hero />
+        <PainSection />
         <Features />
         <Pricing />
-        <Contact />
+        <FAQSection />
+        <ContactSection />
       </main>
       <Footer />
       {/* Umami analytics — cookieless, no consent banner required */}

@@ -17,9 +17,36 @@ import { auth } from "@/lib/auth";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "AdLeak Shield — Stop Wasting Google Ads Budget",
+  title: "AdLeak Shield — Google Ads Clicks But No Calls or Sales? Find Your Wasted Keywords",
   description:
-    "Identify which Google Ads keywords are burning your budget without generating real engagement. Built for small businesses running Google Ads.",
+    "Getting clicks on Google Ads but no calls, leads, or sales? AdLeak Shield shows you exactly which keywords are wasting your budget — and lets you cut them in one click. Free 7-day trial.",
+  keywords: [
+    "Google Ads clicks no conversions",
+    "Google Ads wasted spend",
+    "Google Ads negative keywords tool",
+    "why am I getting Google Ads clicks but no leads",
+    "Google Ads budget wasted",
+    "stop wasting Google Ads money",
+    "Google Ads keyword analysis",
+    "PPC wasted spend tracker",
+  ],
+  openGraph: {
+    title: "AdLeak Shield — Stop Paying for Google Ads Clicks That Never Convert",
+    description:
+      "Find out exactly which keywords are eating your Google Ads budget without generating calls, leads, or sales. Cookieless tracking. GDPR compliant. Free 7-day trial.",
+    url: "https://adleakshield.com",
+    siteName: "AdLeak Shield",
+    type: "website",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "AdLeak Shield — Google Ads Clicks But No Sales? Find Out Why.",
+    description:
+      "AdLeak Shield shows you which Google Ads keywords are wasting your budget. Cut them, get your money back. Free 7-day trial.",
+  },
+  alternates: {
+    canonical: "https://adleakshield.com",
+  },
 };
 
 export default async function RootLayout({
