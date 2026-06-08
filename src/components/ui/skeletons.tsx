@@ -112,9 +112,9 @@ export function DashboardSkeleton() {
             <Shimmer className="h-4 w-52" />   {/* subtitle */}
           </div>
         </div>
+        {/* Only "Manage Setup" shown unconditionally — Manage Subscription is active-only */}
         <div className="flex items-center gap-2">
-          <Shimmer className="h-9 w-44 rounded-lg hidden sm:block" /> {/* Manage Subscription */}
-          <Shimmer className="h-9 w-32 rounded-lg" />                 {/* Manage Setup */}
+          <Shimmer className="h-9 w-32 rounded-lg" />
         </div>
       </div>
 
@@ -129,7 +129,7 @@ export function DashboardSkeleton() {
 
       {/* ── 3. Campaign Status cards ── */}
       <div>
-        <Shimmer className="h-6 w-40 mb-4" />
+        <Shimmer className="h-7 w-40 mb-4" />
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {Array.from({ length: 3 }).map((_, i) => (
             // Mirrors CampaignStatusCard: p-4, flex header, ID, domain, badge
@@ -151,107 +151,67 @@ export function DashboardSkeleton() {
 
       {/* ── 4. Wasted Spend Analysis ── */}
       <div>
-        {/* Heading row */}
+        {/* Heading row — mirrors real: h2 + DateRangePicker + Refresh button */}
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-4">
-          <Shimmer className="h-6 w-52" />
+          <Shimmer className="h-7 w-52" />
           <div className="flex items-center gap-3">
-            <Shimmer className="h-9 w-44 rounded-lg" />  {/* DateRangePicker */}
-            <Shimmer className="h-9 w-24 rounded-lg" />  {/* Refresh button */}
+            <Shimmer className="h-9 w-44 rounded-lg" />
+            <Shimmer className="h-9 w-24 rounded-lg" />
           </div>
         </div>
 
-        {/* LeakTable card — mirrors: card header + filters + table rows */}
-        <div className="rounded-lg border border-gray-200">
-          {/* Card header: icon + title + Export button */}
-          <div className="p-6 border-b border-gray-200">
-            <div className="flex items-center justify-between mb-4">
-              <div className="flex items-center gap-3">
-                <Shimmer className="w-10 h-10 rounded-full flex-shrink-0" />
-                <div className="space-y-1.5">
-                  <Shimmer className="h-6 w-28" />   {/* "Leak Table" */}
-                  <Shimmer className="h-4 w-48" />   {/* subtitle */}
-                </div>
-              </div>
-              <Shimmer className="h-9 w-48 rounded-lg" />  {/* Export button */}
-            </div>
-            {/* Summary row */}
-            <div className="flex gap-6 mb-4">
-              <Shimmer className="h-4 w-32" />
-              <Shimmer className="h-4 w-28" />
-            </div>
-            {/* Filter dropdowns */}
-            <div className="flex gap-3">
-              <Shimmer className="h-9 w-36 rounded-lg" />
-              <Shimmer className="h-9 w-36 rounded-lg" />
+        {/* LeakTable — mirrors LeakTable's own isLoading render exactly:
+            bg-white rounded-lg border p-6 / space-y-4:
+              h-6 w-1/4  (title bar)
+              h-10        (full-width bar)
+              3× h-12     (row blocks)                          */}
+        <div className="bg-white rounded-lg border border-gray-200 p-6">
+          <div className="space-y-4">
+            <Shimmer className="h-6 w-1/4" />
+            <Shimmer className="h-10" />
+            <div className="space-y-3">
+              {Array.from({ length: 3 }).map((_, i) => (
+                <Shimmer key={i} className="h-12" />
+              ))}
             </div>
           </div>
-          {/* Table header row */}
-          <div className="flex gap-4 bg-gray-50 border-b border-gray-200 px-6 py-3">
-            <Shimmer className="h-3 w-24" />
-            <Shimmer className="h-3 w-20" />
-            <Shimmer className="h-3 w-24" />
-            <Shimmer className="h-3 w-20 ml-auto" />
-            <Shimmer className="h-3 w-20" />
-            <Shimmer className="h-3 w-24" />
-          </div>
-          {/* Table rows */}
-          {Array.from({ length: 4 }).map((_, i) => (
-            <div key={i} className="flex gap-4 border-b border-gray-100 px-6 py-4 last:border-0">
-              <Shimmer className="h-4 w-32" />
-              <Shimmer className="h-4 w-14" />
-              <Shimmer className="h-4 w-24" />
-              <Shimmer className="h-4 w-10 ml-auto" />
-              <Shimmer className="h-4 w-10" />
-              <Shimmer className="h-4 w-16" />
-            </div>
-          ))}
         </div>
       </div>
 
       {/* ── 5. Visitor Journeys ── */}
       <div>
-        <Shimmer className="h-6 w-40 mb-4" />
+        <Shimmer className="h-7 w-44 mb-4" />
 
-        {/* SessionsTable card — mirrors: card header + filters + table rows */}
-        <div className="rounded-lg border border-gray-200">
-          {/* Card header: icon + title */}
+        {/* SessionsTable — mirrors the component's actual render while isLoading:
+            The card wrapper + header + filters are ALWAYS rendered (not gated on
+            isLoading). Only the table body swaps to loading blocks.             */}
+        <div className="bg-white rounded-lg border border-gray-200">
+          {/* Header + filters — always visible, same as real component */}
           <div className="p-6 border-b border-gray-200">
             <div className="flex items-center gap-3 mb-5">
               <Shimmer className="w-10 h-10 rounded-full flex-shrink-0" />
               <div className="space-y-1.5">
-                <Shimmer className="h-6 w-28" />   {/* "All Sessions" */}
-                <Shimmer className="h-4 w-56" />   {/* subtitle */}
+                <Shimmer className="h-6 w-28" />
+                <Shimmer className="h-4 w-56" />
               </div>
             </div>
-            {/* Filter grid: keyword(2col) + campaign + matchtype + device + outcome */}
-            <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-3">
+            {/* Filter grid: keyword(xl:col-span-2) + campaign + matchtype + device + outcome */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-3">
               <Shimmer className="h-9 rounded-lg xl:col-span-2" />
               <Shimmer className="h-9 rounded-lg" />
               <Shimmer className="h-9 rounded-lg" />
               <Shimmer className="h-9 rounded-lg" />
               <Shimmer className="h-9 rounded-lg" />
             </div>
+            {/* "Show ad filters" toggle link */}
+            <Shimmer className="h-4 w-48 mt-2" />
           </div>
-          {/* Table header row */}
-          <div className="flex gap-4 bg-gray-50 border-b border-gray-200 px-6 py-3">
-            <Shimmer className="h-3 w-24" />
-            <Shimmer className="h-3 w-20" />
-            <Shimmer className="h-3 w-28" />
-            <Shimmer className="h-3 w-20" />
-            <Shimmer className="h-3 w-14 ml-auto" />
-            <Shimmer className="h-3 w-20" />
+          {/* Table body loading state — mirrors SessionsTable isLoading: p-6 + 5×h-12 */}
+          <div className="p-6 space-y-3">
+            {Array.from({ length: 5 }).map((_, i) => (
+              <Shimmer key={i} className="h-12 rounded-lg" />
+            ))}
           </div>
-          {/* Table rows */}
-          {Array.from({ length: 5 }).map((_, i) => (
-            <div key={i} className="flex gap-4 border-b border-gray-100 px-6 py-3 last:border-0">
-              <Shimmer className="h-4 w-28" />
-              <Shimmer className="h-5 w-14 rounded-full" />   {/* match type badge */}
-              <Shimmer className="h-4 w-32" />
-              <Shimmer className="h-4 w-20" />
-              <Shimmer className="h-4 w-12 ml-auto" />
-              <Shimmer className="h-5 w-20 rounded-full" />   {/* outcome badge */}
-            </div>
-          ))}
         </div>
       </div>
 

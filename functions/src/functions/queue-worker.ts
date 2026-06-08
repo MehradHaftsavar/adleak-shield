@@ -169,11 +169,11 @@ async function ensureSession(
     .query(
       `INSERT INTO Sessions
           (tenant_id, campaign_id, session_fingerprint, keyword, match_type,
-           device, gclid, ip_masked, ad_group_id, ad_id, ad_position)
+           device, gclid, ip_masked, ad_group_id, ad_id, ad_position, is_bounce)
        OUTPUT INSERTED.session_id
        VALUES
           (@tenantId, @campaignId, @fp, @keyword, @matchType, @device,
-           @gclid, @ipMasked, @adGroupId, @adId, @adPosition)`
+           @gclid, @ipMasked, @adGroupId, @adId, @adPosition, 1)`
     );
   
   const sessionId = created.recordset[0]?.session_id ?? null;
