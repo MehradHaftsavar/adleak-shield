@@ -36,6 +36,21 @@
   var SUCCESS_HOSTS = ["wa.link", "wa.me"]; // WhatsApp link patterns
 
   // ===========================================================================
+  // PRE-WARM CONNECTION
+  // Inject a <link rel="preconnect"> immediately so the browser establishes
+  // TCP+TLS with the ingest endpoint before any beacon fires. Without this,
+  // sub-1s clicks (phone taps, instant navigations) lose the race against
+  // the cold connection setup and their beacons never reach Azure.
+  // ===========================================================================
+  try {
+    var _pc = document.createElement("link");
+    _pc.rel = "preconnect";
+    _pc.href = new URL(INGEST_URL).origin;
+    _pc.crossOrigin = "anonymous";
+    document.head.appendChild(_pc);
+  } catch (e) { /* silently ignore */ }
+
+  // ===========================================================================
   // EARLY EXIT — drop silently if no Google Ads parameters present
   // This is critical: only sessions from real ad clicks should be tracked.
   // Saves database space and respects organic traffic privacy.
@@ -141,12 +156,23 @@
         }
       }
 
-      send(isSuccess ? "success_event" : "click", {
+      var eventType = isSuccess ? "success_event" : "click";
+      send(eventType, {
         sessionFingerprint: session.sessionFingerprint,
         pagePath: window.location.pathname,
         elementTag: tag,
         elementHref: href.substring(0, 500),
       });
+
+      // For external navigation links (success events that open dialer/WhatsApp),
+      // delay navigation by 60ms so the beacon has time to be queued before
+      // pagehide fires. Only applies to <a> tags that would cause navigation.
+      if (isSuccess && tag === "a" && href && href.indexOf("#") !== 0 && href.indexOf("javascript") !== 0) {
+        e.preventDefault();
+        setTimeout(function () {
+          window.location.href = el.getAttribute("href");
+        }, 60);
+      }
     },
     true // Capture phase — fires even if the click is intercepted
   );
