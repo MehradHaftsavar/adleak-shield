@@ -46,7 +46,6 @@
     var _pc = document.createElement("link");
     _pc.rel = "preconnect";
     _pc.href = new URL(INGEST_URL).origin;
-    _pc.crossOrigin = "anonymous";
     document.head.appendChild(_pc);
   } catch (e) { /* silently ignore */ }
 
@@ -311,7 +310,7 @@
 
       // Beacon API: best for unload events, no blocking, no response needed
       if (navigator.sendBeacon) {
-        var blob = new Blob([body], { type: "application/json" });
+        var blob = new Blob([body], { type: "text/plain" });
         navigator.sendBeacon(INGEST_URL, blob);
         return;
       }
