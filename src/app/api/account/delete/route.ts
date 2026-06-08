@@ -50,7 +50,7 @@ export async function DELETE() {
       // -----------------------------------------------------------------------
       const realSessionResult = await new mssql.Request(transaction)
         .input('tenantId', mssql.UniqueIdentifier, tenantId)
-        .query(`SELECT COUNT(*) AS cnt FROM Sessions WHERE tenant_id = @tenantId`);
+        .query(`SELECT COUNT(*) AS cnt FROM Sessions WHERE tenant_id = @tenantId AND keyword <> 'adleak_test'`);
 
       const hadRealSessions = (realSessionResult.recordset[0]?.cnt ?? 0) > 0;
 

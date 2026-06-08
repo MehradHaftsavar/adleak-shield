@@ -14,13 +14,15 @@
 
 import React, { useState } from "react";
 import { signIn } from "next-auth/react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import Script from "next/script";
 import { signInSchema } from "@/lib/validators/auth";
 
 export default function LoginPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const callbackUrl = searchParams.get('callbackUrl');
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -75,8 +77,9 @@ export default function LoginPage() {
         return;
       }
 
-      // Success — redirect to dashboard
-      router.push("/dashboard");
+      // Success — redirect to callbackUrl if safe (internal path), else dashboard
+      const dest = callbackUrl && callbackUrl.startsWith('/') ? callbackUrl : '/dashboard';
+      router.push(dest);
       router.refresh(); // Refresh server components to pick up new session
     } catch {
       setError("Something went wrong. Please try again.");

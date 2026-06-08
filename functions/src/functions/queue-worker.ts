@@ -303,16 +303,6 @@ export async function queueWorkerHandler(
   const env = msg.envelope;
   const googleCampaignId = env.payload.session?.campaignId ?? "";
 
-  // Drop test events silently — keyword=adleak_test is fired by the snippet
-  // tester in onboarding/settings. The verification route detects success via
-  // the queue peek (message is there before we drop it here), so no DB write
-  // is needed and test data never appears in Sessions, ClickLogs, or LeakTable.
-  const keyword = env.payload.session?.keyword ?? "";
-  if (keyword === "adleak_test") {
-    context.log("[Worker] Test event — dropping without writing to DB");
-    return;
-  }
-
   if (!googleCampaignId && env.eventType === "session_start") {
     context.log("[Worker] No campaign ID in session_start — discarding", {
       domain: env.domain,

@@ -1,0 +1,5 @@
+-- SUPERSEDED — do not run.
+-- This migration was drafted for a VerificationPings table that was no longer
+-- needed after the verification approach was simplified.
+-- adleak_test events now write to Sessions like any real session, and are
+-- filtered out at the API/query level instead.

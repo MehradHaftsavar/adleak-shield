@@ -9,12 +9,19 @@ import { SnippetStep } from '@/components/onboarding/SnippetStep';
 
 export default function OnboardingPage() {
   const router = useRouter();
-  const { update } = useSession();
+  const { update, status } = useSession();
   const [currentStep, setCurrentStep] = useState<1 | 2 | 3>(1);
   const [domain, setDomain] = useState<string>('');
   const [campaigns, setCampaigns] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isRedirecting, setIsRedirecting] = useState(false);
+
+  // Redirect to login (with return URL) if session expires while on this page
+  useEffect(() => {
+    if (status === 'unauthenticated') {
+      router.push('/auth/login?callbackUrl=%2Fonboarding');
+    }
+  }, [status, router]);
 
   // Check if user already completed onboarding
   useEffect(() => {
@@ -24,13 +31,29 @@ export default function OnboardingPage() {
   const checkOnboardingStatus = async () => {
     setIsLoading(true);
     try {
-      const res = await fetch('/api/domain');
-      if (res.ok) {
-        const data = await res.json();
-        if (data.domain) {
-          setDomain(data.domain);
-          // If domain exists, move to campaign step
-          setCurrentStep(2);
+      const [domainRes, campaignsRes] = await Promise.all([
+        fetch('/api/domain'),
+        fetch('/api/campaigns'),
+      ]);
+
+      if (domainRes.ok) {
+        const domainData = await domainRes.json();
+        if (domainData.domain) {
+          setDomain(domainData.domain);
+
+          // If campaigns also exist, restore to step 3
+          if (campaignsRes.ok) {
+            const campaignsData = await campaignsRes.json();
+            const existing = campaignsData.campaigns || [];
+            if (existing.length > 0) {
+              setCampaigns(existing);
+              setCurrentStep(3);
+            } else {
+              setCurrentStep(2);
+            }
+          } else {
+            setCurrentStep(2);
+          }
         }
       }
     } catch (error) {

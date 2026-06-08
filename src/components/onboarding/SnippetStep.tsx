@@ -22,6 +22,7 @@ export function SnippetStep({ domain, onComplete, onBack }: SnippetStepProps) {
   const [isTesting, setIsTesting] = useState(false);
   const [testResult, setTestResult] = useState<'idle' | 'testing' | 'success' | 'failed'>('idle');
   const [testMessage, setTestMessage] = useState('');
+  const [testProtocol, setTestProtocol] = useState<'https' | 'http'>('https');
 
   useEffect(() => {
     loadSnippet();
@@ -71,7 +72,7 @@ export function SnippetStep({ domain, onComplete, onBack }: SnippetStepProps) {
 
     // Generate test URL with first campaign ID
     const testCampaignId = campaigns[0].id;
-    const testUrl = `http://${domain}/?keyword=adleak_test&campaignid=${testCampaignId}&gclid=test_${Date.now()}&matchtype=exact`;
+    const testUrl = `${testProtocol}://${domain}/?keyword=adleak_test&campaignid=${testCampaignId}&adgroupid=test_group_001&adid=test_ad_001&adposition=1t1&gclid=test_${Date.now()}&matchtype=exact`;
 
     // Open test URL in new tab
     const testWindow = window.open(testUrl, '_blank');
@@ -334,9 +335,32 @@ export function SnippetStep({ domain, onComplete, onBack }: SnippetStepProps) {
               Test Your Setup
             </h3>
             <p className="text-sm text-gray-700 mb-4">
-              Click the button below to verify your tracking snippet is installed correctly. 
+              Click the button below to verify your tracking snippet is installed correctly.
               This will open your website with test parameters and check if we receive the data.
             </p>
+
+            <div className="flex items-center gap-3 mb-4">
+              <span className="text-sm text-gray-600 font-medium">My site uses:</span>
+              <div className="flex rounded-lg border border-gray-200 overflow-hidden text-sm font-medium">
+                <button
+                  type="button"
+                  onClick={() => setTestProtocol('https')}
+                  className={`px-4 py-1.5 transition-colors ${testProtocol === 'https' ? 'bg-purple-600 text-white' : 'bg-white text-gray-600 hover:bg-gray-50'}`}
+                >
+                  HTTPS
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setTestProtocol('http')}
+                  className={`px-4 py-1.5 border-l border-gray-200 transition-colors ${testProtocol === 'http' ? 'bg-purple-600 text-white' : 'bg-white text-gray-600 hover:bg-gray-50'}`}
+                >
+                  HTTP
+                </button>
+              </div>
+              <span className="text-xs text-gray-400">
+                {testProtocol === 'https' ? 'Most sites — recommended' : 'Only if your site has no SSL certificate'}
+              </span>
+            </div>
 
             <button
               onClick={handleTestSetup}

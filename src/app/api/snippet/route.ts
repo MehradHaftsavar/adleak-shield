@@ -55,7 +55,7 @@ export async function GET(request: NextRequest) {
 }
 
 function generateTrackingSnippet(): string {
-  return `<!-- AdLeak Shield -->\n<script src="https://adleakshield.com/tracker.js" defer></script>`;
+  return `<!-- AdLeak Shield -->\n<script src="https://www.adleakshield.com/tracker.js" defer></script>`;
 }
 
 function generateValueTrackTemplate(): string {

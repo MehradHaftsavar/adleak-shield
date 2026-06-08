@@ -25,15 +25,18 @@ export async function GET(request: NextRequest) {
         SET status = 'active'
         WHERE status = 'awaiting_data'
           AND EXISTS (
-            SELECT 1 FROM Sessions s WHERE s.campaign_id = Campaigns.campaign_id
+            SELECT 1 FROM Sessions s
+            WHERE s.campaign_id = Campaigns.campaign_id
+              AND s.keyword <> 'adleak_test'
           )
       `);
 
-      // 1. Check if ANY data received in last 24 hours (Live status)
+      // 1. Check if ANY real data received in last 24 hours (Live status)
       const liveCheckResult = await req.query(`
         SELECT TOP 1 session_id
         FROM Sessions
         WHERE started_at >= DATEADD(hour, -24, GETUTCDATE())
+          AND keyword <> 'adleak_test'
       `);
 
       const isLive = liveCheckResult.recordset.length > 0;
@@ -46,8 +49,8 @@ export async function GET(request: NextRequest) {
           c.slot_number,
           c.status,
           d.domain_name,
-          (SELECT COUNT(*) FROM Sessions s WHERE s.campaign_id = c.campaign_id) as session_count,
-          (SELECT TOP 1 started_at FROM Sessions s WHERE s.campaign_id = c.campaign_id ORDER BY started_at DESC) as last_session
+          (SELECT COUNT(*) FROM Sessions s WHERE s.campaign_id = c.campaign_id AND s.keyword <> 'adleak_test') as session_count,
+          (SELECT TOP 1 started_at FROM Sessions s WHERE s.campaign_id = c.campaign_id AND s.keyword <> 'adleak_test' ORDER BY started_at DESC) as last_session
         FROM Campaigns c
         INNER JOIN Domains d ON c.domain_id = d.domain_id
         ORDER BY c.slot_number

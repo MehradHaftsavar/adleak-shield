@@ -46,6 +46,7 @@ export async function GET(request: NextRequest) {
         's.started_at >= @startDate',
         's.started_at <= @endDate',
         's.keyword IS NOT NULL',
+        "s.keyword <> 'adleak_test'",
       ];
 
       if (keyword) {
