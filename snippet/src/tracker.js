@@ -304,7 +304,7 @@
       var body = JSON.stringify({
         eventType: eventType,
         payload: payload,
-        domain: window.location.hostname,
+        domain: window.location.host,
         ts: Date.now(),
       });
 
