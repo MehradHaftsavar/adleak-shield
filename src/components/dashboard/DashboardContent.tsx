@@ -35,9 +35,21 @@ export function DashboardContent() {
   const [error, setError] = useState('');
   // Initialise synchronously from the URL so the banner is visible on the very
   // first render — before any loading state — regardless of subscribe or resubscribe.
-  const [paymentSuccess, setPaymentSuccess] = useState(
-    () => searchParams.get('payment') === 'success'
-  );
+  // We also write to sessionStorage so the flag survives the router.replace('/dashboard')
+  // call that strips ?payment=success from the URL (which can remount this component
+  // with empty searchParams, causing a plain lazy initialiser to return false).
+  const [paymentSuccess, setPaymentSuccess] = useState<boolean>(() => {
+    if (searchParams.get('payment') === 'success') {
+      if (typeof window !== 'undefined') {
+        sessionStorage.setItem('als_payment_success', 'true');
+      }
+      return true;
+    }
+    if (typeof window !== 'undefined') {
+      return sessionStorage.getItem('als_payment_success') === 'true';
+    }
+    return false;
+  });
   const [upgrading, setUpgrading] = useState(false);
 
   // Date range state for Leak Table
@@ -153,7 +165,7 @@ export function DashboardContent() {
             Subscription activated — full access unlocked.
           </p>
           <button
-            onClick={() => setPaymentSuccess(false)}
+            onClick={() => { setPaymentSuccess(false); sessionStorage.removeItem('als_payment_success'); }}
             className="ml-auto text-green-600 hover:text-green-800 text-lg leading-none"
           >
             ×

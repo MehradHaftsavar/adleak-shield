@@ -75,6 +75,20 @@ export function DashboardShell({
   const [stoppingImp,     setStoppingImp]     = useState(false);
   const [checkoutLoading, setCheckoutLoading] = useState(false);
   const [menuOpen,        setMenuOpen]        = useState(false);
+  // Optimistically treat subscription as active the moment Stripe redirects back,
+  // before update() has had a chance to refresh the JWT. Without this the nav shows
+  // the "Subscribe" button for ~300–500ms while the session is being refreshed.
+  // We persist in sessionStorage so the flag survives the router.replace that strips
+  // ?payment=success from the URL (which can remount this component with a fresh
+  // window.location.search that no longer contains the param).
+  const [justSubscribed,  setJustSubscribed]  = useState<boolean>(() => {
+    if (typeof window === 'undefined') return false;
+    if (new URLSearchParams(window.location.search).get('payment') === 'success') {
+      sessionStorage.setItem('als_just_subscribed', 'true');
+      return true;
+    }
+    return sessionStorage.getItem('als_just_subscribed') === 'true';
+  });
 
   const router = useRouter();
   const { data: session, status, update } = useSession();
@@ -86,7 +100,7 @@ export function DashboardShell({
       router.push('/auth/login');
     }
   }, [status, router]);
-  const isActive = subscriptionStatus === 'active';
+  const isActive = subscriptionStatus === 'active' || justSubscribed;
   const isCancelled = subscriptionStatus === 'canceled';
 
   // After returning from Stripe checkout, force a session refresh so the
@@ -94,11 +108,17 @@ export function DashboardShell({
   // NOTE: do NOT strip ?payment=success here — DashboardContent reads it via
   // useSearchParams to show the success banner, then clears it via router.replace.
   // Calling replaceState here races against that read and can swallow the banner.
+  // Once update() resolves the JWT now has the real subscriptionStatus='active',
+  // so we clear the optimistic justSubscribed flag (isActive will remain true via
+  // the real session data).
   useEffect(() => {
     if (typeof window === 'undefined') return;
     const params = new URLSearchParams(window.location.search);
     if (params.get('payment') === 'success') {
-      update();
+      update().then(() => {
+        setJustSubscribed(false);
+        sessionStorage.removeItem('als_just_subscribed');
+      });
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
