@@ -211,14 +211,13 @@ export function DashboardShell({
       {/* Navigation */}
       <nav className="bg-white border-b border-gray-200 relative z-40">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center h-16">
+          <div className="flex justify-between items-center h-16">
 
-            {/* ── Left zone (flex-1): logo + desktop nav links ── */}
-            <div className="flex-1 flex items-center gap-6">
+            {/* ── Left: logo + desktop nav links ── */}
+            <div className="flex items-center gap-6">
               <span className="text-base font-bold text-gray-900 tracking-tight whitespace-nowrap">
                 AdLeak Shield
               </span>
-              {/* Desktop links — hidden on mobile */}
               <div className="hidden md:flex items-center gap-5">
                 <Link href="/dashboard" className="text-sm text-gray-600 hover:text-gray-900 transition-colors">
                   Dashboard
@@ -229,27 +228,8 @@ export function DashboardShell({
               </div>
             </div>
 
-            {/* ── Centre zone: subscribe/manage button ──
-                Mobile: centred between logo and hamburger.
-                Desktop: hidden here — button lives in the right zone instead. ── */}
-            <div className="flex md:hidden items-center">
-              {!isActive && (
-                <button
-                  onClick={handleSubscribe}
-                  disabled={checkoutLoading}
-                  className="flex items-center gap-1.5 px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-60 text-white text-xs font-semibold rounded-lg transition-colors whitespace-nowrap"
-                >
-                  {checkoutLoading
-                    ? <span className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                    : null}
-                  {isCancelled ? 'Resubscribe' : 'Subscribe — £12.99/mo'}
-                </button>
-              )}
-              {isActive && <ManageSubscriptionButton />}
-            </div>
-
-            {/* ── Right zone (flex-1): desktop extras + hamburger ── */}
-            <div className="flex-1 flex items-center justify-end gap-3">
+            {/* ── Right: desktop extras + hamburger ── */}
+            <div className="flex items-center gap-3">
 
               {/* Desktop-only: subscribe/manage + email + sign out */}
               <div className="hidden md:flex items-center gap-3">
@@ -299,7 +279,6 @@ export function DashboardShell({
         {menuOpen && (
           <div className="md:hidden border-t border-gray-200 bg-white shadow-lg">
             <div className="px-4 py-3 space-y-1">
-              {/* Account email */}
               <p className="text-xs text-gray-400 pb-2 border-b border-gray-100 truncate">{email}</p>
 
               <Link
@@ -316,6 +295,28 @@ export function DashboardShell({
               >
                 Manage Setup
               </Link>
+
+              {/* Subscribe / Manage — mobile only, lives here not in the nav bar */}
+              <div className="pt-2 border-t border-gray-100">
+                {!isActive && (
+                  <button
+                    onClick={() => { setMenuOpen(false); handleSubscribe(); }}
+                    disabled={checkoutLoading}
+                    className="w-full flex items-center justify-center gap-2 px-3 py-2.5 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-60 text-white text-sm font-semibold rounded-lg transition-colors"
+                  >
+                    {checkoutLoading
+                      ? <span className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                      : null}
+                    {isCancelled ? 'Resubscribe' : 'Subscribe — £12.99/mo'}
+                  </button>
+                )}
+                {isActive && (
+                  <div onClick={() => setMenuOpen(false)}>
+                    <ManageSubscriptionButton />
+                  </div>
+                )}
+              </div>
+
               <div className="pt-2 border-t border-gray-100">
                 <button
                   onClick={() => signOut({ callbackUrl: "/auth/login" })}
