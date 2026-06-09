@@ -70,6 +70,32 @@ export async function DELETE() {
 
       const hadRealSessions = (realSessionResult.recordset[0]?.cnt ?? 0) > 0;
 
+      // Always record the email hash regardless of whether real sessions existed.
+      // Email = person, so even accounts that never received real traffic shouldn't
+      // be able to cycle through fresh trials indefinitely. Domain/campaign locking
+      // stays conditional on real sessions (don't penalise a mistyped domain).
+      if (tenantEmail) {
+        const emailHash = crypto
+          .createHash('sha256')
+          .update(tenantEmail.toLowerCase().trim())
+          .digest('hex');
+
+        await new mssql.Request(transaction)
+          .input('emailHash', mssql.NVarChar(64), emailHash)
+          .query(`
+            IF NOT EXISTS (
+              SELECT 1 FROM TrialledResources
+              WHERE resource_type = 'email' AND resource_value = @emailHash
+            )
+              INSERT INTO TrialledResources (resource_type, resource_value)
+              VALUES ('email', @emailHash)
+          `);
+
+        console.log(`[account/delete] Email hash recorded in TrialledResources for tenant ${tenantId}.`);
+      }
+
+      // Domain + campaign locking only applies if the account had real sessions —
+      // no point locking a domain that was never actually used for tracking.
       if (hadRealSessions) {
         const domainsToLog = await new mssql.Request(transaction)
           .input('tenantId', mssql.UniqueIdentifier, tenantId)
@@ -105,30 +131,9 @@ export async function DELETE() {
             `);
         }
 
-        // Also record a hash of the email so that re-signup with the same address
-        // on a brand-new account (different domain, different campaign) is still
-        // caught — the hash is SHA-256 so no raw PII is stored.
-        if (tenantEmail) {
-          const emailHash = crypto
-            .createHash('sha256')
-            .update(tenantEmail.toLowerCase().trim())
-            .digest('hex');
-
-          await new mssql.Request(transaction)
-            .input('emailHash', mssql.NVarChar(64), emailHash)
-            .query(`
-              IF NOT EXISTS (
-                SELECT 1 FROM TrialledResources
-                WHERE resource_type = 'email' AND resource_value = @emailHash
-              )
-                INSERT INTO TrialledResources (resource_type, resource_value)
-                VALUES ('email', @emailHash)
-            `);
-        }
-
-        console.log(`[account/delete] Tenant ${tenantId} had real sessions — email/domains/campaigns recorded in TrialledResources.`);
+        console.log(`[account/delete] Tenant ${tenantId} had real sessions — domains/campaigns recorded in TrialledResources.`);
       } else {
-        console.log(`[account/delete] Tenant ${tenantId} had zero real sessions — skipping TrialledResources (no trial benefit received).`);
+        console.log(`[account/delete] Tenant ${tenantId} had zero real sessions — skipping domain/campaign TrialledResources.`);
       }
 
       // FK-safe deletion order
