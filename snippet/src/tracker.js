@@ -67,7 +67,6 @@
 
     // Build the new session record
     session = {
-      // Generated server-side after the first ping confirms validity
       sessionFingerprint: generateFingerprint(),
       keyword: keyword.substring(0, 255),
       matchType: (params.get("matchtype") || "").substring(0, 20),
@@ -92,7 +91,6 @@
 
   // ===========================================================================
   // PAGEVIEW
-  // Fires on every page load (including SPA route changes via popstate)
   // ===========================================================================
   var pageStart = Date.now();
   var maxScrollPct = 0;
@@ -101,6 +99,21 @@
     sessionFingerprint: session.sessionFingerprint,
     pagePath: window.location.pathname,
   });
+
+  // ===========================================================================
+  // ACTIVE DWELL TIME
+  // Tracks how long the user was actually LOOKING at the page — not counting
+  // time the tab was hidden (switched away, minimised). This makes bounce
+  // detection accurate: a user who opens the tab and immediately switches
+  // to another app for 10 minutes hasn't "engaged" for 10 minutes.
+  // ===========================================================================
+  var hiddenAt = document.hidden ? Date.now() : 0; // if already hidden on load
+  var totalHiddenMs = 0;
+
+  function activeDwellMs() {
+    var currentHidden = (hiddenAt > 0) ? (Date.now() - hiddenAt) : 0;
+    return Math.max(0, Date.now() - pageStart - totalHiddenMs - currentHidden);
+  }
 
   // ===========================================================================
   // SCROLL DEPTH
@@ -146,7 +159,6 @@
       if (href.indexOf("tel:") === 0) isSuccess = true;
       else if (href.indexOf("mailto:") === 0) isSuccess = true;
       else if (href.indexOf("https://") === 0) {
-        // Check WhatsApp link patterns
         for (var i = 0; i < SUCCESS_HOSTS.length; i++) {
           if (href.indexOf("https://" + SUCCESS_HOSTS[i]) === 0) {
             isSuccess = true;
@@ -155,22 +167,27 @@
         }
       }
 
-      var eventType = isSuccess ? "success_event" : "click";
-      send(eventType, {
+      send(isSuccess ? "success_event" : "click", {
         sessionFingerprint: session.sessionFingerprint,
         pagePath: window.location.pathname,
         elementTag: tag,
         elementHref: href.substring(0, 500),
       });
 
-      // For external navigation links (success events that open dialer/WhatsApp),
-      // delay navigation by 60ms so the beacon has time to be queued before
-      // pagehide fires. Only applies to <a> tags that would cause navigation.
+      // For success events on <a> links: delay navigation by 150ms so the
+      // beacon has time to be queued before pagehide fires.
+      // Respects target="_blank" — opens in new tab instead of navigating.
       if (isSuccess && tag === "a" && href && href.indexOf("#") !== 0 && href.indexOf("javascript") !== 0) {
         e.preventDefault();
+        var actualHref = el.getAttribute("href");
+        var opensNewTab = el.getAttribute("target") === "_blank" || el.getAttribute("target") === "_new";
         setTimeout(function () {
-          window.location.href = el.getAttribute("href");
-        }, 60);
+          if (opensNewTab) {
+            window.open(actualHref);
+          } else {
+            window.location.href = actualHref;
+          }
+        }, 150);
       }
     },
     true // Capture phase — fires even if the click is intercepted
@@ -193,23 +210,28 @@
 
   // ===========================================================================
   // HEARTBEAT
-  // Tells the server "this user is still on the page" every 15 seconds.
-  // Stops when the tab is hidden (user switched tabs or minimised).
-  // Resumes when the tab becomes visible again.
+  // Tells the server "this user is still on the page" periodically.
+  // Uses ACTIVE dwell time (excludes time tab was hidden).
+  //
+  // First heartbeat fires at 5s — catches engaged visits (5-15s) where
+  // page_end might be lost before the regular 15s heartbeat fires.
+  // Regular heartbeat fires every 15s after that.
   // ===========================================================================
   var heartbeatInterval = null;
 
+  function sendHeartbeat() {
+    if (document.hidden) return;
+    send("heartbeat", {
+      sessionFingerprint: session.sessionFingerprint,
+      pagePath: window.location.pathname,
+      dwellMs: activeDwellMs(),
+      scrollPct: maxScrollPct,
+    });
+  }
+
   function startHeartbeat() {
     if (heartbeatInterval) return;
-    heartbeatInterval = setInterval(function () {
-      if (document.hidden) return; // Don't track inactive tabs
-      send("heartbeat", {
-        sessionFingerprint: session.sessionFingerprint,
-        pagePath: window.location.pathname,
-        dwellMs: Date.now() - pageStart,
-        scrollPct: maxScrollPct,
-      });
-    }, HEARTBEAT_MS);
+    heartbeatInterval = setInterval(sendHeartbeat, HEARTBEAT_MS);
   }
 
   function stopHeartbeat() {
@@ -217,23 +239,36 @@
     heartbeatInterval = null;
   }
 
+  // Early heartbeat at 5s — marks visits of 5s+ as Engaged even if page_end
+  // never arrives (tab killed between 5-15s before first regular heartbeat)
+  var earlyHeartbeat = setTimeout(sendHeartbeat, 5000);
+
   document.addEventListener("visibilitychange", function () {
-    if (document.hidden) stopHeartbeat();
-    else startHeartbeat();
+    if (document.hidden) {
+      hiddenAt = Date.now();
+      stopHeartbeat();
+    } else {
+      if (hiddenAt > 0) {
+        totalHiddenMs += Date.now() - hiddenAt;
+        hiddenAt = 0;
+      }
+      startHeartbeat();
+    }
   });
 
   startHeartbeat();
 
   // ===========================================================================
-  // UNLOAD — final dwell-time send
+  // UNLOAD — final dwell-time send using ACTIVE dwell (tab-hidden time excluded)
   // pagehide fires reliably on mobile Safari where unload doesn't.
   // Beacon API guarantees the request is sent even as the page is closing.
   // ===========================================================================
   window.addEventListener("pagehide", function () {
+    clearTimeout(earlyHeartbeat); // no point sending both
     send("page_end", {
       sessionFingerprint: session.sessionFingerprint,
       pagePath: window.location.pathname,
-      dwellMs: Date.now() - pageStart,
+      dwellMs: activeDwellMs(),
       scrollPct: maxScrollPct,
     });
   });
@@ -254,15 +289,10 @@
   function saveSession(s) {
     try {
       sessionStorage.setItem(STORAGE_KEY, JSON.stringify(s));
-    } catch (e) {
-      // Silently ignore — sessionStorage may be disabled
-    }
+    } catch (e) {}
   }
 
   function generateFingerprint() {
-    // Lightweight fingerprint: timestamp + random + a small browser signature.
-    // This is NOT cryptographic — it's just a session identifier.
-    // The server combines this with the masked IP for the final fingerprint.
     var sig =
       navigator.userAgent.length +
       "|" +
@@ -308,25 +338,19 @@
         ts: Date.now(),
       });
 
-      // Beacon API: best for unload events, no blocking, no response needed
       if (navigator.sendBeacon) {
         var blob = new Blob([body], { type: "text/plain" });
         navigator.sendBeacon(INGEST_URL, blob);
         return;
       }
 
-      // Fallback for browsers without sendBeacon
       fetch(INGEST_URL, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: body,
         keepalive: true,
         mode: "no-cors",
-      }).catch(function () {
-        // Silently swallow errors — never break the host site
-      });
-    } catch (e) {
-      // Silently swallow — never break the host site
-    }
+      }).catch(function () {});
+    } catch (e) {}
   }
 })();

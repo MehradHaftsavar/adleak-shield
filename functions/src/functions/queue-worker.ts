@@ -375,10 +375,19 @@ export async function queueWorkerHandler(
     });
 
     if (!sessionInfo) {
-      context.log("[Worker] Orphan event — no matching session", {
-        eventType: env.eventType,
-      });
-      return;
+      // Could be a race condition — session_start hasn't been processed yet.
+      // Throw so Azure retries this message after the visibility timeout (~30s),
+      // by which time session_start will have been committed to the DB.
+      // Exception: page_end is low-value and fine to drop if the session is gone.
+      if (env.eventType === "page_end") {
+        context.log("[Worker] Orphan page_end — no session found, dropping", {
+          eventType: env.eventType,
+        });
+        return;
+      }
+      throw new Error(
+        `[Worker] Orphan ${env.eventType} — session not found, will retry`
+      );
     }
 
     campaign = {
