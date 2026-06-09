@@ -119,12 +119,13 @@ export function DashboardSkeleton() {
       </div>
 
       {/* ── 2. Live status bar  (p-4, single row) ── */}
-      <div className="rounded-lg border border-gray-200 p-4">
-        <div className="flex items-center gap-3">
+      {/* Mirrors StatusIndicator: bg-white rounded-lg border p-4, dot+text grouped in gap-2, then lastUpdate */}
+      <div className="flex items-center gap-3 p-4 bg-white rounded-lg border border-gray-200">
+        <div className="flex items-center gap-2">
           <Shimmer className="w-3 h-3 rounded-full flex-shrink-0" />
-          <Shimmer className="h-5 w-36" />           {/* "Live" / "Awaiting Data" */}
-          <Shimmer className="h-4 w-44 ml-auto hidden sm:block" /> {/* Last data: … */}
+          <Shimmer className="h-5 w-32" />  {/* "Live" / "Awaiting Data" label */}
         </div>
+        <Shimmer className="h-4 w-44" />   {/* Last data: … */}
       </div>
 
       {/* ── 3. Campaign Status cards ── */}
@@ -132,8 +133,8 @@ export function DashboardSkeleton() {
         <Shimmer className="h-7 w-40 mb-4" />
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {Array.from({ length: 3 }).map((_, i) => (
-            // Mirrors CampaignStatusCard: p-4, flex header, ID, domain, badge
-            <div key={i} className="rounded-lg border border-gray-200 p-4">
+            // Mirrors CampaignStatusCard: p-4 bg-white, flex header, ID, domain, badge
+            <div key={i} className="p-4 bg-white rounded-lg border border-gray-200">
               <div className="flex items-start justify-between mb-3">
                 <div className="space-y-1.5">
                   <Shimmer className="h-5 w-28" />   {/* "Campaign 1" font-semibold */}
@@ -206,10 +207,11 @@ export function DashboardSkeleton() {
             {/* "Show ad filters" toggle link */}
             <Shimmer className="h-4 w-48 mt-2" />
           </div>
-          {/* Table body loading state — mirrors SessionsTable isLoading: p-6 + 5×h-12 */}
-          <div className="p-6 space-y-3">
+          {/* Table body loading state — mirrors SessionsTable isLoading exactly:
+              parent animate-pulse, children h-12 bg-gray-100 rounded (not gray-200) */}
+          <div className="p-6 animate-pulse space-y-3">
             {Array.from({ length: 5 }).map((_, i) => (
-              <Shimmer key={i} className="h-12 rounded-lg" />
+              <div key={i} className="h-12 bg-gray-100 rounded" />
             ))}
           </div>
         </div>
