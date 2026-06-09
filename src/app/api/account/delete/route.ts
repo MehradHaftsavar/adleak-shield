@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import crypto from 'crypto';
 import { auth } from '@/lib/auth';
 import { getAdminPool } from '@/lib/db/client';
 import { stripe } from '@/lib/stripe';
@@ -21,9 +22,11 @@ export async function DELETE() {
     const pool = await getAdminPool();
     const tenantRow = await pool.request()
       .input('tenantId', mssql.UniqueIdentifier, tenantId)
-      .query(`SELECT stripe_customer_id FROM Tenants WHERE tenant_id = @tenantId AND deleted_at IS NULL`);
+      .query(`SELECT stripe_customer_id, email FROM Tenants WHERE tenant_id = @tenantId AND deleted_at IS NULL`);
 
     const stripeCustomerId = tenantRow.recordset[0]?.stripe_customer_id ?? null;
+    // Capture the real email now — the soft-delete will overwrite it with a placeholder
+    const tenantEmail: string | null = tenantRow.recordset[0]?.email ?? null;
 
     // -------------------------------------------------------------------------
     // Step 2: Delete all data in a single transaction — all-or-nothing.
@@ -89,7 +92,28 @@ export async function DELETE() {
             `);
         }
 
-        console.log(`[account/delete] Tenant ${tenantId} had real sessions — domains/campaigns recorded in TrialledResources.`);
+        // Also record a hash of the email so that re-signup with the same address
+        // on a brand-new account (different domain, different campaign) is still
+        // caught — the hash is SHA-256 so no raw PII is stored.
+        if (tenantEmail) {
+          const emailHash = crypto
+            .createHash('sha256')
+            .update(tenantEmail.toLowerCase().trim())
+            .digest('hex');
+
+          await new mssql.Request(transaction)
+            .input('emailHash', mssql.NVarChar(64), emailHash)
+            .query(`
+              IF NOT EXISTS (
+                SELECT 1 FROM TrialledResources
+                WHERE resource_type = 'email' AND resource_value = @emailHash
+              )
+                INSERT INTO TrialledResources (resource_type, resource_value)
+                VALUES ('email', @emailHash)
+            `);
+        }
+
+        console.log(`[account/delete] Tenant ${tenantId} had real sessions — email/domains/campaigns recorded in TrialledResources.`);
       } else {
         console.log(`[account/delete] Tenant ${tenantId} had zero real sessions — skipping TrialledResources (no trial benefit received).`);
       }

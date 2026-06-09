@@ -45,8 +45,28 @@ export async function POST(req: NextRequest) {
           return null;
         }
 
-        const trialEndsAt = new Date();
-        trialEndsAt.setDate(trialEndsAt.getDate() + 7);
+        // Check if this email was previously used for a trial on a deleted account.
+        // We store a SHA-256 hash (no raw PII) so we can detect re-signups even
+        // when the person uses a completely different domain and campaign ID.
+        const emailHash = crypto
+          .createHash('sha256')
+          .update(email.toLowerCase().trim())
+          .digest('hex');
+
+        const trialledEmail = await request
+          .input('emailHash', mssql.NVarChar(64), emailHash)
+          .query(`
+            SELECT 1 FROM TrialledResources
+            WHERE resource_type = 'email' AND resource_value = @emailHash
+          `);
+
+        const hadPriorTrial = trialledEmail.recordset.length > 0;
+
+        // Genuine first-timer gets 7 days; repeat sign-up gets trial_ends_at = now
+        // so they're immediately paywalled — they already had their free trial.
+        const trialEndsAt = hadPriorTrial
+          ? new Date()
+          : (() => { const d = new Date(); d.setDate(d.getDate() + 7); return d; })();
 
         const ownerEmail = process.env.OWNER_EMAIL?.toLowerCase().trim();
         const isOwner = email === ownerEmail;
