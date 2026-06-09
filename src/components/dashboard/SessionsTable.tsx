@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import {
   Users,
   Search,
@@ -11,7 +11,32 @@ import {
   AlertCircle,
   Clock,
   ChevronRight,
+  Columns,
 } from 'lucide-react';
+
+type ColKey = 'matchType' | 'date' | 'campaign' | 'device' | 'duration' | 'adGroup' | 'adId' | 'position';
+
+const COL_LABELS: Record<ColKey, string> = {
+  matchType: 'Match Type',
+  date:      'Date',
+  campaign:  'Campaign',
+  device:    'Device',
+  duration:  'Duration',
+  adGroup:   'Ad Group',
+  adId:      'Ad ID',
+  position:  'Ad Position',
+};
+
+const DEFAULT_COLS: Record<ColKey, boolean> = {
+  matchType: true,
+  date:      true,
+  campaign:  true,
+  device:    true,
+  duration:  true,
+  adGroup:   false,
+  adId:      false,
+  position:  false,
+};
 import { JourneyTimeline } from './JourneyTimeline';
 
 interface Session {
@@ -119,8 +144,23 @@ export function SessionsTable({ campaigns, dateRange, refreshTrigger }: Sessions
   // Journey slide-over
   const [selectedSession, setSelectedSession] = useState<Session | null>(null);
 
-  // Optional column visibility
-  const [showAdCols, setShowAdCols] = useState(false);
+  // Column visibility
+  const [cols, setCols] = useState<Record<ColKey, boolean>>(DEFAULT_COLS);
+  const [colPickerOpen, setColPickerOpen] = useState(false);
+  const colPickerRef = useRef<HTMLDivElement>(null);
+
+  const toggleCol = (key: ColKey) => setCols(prev => ({ ...prev, [key]: !prev[key] }));
+
+  // Close picker on outside click
+  useEffect(() => {
+    function handleClick(e: MouseEvent) {
+      if (colPickerRef.current && !colPickerRef.current.contains(e.target as Node)) {
+        setColPickerOpen(false);
+      }
+    }
+    if (colPickerOpen) document.addEventListener('mousedown', handleClick);
+    return () => document.removeEventListener('mousedown', handleClick);
+  }, [colPickerOpen]);
 
   // Pagination
   const PAGE_SIZE = 10;
@@ -191,17 +231,51 @@ export function SessionsTable({ campaigns, dateRange, refreshTrigger }: Sessions
                 <p className="text-sm text-gray-600">Every visit from your Google Ads campaigns</p>
               </div>
             </div>
-            <button
-              type="button"
-              onClick={() => setShowAdCols(v => !v)}
-              className={`flex-shrink-0 flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg border transition-colors ${
-                showAdCols
-                  ? 'bg-blue-600 text-white border-blue-600'
-                  : 'bg-white text-gray-600 border-gray-300 hover:bg-gray-50'
-              }`}
-            >
-              {showAdCols ? '− Hide' : '+ Show'} Ad&nbsp;Columns
-            </button>
+
+            {/* Column picker */}
+            <div className="relative flex-shrink-0" ref={colPickerRef}>
+              <button
+                type="button"
+                onClick={() => setColPickerOpen(v => !v)}
+                className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors text-gray-600"
+              >
+                <Columns className="w-3.5 h-3.5" />
+                Columns
+                {Object.values(cols).filter(Boolean).length !== Object.keys(cols).length && (
+                  <span className="ml-0.5 inline-flex items-center justify-center w-4 h-4 rounded-full bg-blue-600 text-white text-[10px] font-semibold">
+                    {Object.values(cols).filter(Boolean).length}
+                  </span>
+                )}
+              </button>
+
+              {colPickerOpen && (
+                <div className="absolute right-0 top-full mt-1 z-30 bg-white border border-gray-200 rounded-lg shadow-lg p-3 w-44">
+                  <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider mb-2">Toggle columns</p>
+                  <div className="space-y-1">
+                    {(Object.keys(COL_LABELS) as ColKey[]).map(key => (
+                      <label key={key} className="flex items-center gap-2 cursor-pointer group">
+                        <input
+                          type="checkbox"
+                          checked={cols[key]}
+                          onChange={() => toggleCol(key)}
+                          className="w-3.5 h-3.5 rounded accent-blue-600"
+                        />
+                        <span className="text-xs text-gray-700 group-hover:text-gray-900 select-none">
+                          {COL_LABELS[key]}
+                        </span>
+                      </label>
+                    ))}
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setCols(DEFAULT_COLS)}
+                    className="mt-3 w-full text-[11px] text-gray-400 hover:text-gray-600 transition-colors text-center"
+                  >
+                    Reset to default
+                  </button>
+                </div>
+              )}
+            </div>
           </div>
 
           {/* Filters */}
@@ -405,42 +479,16 @@ export function SessionsTable({ campaigns, dateRange, refreshTrigger }: Sessions
             <table className="w-full">
               <thead className="bg-gray-50 border-b border-gray-200">
                 <tr>
-                  <th className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Keyword
-                  </th>
-                  <th className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider hidden sm:table-cell">
-                    Match Type
-                  </th>
-                  <th className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider hidden md:table-cell">
-                    Date
-                  </th>
-                  <th className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider hidden lg:table-cell">
-                    Campaign
-                  </th>
-                  <th className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider hidden md:table-cell">
-                    Device
-                  </th>
-                  <th className="px-4 sm:px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider hidden lg:table-cell">
-                    Duration
-                  </th>
-                  {showAdCols && (
-                    <th className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Ad Group
-                    </th>
-                  )}
-                  {showAdCols && (
-                    <th className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Ad ID
-                    </th>
-                  )}
-                  {showAdCols && (
-                    <th className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Position
-                    </th>
-                  )}
-                  <th className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Outcome
-                  </th>
+                  <th className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Keyword</th>
+                  {cols.matchType && <th className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Match Type</th>}
+                  {cols.date      && <th className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date</th>}
+                  {cols.campaign  && <th className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Campaign</th>}
+                  {cols.device    && <th className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Device</th>}
+                  {cols.duration  && <th className="px-4 sm:px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Duration</th>}
+                  {cols.adGroup   && <th className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Ad Group</th>}
+                  {cols.adId      && <th className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Ad ID</th>}
+                  {cols.position  && <th className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Ad Position</th>}
+                  <th className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Outcome</th>
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-100">
@@ -456,40 +504,50 @@ export function SessionsTable({ campaigns, dateRange, refreshTrigger }: Sessions
                         <ChevronRight className="w-3.5 h-3.5 text-gray-400 opacity-0 group-hover:opacity-100 transition-opacity" />
                       </div>
                     </td>
-                    <td className="px-4 sm:px-6 py-3 whitespace-nowrap hidden sm:table-cell">
-                      <span className="inline-flex px-2 py-0.5 text-xs font-medium rounded-full bg-blue-100 text-blue-800">
-                        {s.matchType || '—'}
-                      </span>
-                    </td>
-                    <td className="px-4 sm:px-6 py-3 whitespace-nowrap text-sm text-gray-600 hidden md:table-cell">
-                      {formatDate(s.startedAt)}
-                    </td>
-                    <td className="px-4 sm:px-6 py-3 whitespace-nowrap text-sm text-gray-600 hidden lg:table-cell">
-                      {s.googleCampaignId}
-                    </td>
-                    <td className="px-4 sm:px-6 py-3 whitespace-nowrap hidden md:table-cell">
-                      <span className="inline-flex items-center gap-1.5 text-sm text-gray-600">
-                        <DeviceIcon device={s.device} />
-                        {s.device || 'Desktop'}
-                      </span>
-                    </td>
-                    <td className="px-4 sm:px-6 py-3 whitespace-nowrap text-right hidden lg:table-cell">
-                      <span className="inline-flex items-center gap-1 text-sm text-gray-600">
-                        <Clock className="w-3.5 h-3.5 text-gray-400" />
-                        {formatDuration(s.totalDurationMs)}
-                      </span>
-                    </td>
-                    {showAdCols && (
+                    {cols.matchType && (
+                      <td className="px-4 sm:px-6 py-3 whitespace-nowrap">
+                        <span className="inline-flex px-2 py-0.5 text-xs font-medium rounded-full bg-blue-100 text-blue-800">
+                          {s.matchType || '—'}
+                        </span>
+                      </td>
+                    )}
+                    {cols.date && (
+                      <td className="px-4 sm:px-6 py-3 whitespace-nowrap text-sm text-gray-600">
+                        {formatDate(s.startedAt)}
+                      </td>
+                    )}
+                    {cols.campaign && (
+                      <td className="px-4 sm:px-6 py-3 whitespace-nowrap text-sm text-gray-600">
+                        {s.googleCampaignId}
+                      </td>
+                    )}
+                    {cols.device && (
+                      <td className="px-4 sm:px-6 py-3 whitespace-nowrap">
+                        <span className="inline-flex items-center gap-1.5 text-sm text-gray-600">
+                          <DeviceIcon device={s.device} />
+                          {s.device || 'Desktop'}
+                        </span>
+                      </td>
+                    )}
+                    {cols.duration && (
+                      <td className="px-4 sm:px-6 py-3 whitespace-nowrap text-right">
+                        <span className="inline-flex items-center gap-1 text-sm text-gray-600">
+                          <Clock className="w-3.5 h-3.5 text-gray-400" />
+                          {formatDuration(s.totalDurationMs)}
+                        </span>
+                      </td>
+                    )}
+                    {cols.adGroup && (
                       <td className="px-4 sm:px-6 py-3 whitespace-nowrap">
                         <span className="text-sm text-gray-500 font-mono">{s.adGroupId ?? '—'}</span>
                       </td>
                     )}
-                    {showAdCols && (
+                    {cols.adId && (
                       <td className="px-4 sm:px-6 py-3 whitespace-nowrap">
                         <span className="text-sm text-gray-500 font-mono">{s.adId ?? '—'}</span>
                       </td>
                     )}
-                    {showAdCols && (
+                    {cols.position && (
                       <td className="px-4 sm:px-6 py-3 whitespace-nowrap">
                         <span className="text-sm text-gray-500">{s.adPosition ?? '—'}</span>
                       </td>
