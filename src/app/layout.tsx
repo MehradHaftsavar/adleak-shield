@@ -65,7 +65,12 @@ export default async function RootLayout({
   return (
     <html lang="en">
       <head>
+        {/* Base viewport for tablets/desktop — phones get 0.85 scale via the script below */}
         <meta name="viewport" content="width=device-width, initial-scale=1" />
+        {/* Runs synchronously in <head> before first paint — no flash.
+            Phones (screen.width < 640) get a slightly zoomed-out initial scale
+            so the dashboard content fits without horizontal overflow. */}
+        <script dangerouslySetInnerHTML={{ __html: `(function(){if(window.screen.width<640){var m=document.querySelector('meta[name="viewport"]');if(m)m.setAttribute('content','width=device-width,initial-scale=0.85');}})();` }} />
       </head>
       <body className="bg-gray-50 text-gray-900 antialiased flex flex-col min-h-screen overflow-x-hidden">
         {/* refetchOnWindowFocus (default true) re-validates the JWT whenever the
