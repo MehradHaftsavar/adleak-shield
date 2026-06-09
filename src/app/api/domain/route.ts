@@ -48,11 +48,20 @@ export async function POST(request: NextRequest) {
 
     const { domain } = validation.data;
 
-    // 3. Check if this domain is already claimed by a different tenant
+    // 3. Check if this domain is already claimed by a different ACTIVE tenant.
+    //    We join to Tenants and require deleted_at IS NULL so that stale domain
+    //    rows left behind by soft-deleted accounts (e.g. RLS prevented cleanup
+    //    on a previous delete attempt) don't permanently block re-registration.
     const claimedByOther = await withAdminDb(async (req) => {
       const result = await req
         .input('domainName', mssql.NVarChar, domain)
-        .query(`SELECT tenant_id FROM Domains WHERE domain_name = @domainName`);
+        .query(`
+          SELECT d.tenant_id
+          FROM Domains d
+          INNER JOIN Tenants t ON t.tenant_id = d.tenant_id
+          WHERE d.domain_name = @domainName
+            AND t.deleted_at IS NULL
+        `);
       const row = result.recordset[0];
       return row && row.tenant_id !== session.user.tenantId ? true : false;
     });

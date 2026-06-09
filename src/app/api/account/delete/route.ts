@@ -40,6 +40,19 @@ export async function DELETE() {
       const req = new mssql.Request(transaction);
       req.input('tenantId', mssql.UniqueIdentifier, tenantId);
 
+      // CRITICAL: Set SESSION_CONTEXT so the RLS filter predicates on Domains,
+      // Sessions, Campaigns, ClickLogs, JourneyEvents etc. allow deletion of
+      // this tenant's rows. Without this the connection has SESSION_CONTEXT = NULL
+      // which the RLS predicate resolves to no-match — every DELETE silently
+      // affects 0 rows. The Tenants soft-delete works because Tenants has no RLS,
+      // but all child tables do.
+      await new mssql.Request(transaction)
+        .input('tenantIdCtx', mssql.UniqueIdentifier, tenantId)
+        .query(`
+          DECLARE @tid VARBINARY(128) = CAST(CAST(@tenantIdCtx AS UNIQUEIDENTIFIER) AS VARBINARY(128));
+          EXEC sp_set_session_context N'TenantId', @tid, @read_only = 0;
+        `);
+
       // -----------------------------------------------------------------------
       // Record domains + campaigns in TrialledResources BEFORE deleting them
       // so that re-registration by the same person never gets a new trial.
