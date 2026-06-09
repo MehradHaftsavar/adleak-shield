@@ -314,12 +314,12 @@ export function DashboardContent() {
               Wasted Spend Analysis
             </h2>
 
-            <div className="flex items-center justify-center sm:justify-end gap-3">
+            <div className="flex flex-wrap items-center gap-2">
               <DateRangePicker onRangeChange={handleLeakDateChange} />
 
               <button
                 onClick={handleManualRefresh}
-                className="flex items-center gap-2 px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg transition-colors"
+                className="flex items-center gap-2 px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg transition-colors flex-shrink-0"
                 title="Refresh leak data"
               >
                 <RefreshCw className="w-4 h-4" />

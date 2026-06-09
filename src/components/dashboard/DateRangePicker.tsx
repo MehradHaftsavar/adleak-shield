@@ -75,8 +75,8 @@ export function DateRangePicker({ onRangeChange }: DateRangePickerProps) {
 
   return (
     <div className="relative">
-      <div className="flex items-center gap-2">
-        <Calendar className="w-14 h-14 sm:w-6 sm:h-6 text-gray-500" />
+      <div className="flex items-center gap-2 flex-wrap">
+        <Calendar className="w-5 h-5 text-gray-500 flex-shrink-0" />
         <div className="flex gap-2 flex-wrap">
           <button
             onClick={() => handlePresetChange('7d')}
