@@ -393,7 +393,7 @@ export function LeakTable({ dateRange, refreshTrigger }: LeakTableProps) {
 
       {/* Pagination */}
       {rows.length > 0 && (
-        <div className="px-6 py-3 border-t border-gray-200 flex items-center justify-between gap-4 bg-white">
+        <div className="px-4 py-3 border-t border-gray-200 flex flex-col sm:flex-row items-center justify-between gap-2 bg-white">
           <p className="text-xs text-gray-500">
             {rows.length === 0
               ? 'No results'
