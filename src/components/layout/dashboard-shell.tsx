@@ -242,7 +242,8 @@ export function DashboardShell({
                   {checkoutLoading
                     ? <span className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
                     : null}
-                  {isCancelled ? 'Resubscribe' : 'Subscribe — £12.99/mo'}
+                  <span className="hidden sm:inline">{isCancelled ? 'Resubscribe' : 'Subscribe — £12.99/mo'}</span>
+                  <span className="sm:hidden">{isCancelled ? 'Resubscribe' : 'Subscribe'}</span>
                 </button>
               )}
 
