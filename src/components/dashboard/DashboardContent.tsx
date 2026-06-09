@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { useEffect, useState, useCallback } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { useSession } from 'next-auth/react';
-import { Activity, Settings, Plus, RefreshCw, CheckCircle, CreditCard } from 'lucide-react';
+import { Activity, Plus, RefreshCw, CheckCircle } from 'lucide-react';
 import { StatusIndicator } from '@/components/dashboard/StatusIndicator';
 import { CampaignStatusCard } from '@/components/dashboard/CampaignStatusCard';
 import { UnregisteredTrafficAlert } from '@/components/dashboard/UnregisteredTrafficAlert';
@@ -70,21 +70,6 @@ export function DashboardContent() {
     }
   }, []);
 
-  const [portalLoading, setPortalLoading] = useState(false);
-  const [settingsLoading, setSettingsLoading] = useState(false);
-
-  const handlePortal = useCallback(async () => {
-    setPortalLoading(true);
-    try {
-      const res = await fetch('/api/stripe/portal', { method: 'POST' });
-      const data = await res.json();
-      if (data.url) window.open(data.url, '_blank', 'noopener,noreferrer');
-    } catch (err) {
-      console.error('Portal error:', err);
-    } finally {
-      setPortalLoading(false);
-    }
-  }, []);
 
   useEffect(() => {
     if (searchParams.get('payment') === 'success') {
@@ -212,42 +197,13 @@ export function DashboardContent() {
       )}
 
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 sm:w-12 sm:h-12 bg-blue-100 rounded-full flex items-center justify-center flex-shrink-0">
-            <Activity className="w-5 h-5 sm:w-6 sm:h-6 text-blue-600" />
-          </div>
-          <div>
-            <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">Dashboard</h1>
-            <p className="text-gray-600 text-sm mt-0.5">Monitor your tracking status</p>
-          </div>
+      <div className="flex items-center gap-3">
+        <div className="w-10 h-10 sm:w-12 sm:h-12 bg-blue-100 rounded-full flex items-center justify-center flex-shrink-0">
+          <Activity className="w-5 h-5 sm:w-6 sm:h-6 text-blue-600" />
         </div>
-
-        <div className="flex items-center gap-2 flex-wrap">
-          {status?.subscriptionStatus === 'active' && (
-            <button
-              onClick={handlePortal}
-              disabled={portalLoading}
-              className="flex items-center gap-2 px-3 py-2 text-sm font-medium bg-white border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-60 transition-colors"
-            >
-              {portalLoading
-                ? <span className="w-4 h-4 border-2 border-gray-400 border-t-transparent rounded-full animate-spin" />
-                : <CreditCard className="w-4 h-4" />}
-              <span className="hidden sm:inline">Manage Subscription</span>
-              <span className="sm:hidden">Subscription</span>
-            </button>
-          )}
-          <button
-            onClick={() => { setSettingsLoading(true); router.push('/settings'); }}
-            disabled={settingsLoading}
-            className="flex items-center gap-2 px-3 py-2 text-sm font-medium bg-white border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-60 transition-colors"
-          >
-            {settingsLoading
-              ? <span className="w-4 h-4 border-2 border-gray-400 border-t-transparent rounded-full animate-spin" />
-              : <Settings className="w-4 h-4" />}
-            <span className="hidden sm:inline">Manage Setup</span>
-            <span className="sm:hidden">Setup</span>
-          </button>
+        <div>
+          <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">Dashboard</h1>
+          <p className="text-gray-600 text-sm mt-0.5">Monitor your tracking status</p>
         </div>
       </div>
 

@@ -11,6 +11,9 @@ import {
   AlertCircle,
   Clock,
   ChevronRight,
+  ChevronUp,
+  ChevronDown,
+  ChevronsUpDown,
   Columns,
 } from 'lucide-react';
 
@@ -37,6 +40,27 @@ const DEFAULT_COLS: Record<ColKey, boolean> = {
   adId:      false,
   position:  false,
 };
+
+const MOBILE_COLS: Record<ColKey, boolean> = {
+  matchType: false,
+  date:      false,
+  campaign:  false,
+  device:    false,
+  duration:  false,
+  adGroup:   false,
+  adId:      false,
+  position:  false,
+};
+
+type SortKey = 'keyword' | 'matchType' | 'date' | 'campaign' | 'device' | 'duration' | 'adGroup' | 'adId' | 'position' | 'outcome';
+type SortDir = 'asc' | 'desc';
+
+function SortIcon({ col, sortKey, sortDir }: { col: SortKey; sortKey: SortKey; sortDir: SortDir }) {
+  if (col !== sortKey) return <ChevronsUpDown className="w-3 h-3 text-gray-400 inline ml-1" />;
+  return sortDir === 'asc'
+    ? <ChevronUp className="w-3 h-3 text-blue-600 inline ml-1" />
+    : <ChevronDown className="w-3 h-3 text-blue-600 inline ml-1" />;
+}
 import { JourneyTimeline } from './JourneyTimeline';
 
 interface Session {
@@ -144,12 +168,28 @@ export function SessionsTable({ campaigns, dateRange, refreshTrigger }: Sessions
   // Journey slide-over
   const [selectedSession, setSelectedSession] = useState<Session | null>(null);
 
-  // Column visibility
-  const [cols, setCols] = useState<Record<ColKey, boolean>>(DEFAULT_COLS);
+  // Column visibility — mobile shows only Keyword + Outcome by default
+  const [cols, setCols] = useState<Record<ColKey, boolean>>(() =>
+    typeof window !== 'undefined' && window.innerWidth < 640 ? MOBILE_COLS : DEFAULT_COLS
+  );
   const [colPickerOpen, setColPickerOpen] = useState(false);
   const colPickerRef = useRef<HTMLDivElement>(null);
 
   const toggleCol = (key: ColKey) => setCols(prev => ({ ...prev, [key]: !prev[key] }));
+
+  // Sorting
+  const [sortKey, setSortKey] = useState<SortKey>('date');
+  const [sortDir, setSortDir] = useState<SortDir>('desc');
+
+  const handleSort = (col: SortKey) => {
+    if (sortKey === col) {
+      setSortDir(d => d === 'asc' ? 'desc' : 'asc');
+    } else {
+      setSortKey(col);
+      setSortDir(col === 'date' || col === 'duration' ? 'desc' : 'asc');
+    }
+    setPage(1);
+  };
 
   // Close picker on outside click
   useEffect(() => {
@@ -213,8 +253,28 @@ export function SessionsTable({ campaigns, dateRange, refreshTrigger }: Sessions
     }
   }, [sessions]);
 
-  const totalPages = Math.max(1, Math.ceil(sessions.length / PAGE_SIZE));
-  const pageRows = sessions.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+  const sortedSessions = useMemo(() => {
+    const outcomeScore = (s: Session) => s.hasSuccessEvent ? 2 : s.isBounce ? 0 : 1;
+    return [...sessions].sort((a, b) => {
+      let cmp = 0;
+      switch (sortKey) {
+        case 'keyword':   cmp = a.keyword.localeCompare(b.keyword); break;
+        case 'matchType': cmp = (a.matchType || '').localeCompare(b.matchType || ''); break;
+        case 'date':      cmp = new Date(a.startedAt).getTime() - new Date(b.startedAt).getTime(); break;
+        case 'campaign':  cmp = a.googleCampaignId.localeCompare(b.googleCampaignId); break;
+        case 'device':    cmp = (a.device || '').localeCompare(b.device || ''); break;
+        case 'duration':  cmp = (a.totalDurationMs ?? 0) - (b.totalDurationMs ?? 0); break;
+        case 'adGroup':   cmp = (a.adGroupId || '').localeCompare(b.adGroupId || ''); break;
+        case 'adId':      cmp = (a.adId || '').localeCompare(b.adId || ''); break;
+        case 'position':  cmp = (a.adPosition || '').localeCompare(b.adPosition || ''); break;
+        case 'outcome':   cmp = outcomeScore(a) - outcomeScore(b); break;
+      }
+      return sortDir === 'asc' ? cmp : -cmp;
+    });
+  }, [sessions, sortKey, sortDir]);
+
+  const totalPages = Math.max(1, Math.ceil(sortedSessions.length / PAGE_SIZE));
+  const pageRows = sortedSessions.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
 
   return (
     <>
@@ -410,9 +470,9 @@ export function SessionsTable({ campaigns, dateRange, refreshTrigger }: Sessions
             )}
           </div>
 
-          {!isLoading && sessions.length > 0 && (
+          {!isLoading && sortedSessions.length > 0 && (
             <p className="text-xs text-gray-400 mt-3">
-              Showing {(page - 1) * PAGE_SIZE + 1}–{Math.min(page * PAGE_SIZE, sessions.length)} of {sessions.length} session{sessions.length !== 1 ? 's' : ''}
+              Showing {(page - 1) * PAGE_SIZE + 1}–{Math.min(page * PAGE_SIZE, sortedSessions.length)} of {sortedSessions.length} session{sortedSessions.length !== 1 ? 's' : ''}
               {sessions.length === 100 ? ' (max 100 loaded)' : ''}
             </p>
           )}
@@ -479,16 +539,22 @@ export function SessionsTable({ campaigns, dateRange, refreshTrigger }: Sessions
             <table className="w-full">
               <thead className="bg-gray-50 border-b border-gray-200">
                 <tr>
-                  <th className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Keyword</th>
-                  {cols.matchType && <th className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Match Type</th>}
-                  {cols.date      && <th className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date</th>}
-                  {cols.campaign  && <th className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Campaign</th>}
-                  {cols.device    && <th className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Device</th>}
-                  {cols.duration  && <th className="px-4 sm:px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Duration</th>}
-                  {cols.adGroup   && <th className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Ad Group</th>}
-                  {cols.adId      && <th className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Ad ID</th>}
-                  {cols.position  && <th className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Ad Position</th>}
-                  <th className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Outcome</th>
+                  {(() => {
+                    const thClass = "px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer select-none hover:bg-gray-100 transition-colors";
+                    const thR = thClass.replace('text-left', 'text-right');
+                    return (<>
+                      <th className={thClass} onClick={() => handleSort('keyword')}>Keyword <SortIcon col="keyword" sortKey={sortKey} sortDir={sortDir} /></th>
+                      {cols.matchType && <th className={thClass} onClick={() => handleSort('matchType')}>Match Type <SortIcon col="matchType" sortKey={sortKey} sortDir={sortDir} /></th>}
+                      {cols.date      && <th className={thClass} onClick={() => handleSort('date')}>Date <SortIcon col="date" sortKey={sortKey} sortDir={sortDir} /></th>}
+                      {cols.campaign  && <th className={thClass} onClick={() => handleSort('campaign')}>Campaign <SortIcon col="campaign" sortKey={sortKey} sortDir={sortDir} /></th>}
+                      {cols.device    && <th className={thClass} onClick={() => handleSort('device')}>Device <SortIcon col="device" sortKey={sortKey} sortDir={sortDir} /></th>}
+                      {cols.duration  && <th className={thR}     onClick={() => handleSort('duration')}>Duration <SortIcon col="duration" sortKey={sortKey} sortDir={sortDir} /></th>}
+                      {cols.adGroup   && <th className={thClass} onClick={() => handleSort('adGroup')}>Ad Group <SortIcon col="adGroup" sortKey={sortKey} sortDir={sortDir} /></th>}
+                      {cols.adId      && <th className={thClass} onClick={() => handleSort('adId')}>Ad ID <SortIcon col="adId" sortKey={sortKey} sortDir={sortDir} /></th>}
+                      {cols.position  && <th className={thClass} onClick={() => handleSort('position')}>Ad Position <SortIcon col="position" sortKey={sortKey} sortDir={sortDir} /></th>}
+                      <th className={thClass} onClick={() => handleSort('outcome')}>Outcome <SortIcon col="outcome" sortKey={sortKey} sortDir={sortDir} /></th>
+                    </>);
+                  })()}
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-100">
@@ -566,7 +632,7 @@ export function SessionsTable({ campaigns, dateRange, refreshTrigger }: Sessions
         {!isLoading && sessions.length > 0 && (
           <div className="px-4 py-3 border-t border-gray-200 flex flex-col sm:flex-row items-center justify-between gap-2 bg-white">
             <p className="text-xs text-gray-500">
-              Showing {(page - 1) * PAGE_SIZE + 1}–{Math.min(page * PAGE_SIZE, sessions.length)} of {sessions.length} session{sessions.length !== 1 ? 's' : ''}
+              Showing {(page - 1) * PAGE_SIZE + 1}–{Math.min(page * PAGE_SIZE, sortedSessions.length)} of {sortedSessions.length} session{sortedSessions.length !== 1 ? 's' : ''}
             </p>
             <div className="flex items-center gap-2">
               <button
