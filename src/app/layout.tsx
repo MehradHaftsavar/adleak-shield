@@ -64,6 +64,9 @@ export default async function RootLayout({
 
   return (
     <html lang="en">
+      <head>
+        <meta name="viewport" content="width=device-width, initial-scale=1" />
+      </head>
       <body className="bg-gray-50 text-gray-900 antialiased flex flex-col min-h-screen">
         {/* refetchOnWindowFocus (default true) re-validates the JWT whenever the
             user returns to the tab — enough to catch expired sessions without
