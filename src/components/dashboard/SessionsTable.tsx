@@ -92,6 +92,16 @@ interface SessionsTableProps {
   refreshTrigger: number;
 }
 
+function formatAdPosition(pos: string | null): string {
+  if (!pos) return '—';
+  if (pos === 'none') return 'Display Network';
+  const m = pos.match(/^(\d+)(t|o)(\d+)$/);
+  if (!m) return pos;
+  const [, page, placement, rank] = m;
+  const loc = placement === 't' ? 'Top' : 'Bottom';
+  return page === '1' ? `${loc} #${rank}` : `Pg ${page} ${loc} #${rank}`;
+}
+
 function formatDuration(ms: number | null): string {
   if (!ms) return '< 1s';
   if (ms < 1000) return `${ms}ms`;
@@ -461,9 +471,7 @@ export function SessionsTable({ campaigns, dateRange, refreshTrigger }: Sessions
                     <option disabled value="">No data yet</option>
                   )}
                   {adPositionOptions.map(v => (
-                    <option key={v} value={v}>
-                      {v}{v.includes('t') ? ' — top of page' : v === 'none' ? ' — display network' : ' — other'}
-                    </option>
+                    <option key={v} value={v}>{formatAdPosition(v)}</option>
                   ))}
                 </select>
               </div>
@@ -615,7 +623,7 @@ export function SessionsTable({ campaigns, dateRange, refreshTrigger }: Sessions
                     )}
                     {cols.position && (
                       <td className="px-4 sm:px-6 py-3 whitespace-nowrap">
-                        <span className="text-sm text-gray-500">{s.adPosition ?? '—'}</span>
+                        <span className="text-sm text-gray-500">{formatAdPosition(s.adPosition)}</span>
                       </td>
                     )}
                     <td className="px-4 sm:px-6 py-3 whitespace-nowrap">
