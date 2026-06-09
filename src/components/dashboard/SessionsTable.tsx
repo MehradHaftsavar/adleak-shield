@@ -119,6 +119,9 @@ export function SessionsTable({ campaigns, dateRange, refreshTrigger }: Sessions
   // Journey slide-over
   const [selectedSession, setSelectedSession] = useState<Session | null>(null);
 
+  // Optional column visibility
+  const [showAdCols, setShowAdCols] = useState(false);
+
   // Pagination
   const PAGE_SIZE = 10;
   const [page, setPage] = useState(1);
@@ -178,14 +181,27 @@ export function SessionsTable({ campaigns, dateRange, refreshTrigger }: Sessions
       <div className="bg-white rounded-lg border border-gray-200">
         {/* Header */}
         <div className="p-6 border-b border-gray-200">
-          <div className="flex items-center gap-3 mb-5">
-            <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center flex-shrink-0">
-              <Users className="w-5 h-5 text-blue-600" />
+          <div className="flex items-center justify-between gap-3 mb-5">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center flex-shrink-0">
+                <Users className="w-5 h-5 text-blue-600" />
+              </div>
+              <div>
+                <h2 className="text-xl font-bold text-gray-900">All Sessions</h2>
+                <p className="text-sm text-gray-600">Every visit from your Google Ads campaigns</p>
+              </div>
             </div>
-            <div>
-              <h2 className="text-xl font-bold text-gray-900">All Sessions</h2>
-              <p className="text-sm text-gray-600">Every visit from your Google Ads campaigns</p>
-            </div>
+            <button
+              type="button"
+              onClick={() => setShowAdCols(v => !v)}
+              className={`flex-shrink-0 flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg border transition-colors ${
+                showAdCols
+                  ? 'bg-blue-600 text-white border-blue-600'
+                  : 'bg-white text-gray-600 border-gray-300 hover:bg-gray-50'
+              }`}
+            >
+              {showAdCols ? '− Hide' : '+ Show'} Ad&nbsp;Columns
+            </button>
           </div>
 
           {/* Filters */}
@@ -392,30 +408,36 @@ export function SessionsTable({ campaigns, dateRange, refreshTrigger }: Sessions
                   <th className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Keyword
                   </th>
-                  <th className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider hidden sm:table-cell">
                     Match Type
                   </th>
-                  <th className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider hidden md:table-cell">
                     Date
                   </th>
-                  <th className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider hidden lg:table-cell">
                     Campaign
                   </th>
                   <th className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider hidden md:table-cell">
                     Device
                   </th>
-                  <th className="px-4 sm:px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider hidden md:table-cell">
+                  <th className="px-4 sm:px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider hidden lg:table-cell">
                     Duration
                   </th>
-                  <th className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider hidden xl:table-cell">
-                    Ad Group
-                  </th>
-                  <th className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider hidden xl:table-cell">
-                    Ad ID
-                  </th>
-                  <th className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider hidden xl:table-cell">
-                    Position
-                  </th>
+                  {showAdCols && (
+                    <th className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Ad Group
+                    </th>
+                  )}
+                  {showAdCols && (
+                    <th className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Ad ID
+                    </th>
+                  )}
+                  {showAdCols && (
+                    <th className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Position
+                    </th>
+                  )}
                   <th className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Outcome
                   </th>
@@ -434,15 +456,15 @@ export function SessionsTable({ campaigns, dateRange, refreshTrigger }: Sessions
                         <ChevronRight className="w-3.5 h-3.5 text-gray-400 opacity-0 group-hover:opacity-100 transition-opacity" />
                       </div>
                     </td>
-                    <td className="px-4 sm:px-6 py-3 whitespace-nowrap">
+                    <td className="px-4 sm:px-6 py-3 whitespace-nowrap hidden sm:table-cell">
                       <span className="inline-flex px-2 py-0.5 text-xs font-medium rounded-full bg-blue-100 text-blue-800">
                         {s.matchType || '—'}
                       </span>
                     </td>
-                    <td className="px-4 sm:px-6 py-3 whitespace-nowrap text-sm text-gray-600">
+                    <td className="px-4 sm:px-6 py-3 whitespace-nowrap text-sm text-gray-600 hidden md:table-cell">
                       {formatDate(s.startedAt)}
                     </td>
-                    <td className="px-4 sm:px-6 py-3 whitespace-nowrap text-sm text-gray-600">
+                    <td className="px-4 sm:px-6 py-3 whitespace-nowrap text-sm text-gray-600 hidden lg:table-cell">
                       {s.googleCampaignId}
                     </td>
                     <td className="px-4 sm:px-6 py-3 whitespace-nowrap hidden md:table-cell">
@@ -451,21 +473,27 @@ export function SessionsTable({ campaigns, dateRange, refreshTrigger }: Sessions
                         {s.device || 'Desktop'}
                       </span>
                     </td>
-                    <td className="px-4 sm:px-6 py-3 whitespace-nowrap text-right hidden md:table-cell">
+                    <td className="px-4 sm:px-6 py-3 whitespace-nowrap text-right hidden lg:table-cell">
                       <span className="inline-flex items-center gap-1 text-sm text-gray-600">
                         <Clock className="w-3.5 h-3.5 text-gray-400" />
                         {formatDuration(s.totalDurationMs)}
                       </span>
                     </td>
-                    <td className="px-4 sm:px-6 py-3 whitespace-nowrap hidden xl:table-cell">
-                      <span className="text-sm text-gray-500 font-mono">{s.adGroupId ?? '—'}</span>
-                    </td>
-                    <td className="px-4 sm:px-6 py-3 whitespace-nowrap hidden xl:table-cell">
-                      <span className="text-sm text-gray-500 font-mono">{s.adId ?? '—'}</span>
-                    </td>
-                    <td className="px-4 sm:px-6 py-3 whitespace-nowrap hidden xl:table-cell">
-                      <span className="text-sm text-gray-500">{s.adPosition ?? '—'}</span>
-                    </td>
+                    {showAdCols && (
+                      <td className="px-4 sm:px-6 py-3 whitespace-nowrap">
+                        <span className="text-sm text-gray-500 font-mono">{s.adGroupId ?? '—'}</span>
+                      </td>
+                    )}
+                    {showAdCols && (
+                      <td className="px-4 sm:px-6 py-3 whitespace-nowrap">
+                        <span className="text-sm text-gray-500 font-mono">{s.adId ?? '—'}</span>
+                      </td>
+                    )}
+                    {showAdCols && (
+                      <td className="px-4 sm:px-6 py-3 whitespace-nowrap">
+                        <span className="text-sm text-gray-500">{s.adPosition ?? '—'}</span>
+                      </td>
+                    )}
                     <td className="px-4 sm:px-6 py-3 whitespace-nowrap">
                       <OutcomeBadge isBounce={s.isBounce} hasSuccessEvent={s.hasSuccessEvent} />
                     </td>

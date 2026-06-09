@@ -11,10 +11,15 @@
 // components throughout the app via the useSession() hook.
 // =============================================================================
 
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { SessionProvider } from "next-auth/react";
 import { auth } from "@/lib/auth";
 import "./globals.css";
+
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+};
 
 export const metadata: Metadata = {
   title: "AdLeak Shield — Google Ads Clicks But No Calls or Sales? Find Your Wasted Keywords",
