@@ -211,10 +211,10 @@ export function DashboardShell({
       {/* Navigation */}
       <nav className="bg-white border-b border-gray-200 relative z-40">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center h-16">
+          <div className="flex items-center h-16">
 
-            {/* ── Left: logo + desktop nav links ── */}
-            <div className="flex items-center gap-6">
+            {/* ── Left zone (flex-1): logo + desktop nav links ── */}
+            <div className="flex-1 flex items-center gap-6">
               <span className="text-base font-bold text-gray-900 tracking-tight whitespace-nowrap">
                 AdLeak Shield
               </span>
@@ -229,39 +229,51 @@ export function DashboardShell({
               </div>
             </div>
 
-            {/* ── Right: subscribe + desktop extras + hamburger ── */}
-            <div className="flex items-center gap-3">
-
-              {/* Subscribe CTA — shown when not active */}
+            {/* ── Centre zone: subscribe/manage button ──
+                Mobile: centred between logo and hamburger.
+                Desktop: hidden here — button lives in the right zone instead. ── */}
+            <div className="flex md:hidden items-center">
               {!isActive && (
                 <button
                   onClick={handleSubscribe}
                   disabled={checkoutLoading}
-                  className="flex items-center gap-1.5 px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-60 text-white text-xs sm:text-sm font-semibold rounded-lg transition-colors whitespace-nowrap"
+                  className="flex items-center gap-1.5 px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-60 text-white text-xs font-semibold rounded-lg transition-colors whitespace-nowrap"
                 >
                   {checkoutLoading
                     ? <span className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
                     : null}
-                  <span className="hidden sm:inline">{isCancelled ? 'Resubscribe' : 'Subscribe — £12.99/mo'}</span>
-                  <span className="sm:hidden">{isCancelled ? 'Resubscribe' : 'Subscribe'}</span>
+                  {isCancelled ? 'Resubscribe' : 'Subscribe — £12.99/mo'}
                 </button>
               )}
+              {isActive && <ManageSubscriptionButton />}
+            </div>
 
-              {/* Manage Subscription — shown when active */}
-              {isActive && (
-                <ManageSubscriptionButton />
-              )}
+            {/* ── Right zone (flex-1): desktop extras + hamburger ── */}
+            <div className="flex-1 flex items-center justify-end gap-3">
 
-              {/* Desktop-only: email + sign out */}
-              <span className="text-xs text-gray-400 hidden md:block max-w-[160px] truncate">
-                {email}
-              </span>
-              <button
-                onClick={() => signOut({ callbackUrl: "/auth/login" })}
-                className="hidden md:block text-sm text-gray-500 hover:text-gray-900 transition-colors whitespace-nowrap"
-              >
-                Sign out
-              </button>
+              {/* Desktop-only: subscribe/manage + email + sign out */}
+              <div className="hidden md:flex items-center gap-3">
+                {!isActive && (
+                  <button
+                    onClick={handleSubscribe}
+                    disabled={checkoutLoading}
+                    className="flex items-center gap-1.5 px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-60 text-white text-sm font-semibold rounded-lg transition-colors whitespace-nowrap"
+                  >
+                    {checkoutLoading
+                      ? <span className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                      : null}
+                    {isCancelled ? 'Resubscribe' : 'Subscribe — £12.99/mo'}
+                  </button>
+                )}
+                {isActive && <ManageSubscriptionButton />}
+                <span className="text-xs text-gray-400 max-w-[160px] truncate">{email}</span>
+                <button
+                  onClick={() => signOut({ callbackUrl: "/auth/login" })}
+                  className="text-sm text-gray-500 hover:text-gray-900 transition-colors whitespace-nowrap"
+                >
+                  Sign out
+                </button>
+              </div>
 
               {/* Hamburger — mobile only */}
               <button
@@ -270,12 +282,10 @@ export function DashboardShell({
                 aria-label="Open menu"
               >
                 {menuOpen ? (
-                  /* X icon */
                   <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
                   </svg>
                 ) : (
-                  /* Hamburger icon */
                   <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" d="M4 6h16M4 12h16M4 18h16" />
                   </svg>
