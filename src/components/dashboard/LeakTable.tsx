@@ -111,7 +111,7 @@ export function LeakTable({ dateRange, refreshTrigger }: LeakTableProps) {
   const [sortDir, setSortDir] = useState<SortDir>('desc');
 
   // Pagination
-  const PAGE_SIZE = 10;
+  const PAGE_SIZE = 5;
   const [page, setPage] = useState(1);
 
   useEffect(() => { loadLeaks(); }, [dateRange, refreshTrigger]);

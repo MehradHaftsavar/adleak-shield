@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import {
   Users,
   Search,
@@ -198,7 +198,6 @@ export function SessionsTable({ campaigns, dateRange, refreshTrigger }: Sessions
       setSortKey(col);
       setSortDir(col === 'date' || col === 'duration' ? 'desc' : 'asc');
     }
-    setPage(1);
   };
 
   // Close picker on outside click
@@ -212,16 +211,30 @@ export function SessionsTable({ campaigns, dateRange, refreshTrigger }: Sessions
     return () => document.removeEventListener('mousedown', handleClick);
   }, [colPickerOpen]);
 
-  // Pagination
+  // Pagination — fetch 50 sessions (5 pages worth) per request, paginate
+  // 10-at-a-time client-side within that batch, fetching the next/prev
+  // batch from the server when crossing a 50-row boundary.
   const PAGE_SIZE = 10;
-  const [page, setPage] = useState(1);
+  const BATCH_SIZE = 50;
+  const PAGES_PER_BATCH = BATCH_SIZE / PAGE_SIZE;
+
+  const [batch, setBatch]         = useState(1);
+  const [subPage, setSubPage]     = useState(1);
+  const [totalCount, setTotalCount] = useState(0);
 
   const loadSessions = useCallback(async () => {
     setIsLoading(true);
     setError('');
 
     try {
-      const params = new URLSearchParams({ start: dateRange.start, end: dateRange.end });
+      const params = new URLSearchParams({
+        start: dateRange.start,
+        end: dateRange.end,
+        page: String(batch),
+        pageSize: String(BATCH_SIZE),
+        sortKey,
+        sortDir,
+      });
       if (keyword)    params.set('keyword',    keyword);
       if (campaignId) params.set('campaignId', campaignId);
       if (matchType)  params.set('matchType',  matchType);
@@ -235,13 +248,19 @@ export function SessionsTable({ campaigns, dateRange, refreshTrigger }: Sessions
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Failed to load sessions');
       setSessions(data.sessions || []);
-      setPage(1);
+      setTotalCount(data.total ?? 0);
     } catch (err: any) {
       setError(err.message || 'Network error');
     } finally {
       setIsLoading(false);
     }
-  }, [keyword, campaignId, matchType, device, outcome, adGroupId, adId, adPosition, dateRange, refreshTrigger]);
+  }, [batch, keyword, campaignId, matchType, device, outcome, adGroupId, adId, adPosition, dateRange, sortKey, sortDir, refreshTrigger]);
+
+  // Reset to the first page/batch whenever filters, sort, or date range change
+  useEffect(() => {
+    setBatch(1);
+    setSubPage(1);
+  }, [keyword, campaignId, matchType, device, outcome, adGroupId, adId, adPosition, dateRange, sortKey, sortDir]);
 
   useEffect(() => {
     const hasText = keyword || adGroupId || adId || adPosition;
@@ -263,28 +282,28 @@ export function SessionsTable({ campaigns, dateRange, refreshTrigger }: Sessions
     }
   }, [sessions]);
 
-  const sortedSessions = useMemo(() => {
-    const outcomeScore = (s: Session) => s.hasSuccessEvent ? 2 : s.isBounce ? 0 : 1;
-    return [...sessions].sort((a, b) => {
-      let cmp = 0;
-      switch (sortKey) {
-        case 'keyword':   cmp = a.keyword.localeCompare(b.keyword); break;
-        case 'matchType': cmp = (a.matchType || '').localeCompare(b.matchType || ''); break;
-        case 'date':      cmp = new Date(a.startedAt).getTime() - new Date(b.startedAt).getTime(); break;
-        case 'campaign':  cmp = a.googleCampaignId.localeCompare(b.googleCampaignId); break;
-        case 'device':    cmp = (a.device || '').localeCompare(b.device || ''); break;
-        case 'duration':  cmp = (a.totalDurationMs ?? 0) - (b.totalDurationMs ?? 0); break;
-        case 'adGroup':   cmp = (a.adGroupId || '').localeCompare(b.adGroupId || ''); break;
-        case 'adId':      cmp = (a.adId || '').localeCompare(b.adId || ''); break;
-        case 'position':  cmp = (a.adPosition || '').localeCompare(b.adPosition || ''); break;
-        case 'outcome':   cmp = outcomeScore(a) - outcomeScore(b); break;
-      }
-      return sortDir === 'asc' ? cmp : -cmp;
-    });
-  }, [sessions, sortKey, sortDir]);
+  const totalPages   = Math.max(1, Math.ceil(totalCount / PAGE_SIZE));
+  const overallPage  = (batch - 1) * PAGES_PER_BATCH + subPage;
+  const pageRows     = sessions.slice((subPage - 1) * PAGE_SIZE, subPage * PAGE_SIZE);
 
-  const totalPages = Math.max(1, Math.ceil(sortedSessions.length / PAGE_SIZE));
-  const pageRows = sortedSessions.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+  const goToPrevPage = () => {
+    if (subPage > 1) {
+      setSubPage(p => p - 1);
+    } else if (batch > 1) {
+      setBatch(b => b - 1);
+      setSubPage(PAGES_PER_BATCH);
+    }
+  };
+
+  const goToNextPage = () => {
+    if (overallPage >= totalPages) return;
+    if (subPage < PAGES_PER_BATCH) {
+      setSubPage(p => p + 1);
+    } else {
+      setBatch(b => b + 1);
+      setSubPage(1);
+    }
+  };
 
   return (
     <>
@@ -478,10 +497,9 @@ export function SessionsTable({ campaigns, dateRange, refreshTrigger }: Sessions
             )}
           </div>
 
-          {!isLoading && sortedSessions.length > 0 && (
+          {!isLoading && totalCount > 0 && (
             <p className="text-xs text-gray-400 mt-3">
-              Showing {(page - 1) * PAGE_SIZE + 1}–{Math.min(page * PAGE_SIZE, sortedSessions.length)} of {sortedSessions.length} session{sortedSessions.length !== 1 ? 's' : ''}
-              {sessions.length === 100 ? ' (max 100 loaded)' : ''}
+              Showing {(overallPage - 1) * PAGE_SIZE + 1}–{Math.min(overallPage * PAGE_SIZE, totalCount)} of {totalCount} session{totalCount !== 1 ? 's' : ''}
             </p>
           )}
         </div>
@@ -637,25 +655,25 @@ export function SessionsTable({ campaigns, dateRange, refreshTrigger }: Sessions
         )}
 
         {/* Pagination */}
-        {!isLoading && sessions.length > 0 && (
+        {!isLoading && totalCount > 0 && (
           <div className="px-4 py-3 border-t border-gray-200 flex flex-col sm:flex-row items-center justify-between gap-2 bg-white">
             <p className="text-xs text-gray-500">
-              Showing {(page - 1) * PAGE_SIZE + 1}–{Math.min(page * PAGE_SIZE, sortedSessions.length)} of {sortedSessions.length} session{sortedSessions.length !== 1 ? 's' : ''}
+              Showing {(overallPage - 1) * PAGE_SIZE + 1}–{Math.min(overallPage * PAGE_SIZE, totalCount)} of {totalCount} session{totalCount !== 1 ? 's' : ''}
             </p>
             <div className="flex items-center gap-2">
               <button
-                onClick={() => setPage(p => Math.max(1, p - 1))}
-                disabled={page === 1}
+                onClick={goToPrevPage}
+                disabled={overallPage === 1}
                 className="px-3 py-1.5 text-xs font-medium border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
               >
                 ← Prev
               </button>
               <span className="text-xs text-gray-600 font-medium px-1">
-                Page {page} of {totalPages}
+                Page {overallPage} of {totalPages}
               </span>
               <button
-                onClick={() => setPage(p => Math.min(totalPages, p + 1))}
-                disabled={page === totalPages}
+                onClick={goToNextPage}
+                disabled={overallPage === totalPages}
                 className="px-3 py-1.5 text-xs font-medium border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
               >
                 Next →

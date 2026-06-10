@@ -38,6 +38,30 @@ export async function GET(request: NextRequest) {
     const start = startDate || new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
     const end   = endDate   || new Date().toISOString();
 
+    // Pagination
+    const pageParam     = parseInt(searchParams.get('page') || '1', 10);
+    const pageSizeParam = parseInt(searchParams.get('pageSize') || '50', 10);
+    const page     = Number.isFinite(pageParam) && pageParam > 0 ? pageParam : 1;
+    const pageSize = Number.isFinite(pageSizeParam) && pageSizeParam > 0 && pageSizeParam <= 100 ? pageSizeParam : 50;
+    const offset   = (page - 1) * pageSize;
+
+    // Sorting — whitelist columns to prevent SQL injection via sortKey/sortDir
+    const SORT_COLUMNS: Record<string, string> = {
+      keyword:   's.keyword',
+      matchType: 's.match_type',
+      date:      's.started_at',
+      campaign:  'c.google_campaign_id',
+      device:    's.device',
+      duration:  's.total_duration_ms',
+      adGroup:   's.ad_group_id',
+      adId:      's.ad_id',
+      position:  's.ad_position',
+      outcome:   `CASE WHEN EXISTS (SELECT 1 FROM JourneyEvents je WHERE je.session_id = s.session_id AND je.event_type = 'success_event') THEN 2 WHEN s.is_bounce = 1 THEN 0 ELSE 1 END`,
+    };
+    const sortKeyParam = searchParams.get('sortKey') || 'date';
+    const sortColumn   = SORT_COLUMNS[sortKeyParam] || SORT_COLUMNS.date;
+    const sortDir      = (searchParams.get('sortDir') || 'desc').toLowerCase() === 'asc' ? 'ASC' : 'DESC';
+
     const result = await withTenantDb(tenantId, async (req) => {
       req.input('startDate', mssql.DateTime, new Date(start));
       req.input('endDate',   mssql.DateTime, new Date(end));
@@ -101,8 +125,19 @@ export async function GET(request: NextRequest) {
 
       const where = conditions.join(' AND ');
 
+      const countResult = await req.query(`
+        SELECT COUNT(*) AS total
+        FROM Sessions s
+        INNER JOIN Campaigns c ON s.campaign_id = c.campaign_id
+        WHERE ${where}
+      `);
+      const total = countResult.recordset[0]?.total ?? 0;
+
+      req.input('offsetVal',   mssql.Int, offset);
+      req.input('pageSizeVal', mssql.Int, pageSize);
+
       const queryResult = await req.query(`
-        SELECT TOP 100
+        SELECT
           s.session_id,
           s.keyword,
           s.match_type,
@@ -126,28 +161,32 @@ export async function GET(request: NextRequest) {
         FROM Sessions s
         INNER JOIN Campaigns c ON s.campaign_id = c.campaign_id
         WHERE ${where}
-        ORDER BY s.started_at DESC
+        ORDER BY ${sortColumn} ${sortDir}, s.session_id ${sortDir}
+        OFFSET @offsetVal ROWS FETCH NEXT @pageSizeVal ROWS ONLY
       `);
 
-      return queryResult.recordset.map(row => ({
-        sessionId:         row.session_id,
-        keyword:           row.keyword,
-        matchType:         row.match_type,
-        device:            row.device,
-        startedAt:         row.started_at,
-        totalDurationMs:   row.total_duration_ms,
-        isBounce:          row.is_bounce === true || row.is_bounce === 1,
-        adGroupId:         row.ad_group_id  ?? null,
-        adId:              row.ad_id        ?? null,
-        adPosition:        row.ad_position  ?? null,
-        googleCampaignId:  row.google_campaign_id,
-        campaignId:        row.campaign_uuid,
-        eventCount:        row.event_count,
-        hasSuccessEvent:   row.success_count > 0,
-      }));
+      return {
+        total,
+        sessions: queryResult.recordset.map(row => ({
+          sessionId:         row.session_id,
+          keyword:           row.keyword,
+          matchType:         row.match_type,
+          device:            row.device,
+          startedAt:         row.started_at,
+          totalDurationMs:   row.total_duration_ms,
+          isBounce:          row.is_bounce === true || row.is_bounce === 1,
+          adGroupId:         row.ad_group_id  ?? null,
+          adId:              row.ad_id        ?? null,
+          adPosition:        row.ad_position  ?? null,
+          googleCampaignId:  row.google_campaign_id,
+          campaignId:        row.campaign_uuid,
+          eventCount:        row.event_count,
+          hasSuccessEvent:   row.success_count > 0,
+        })),
+      };
     });
 
-    return NextResponse.json({ sessions: result });
+    return NextResponse.json({ sessions: result.sessions, total: result.total });
   } catch (error) {
     console.error('Sessions error:', error);
     return NextResponse.json({ error: 'Failed to fetch sessions' }, { status: 500 });
