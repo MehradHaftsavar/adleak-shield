@@ -444,6 +444,24 @@ export async function queueWorkerHandler(
         case "click":
         case "success_event":
         case "heartbeat":
+          // The standalone "pageview" event races against session_start's own
+          // pageview insert (both fire ~simultaneously on page load). If this
+          // message is processed before session_start commits, ensureSession
+          // throws above and Azure retries ~30s later — by which time
+          // session_start's pageview row already exists, so this would create
+          // a duplicate "Visited <page>" entry with a misleading later
+          // timestamp. Skip the insert if that row is already there.
+          if (env.eventType === "pageview") {
+            const existingPageview = await new mssql.Request(tx)
+              .input("sessionId", mssql.UniqueIdentifier, sessionId)
+              .input("pagePath", mssql.NVarChar, env.payload.pagePath ?? null)
+              .query(
+                `SELECT TOP 1 1 FROM JourneyEvents
+                 WHERE session_id = @sessionId AND event_type = 'pageview'
+                   AND page_path = @pagePath`
+              );
+            if (existingPageview.recordset.length > 0) break;
+          }
           await insertJourneyEvent(
             tx,
             msg,
