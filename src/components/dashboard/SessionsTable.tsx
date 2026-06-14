@@ -35,7 +35,7 @@ const DEFAULT_COLS: Record<ColKey, boolean> = {
   matchType: true,
   date:      true,
   campaign:  true,
-  device:    true,
+  device:    false,
   location:  true,
   duration:  true,
   adGroup:   false,
@@ -220,6 +220,10 @@ export function SessionsTable({ campaigns, dateRange, refreshTrigger }: Sessions
   const colPickerRef = useRef<HTMLDivElement>(null);
 
   const toggleCol = (key: ColKey) => setCols(prev => ({ ...prev, [key]: !prev[key] }));
+
+  // Auto-show the Device column when a Device filter is active, even if the
+  // user hasn't enabled it in the column picker — they're looking for it.
+  const effectiveCols: Record<ColKey, boolean> = { ...cols, device: cols.device || !!device };
 
   // Sorting
   const [sortKey, setSortKey] = useState<SortKey>('date');
@@ -627,7 +631,7 @@ export function SessionsTable({ campaigns, dateRange, refreshTrigger }: Sessions
                       {cols.matchType && <th className={thClass} onClick={() => handleSort('matchType')}>Match Type <SortIcon col="matchType" sortKey={sortKey} sortDir={sortDir} /></th>}
                       {cols.date      && <th className={thClass} onClick={() => handleSort('date')}>Date <SortIcon col="date" sortKey={sortKey} sortDir={sortDir} /></th>}
                       {cols.campaign  && <th className={thClass} onClick={() => handleSort('campaign')}>Campaign <SortIcon col="campaign" sortKey={sortKey} sortDir={sortDir} /></th>}
-                      {cols.device    && <th className={thClass} onClick={() => handleSort('device')}>Device <SortIcon col="device" sortKey={sortKey} sortDir={sortDir} /></th>}
+                      {effectiveCols.device && <th className={thClass} onClick={() => handleSort('device')}>Device <SortIcon col="device" sortKey={sortKey} sortDir={sortDir} /></th>}
                       {cols.location  && <th className={thClass} onClick={() => handleSort('location')}>Location <SortIcon col="location" sortKey={sortKey} sortDir={sortDir} /></th>}
                       {cols.duration  && <th className={thR}     onClick={() => handleSort('duration')}>Duration <SortIcon col="duration" sortKey={sortKey} sortDir={sortDir} /></th>}
                       {cols.adGroup   && <th className={thClass} onClick={() => handleSort('adGroup')}>Ad Group <SortIcon col="adGroup" sortKey={sortKey} sortDir={sortDir} /></th>}
@@ -668,7 +672,7 @@ export function SessionsTable({ campaigns, dateRange, refreshTrigger }: Sessions
                         {s.googleCampaignId}
                       </td>
                     )}
-                    {cols.device && (
+                    {effectiveCols.device && (
                       <td className="px-4 sm:px-6 py-3 whitespace-nowrap">
                         <span className="inline-flex items-center gap-1.5 text-sm text-gray-600">
                           <DeviceIcon device={s.device} />

@@ -380,13 +380,9 @@ export async function queueWorkerHandler(
       // Could be a race condition — session_start hasn't been processed yet.
       // Throw so Azure retries this message after the visibility timeout (~30s),
       // by which time session_start will have been committed to the DB.
-      // Exception: page_end is low-value and fine to drop if the session is gone.
-      if (env.eventType === "page_end") {
-        context.log("[Worker] Orphan page_end — no session found, dropping", {
-          eventType: env.eventType,
-        });
-        return;
-      }
+      // page_end retries too — for short sessions it's the ONLY source of
+      // dwell time, and dropping it silently leaves total_duration_ms NULL
+      // (shown as "< 1s" even for real 2-3s visits).
       throw new Error(
         `[Worker] Orphan ${env.eventType} — session not found, will retry`
       );
