@@ -79,6 +79,8 @@ export const QueueMessageSchema = z.object({
   ipMasked: z.string().max(45),     // e.g. "82.12.34.xxx" or IPv6 equivalent
   receivedAt: z.string().datetime(), // ISO 8601 timestamp from server
   userAgent: z.string().max(500),
+  city: z.string().max(100).nullable(),    // from geoip-lite, looked up before masking
+  country: z.string().max(2).nullable(),   // ISO 3166-1 alpha-2
 });
 
 export type QueueMessage = z.infer<typeof QueueMessageSchema>;

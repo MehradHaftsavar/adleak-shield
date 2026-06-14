@@ -85,6 +85,8 @@ export const sessions = pgTable('Sessions', {
   keyword: varchar('keyword', { length: 500 }),
   campaignId: varchar('campaign_id', { length: 50 }),
   device: varchar('device', { length: 50 }),
+  city: varchar('city', { length: 100 }),
+  country: varchar('country', { length: 2 }),
   totalDuration: integer('total_duration').default(0), // Total seconds
   pageCount: integer('page_count').default(0),
   hadSuccessEvent: boolean('had_success_event').default(false).notNull(),

@@ -17,13 +17,14 @@ import {
   Columns,
 } from 'lucide-react';
 
-type ColKey = 'matchType' | 'date' | 'campaign' | 'device' | 'duration' | 'adGroup' | 'adId' | 'position';
+type ColKey = 'matchType' | 'date' | 'campaign' | 'device' | 'location' | 'duration' | 'adGroup' | 'adId' | 'position';
 
 const COL_LABELS: Record<ColKey, string> = {
   matchType: 'Match Type',
   date:      'Date',
   campaign:  'Campaign',
   device:    'Device',
+  location:  'Location',
   duration:  'Duration',
   adGroup:   'Ad Group',
   adId:      'Ad ID',
@@ -35,6 +36,7 @@ const DEFAULT_COLS: Record<ColKey, boolean> = {
   date:      true,
   campaign:  true,
   device:    true,
+  location:  true,
   duration:  true,
   adGroup:   false,
   adId:      false,
@@ -46,13 +48,14 @@ const MOBILE_COLS: Record<ColKey, boolean> = {
   date:      false,
   campaign:  false,
   device:    false,
+  location:  false,
   duration:  false,
   adGroup:   false,
   adId:      false,
   position:  false,
 };
 
-type SortKey = 'keyword' | 'matchType' | 'date' | 'campaign' | 'device' | 'duration' | 'adGroup' | 'adId' | 'position' | 'outcome';
+type SortKey = 'keyword' | 'matchType' | 'date' | 'campaign' | 'device' | 'location' | 'duration' | 'adGroup' | 'adId' | 'position' | 'outcome';
 type SortDir = 'asc' | 'desc';
 
 function SortIcon({ col, sortKey, sortDir }: { col: SortKey; sortKey: SortKey; sortDir: SortDir }) {
@@ -74,6 +77,8 @@ interface Session {
   adGroupId:        string | null;
   adId:             string | null;
   adPosition:       string | null;
+  city:             string | null;
+  country:          string | null;
   googleCampaignId: string;
   campaignId:       string;
   eventCount:       number;
@@ -100,6 +105,33 @@ function formatAdPosition(pos: string | null): string {
   const [, page, placement, rank] = m;
   const loc = placement === 't' ? 'Top' : 'Bottom';
   return page === '1' ? `${loc} #${rank}` : `Pg ${page} ${loc} #${rank}`;
+}
+
+// Converts an ISO 3166-1 alpha-2 code (e.g. "GB") to its flag emoji using
+// Unicode regional indicator symbols — no extra dependency needed.
+function countryFlag(countryCode: string | null): string {
+  if (!countryCode || countryCode.length !== 2) return '';
+  const codePoints = countryCode
+    .toUpperCase()
+    .split('')
+    .map(c => 127397 + c.charCodeAt(0));
+  return String.fromCodePoint(...codePoints);
+}
+
+function formatLocation(city: string | null, country: string | null): string {
+  if (!city && !country) return '—';
+  const flag = countryFlag(country);
+  const text = [city, country].filter(Boolean).join(', ');
+  return flag ? `${flag} ${text}` : text;
+}
+
+// Converts an ISO 3166-1 alpha-2 code to its English display name, e.g. "GB" -> "United Kingdom"
+function countryName(countryCode: string): string {
+  try {
+    return new Intl.DisplayNames(['en'], { type: 'region' }).of(countryCode) ?? countryCode;
+  } catch {
+    return countryCode;
+  }
 }
 
 function formatDuration(ms: number | null): string {
@@ -164,6 +196,7 @@ export function SessionsTable({ campaigns, dateRange, refreshTrigger }: Sessions
   const [matchType,  setMatchType]  = useState('');
   const [device,     setDevice]     = useState('');
   const [outcome,    setOutcome]    = useState('');
+  const [country,    setCountry]    = useState('');
   // Filters — ad detail
   const [adGroupId,   setAdGroupId]   = useState('');
   const [adId,        setAdId]        = useState('');
@@ -175,6 +208,7 @@ export function SessionsTable({ campaigns, dateRange, refreshTrigger }: Sessions
   const [adGroupOptions,   setAdGroupOptions]   = useState<string[]>([]);
   const [adIdOptions,      setAdIdOptions]      = useState<string[]>([]);
   const [adPositionOptions, setAdPositionOptions] = useState<string[]>([]);
+  const [countryOptions,   setCountryOptions]   = useState<string[]>([]);
   // Journey slide-over
   const [selectedSession, setSelectedSession] = useState<Session | null>(null);
 
@@ -243,6 +277,7 @@ export function SessionsTable({ campaigns, dateRange, refreshTrigger }: Sessions
       if (adGroupId)  params.set('adGroupId',  adGroupId);
       if (adId)       params.set('adId',       adId);
       if (adPosition) params.set('adPosition', adPosition);
+      if (country)    params.set('country',    country);
 
       const res  = await fetch(`/api/sessions?${params}`, { cache: 'no-store' });
       const data = await res.json();
@@ -254,13 +289,13 @@ export function SessionsTable({ campaigns, dateRange, refreshTrigger }: Sessions
     } finally {
       setIsLoading(false);
     }
-  }, [batch, keyword, campaignId, matchType, device, outcome, adGroupId, adId, adPosition, dateRange, sortKey, sortDir, refreshTrigger]);
+  }, [batch, keyword, campaignId, matchType, device, outcome, adGroupId, adId, adPosition, country, dateRange, sortKey, sortDir, refreshTrigger]);
 
   // Reset to the first page/batch whenever filters, sort, or date range change
   useEffect(() => {
     setBatch(1);
     setSubPage(1);
-  }, [keyword, campaignId, matchType, device, outcome, adGroupId, adId, adPosition, dateRange, sortKey, sortDir]);
+  }, [keyword, campaignId, matchType, device, outcome, adGroupId, adId, adPosition, country, dateRange, sortKey, sortDir]);
 
   useEffect(() => {
     const hasText = keyword || adGroupId || adId || adPosition;
@@ -279,6 +314,10 @@ export function SessionsTable({ campaigns, dateRange, refreshTrigger }: Sessions
       if (groups.length) setAdGroupOptions(groups);
       if (ids.length)    setAdIdOptions(ids);
       if (pos.length)    setAdPositionOptions(pos);
+    }
+    if (!country) {
+      const countries = [...new Set(sessions.map(s => s.country).filter((v): v is string => !!v))].sort();
+      if (countries.length) setCountryOptions(countries);
     }
   }, [sessions]);
 
@@ -368,7 +407,7 @@ export function SessionsTable({ campaigns, dateRange, refreshTrigger }: Sessions
           </div>
 
           {/* Filters */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-7 gap-3">
             {/* Keyword search */}
             <div className="relative xl:col-span-2">
               <Search className="absolute left-3 top-2.5 w-4 h-4 text-gray-400" />
@@ -429,6 +468,21 @@ export function SessionsTable({ campaigns, dateRange, refreshTrigger }: Sessions
               <option value="converted">Converted</option>
               <option value="bounce">Bounced</option>
               <option value="engaged">Engaged</option>
+            </select>
+
+            {/* Country */}
+            <select
+              value={country}
+              onChange={e => setCountry(e.target.value)}
+              className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            >
+              <option value="">All Countries</option>
+              {countryOptions.length === 0 && (
+                <option disabled value="">No data yet</option>
+              )}
+              {countryOptions.map(v => (
+                <option key={v} value={v}>{countryFlag(v)} {countryName(v)}</option>
+              ))}
             </select>
           </div>
 
@@ -523,7 +577,7 @@ export function SessionsTable({ campaigns, dateRange, refreshTrigger }: Sessions
           </div>
         ) : sessions.length === 0 ? (
           (() => {
-            const hasFilters = !!(keyword || campaignId || matchType || device || outcome || adGroupId || adId || adPosition);
+            const hasFilters = !!(keyword || campaignId || matchType || device || outcome || adGroupId || adId || adPosition || country);
             return hasFilters ? (
               /* Filters active — nothing matched */
               <div className="p-10 text-center">
@@ -533,7 +587,7 @@ export function SessionsTable({ campaigns, dateRange, refreshTrigger }: Sessions
                 <p className="text-gray-700 font-medium">No sessions match your filters</p>
                 <p className="text-gray-400 text-sm mt-1">Try clearing a filter or widening the date range</p>
                 <button
-                  onClick={() => { setKeyword(''); setCampaignId(''); setMatchType(''); setDevice(''); setOutcome(''); setAdGroupId(''); setAdId(''); setAdPosition(''); }}
+                  onClick={() => { setKeyword(''); setCampaignId(''); setMatchType(''); setDevice(''); setOutcome(''); setAdGroupId(''); setAdId(''); setAdPosition(''); setCountry(''); }}
                   className="mt-4 px-4 py-2 text-sm font-medium text-blue-600 border border-blue-200 rounded-lg hover:bg-blue-50 transition-colors"
                 >
                   Clear all filters
@@ -574,6 +628,7 @@ export function SessionsTable({ campaigns, dateRange, refreshTrigger }: Sessions
                       {cols.date      && <th className={thClass} onClick={() => handleSort('date')}>Date <SortIcon col="date" sortKey={sortKey} sortDir={sortDir} /></th>}
                       {cols.campaign  && <th className={thClass} onClick={() => handleSort('campaign')}>Campaign <SortIcon col="campaign" sortKey={sortKey} sortDir={sortDir} /></th>}
                       {cols.device    && <th className={thClass} onClick={() => handleSort('device')}>Device <SortIcon col="device" sortKey={sortKey} sortDir={sortDir} /></th>}
+                      {cols.location  && <th className={thClass} onClick={() => handleSort('location')}>Location <SortIcon col="location" sortKey={sortKey} sortDir={sortDir} /></th>}
                       {cols.duration  && <th className={thR}     onClick={() => handleSort('duration')}>Duration <SortIcon col="duration" sortKey={sortKey} sortDir={sortDir} /></th>}
                       {cols.adGroup   && <th className={thClass} onClick={() => handleSort('adGroup')}>Ad Group <SortIcon col="adGroup" sortKey={sortKey} sortDir={sortDir} /></th>}
                       {cols.adId      && <th className={thClass} onClick={() => handleSort('adId')}>Ad ID <SortIcon col="adId" sortKey={sortKey} sortDir={sortDir} /></th>}
@@ -619,6 +674,11 @@ export function SessionsTable({ campaigns, dateRange, refreshTrigger }: Sessions
                           <DeviceIcon device={s.device} />
                           {s.device || 'Desktop'}
                         </span>
+                      </td>
+                    )}
+                    {cols.location && (
+                      <td className="px-4 sm:px-6 py-3 whitespace-nowrap text-sm text-gray-600">
+                        {formatLocation(s.city, s.country)}
                       </td>
                     )}
                     {cols.duration && (

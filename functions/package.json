@@ -14,15 +14,17 @@
   },
   "dependencies": {
     "@azure/functions": "^4.5.1",
-    "@azure/storage-queue": "^12.20.0",
     "@azure/identity": "^4.4.1",
+    "@azure/storage-queue": "^12.20.0",
+    "geoip-lite": "^1.4.10",
     "mssql": "^11.0.1",
     "resend": "^4.0.0",
     "zod": "^3.23.8"
   },
   "devDependencies": {
-    "@types/node": "^22.0.0",
+    "@types/geoip-lite": "^1.4.4",
     "@types/mssql": "^9.1.5",
+    "@types/node": "^22.0.0",
     "rimraf": "^5.0.10",
     "typescript": "^5.5.4"
   }

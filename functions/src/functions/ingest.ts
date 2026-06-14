@@ -29,6 +29,7 @@ import {
 import { IngestEnvelopeSchema, type QueueMessage } from "../lib/schemas.js";
 import { enqueueMessage } from "../lib/queue.js";
 import { extractClientIp, maskIp } from "../lib/ip-mask.js";
+import { lookupGeo } from "../lib/geo.js";
  
 // CORS headers — applied to all responses including OPTIONS preflight
 function corsHeaders(origin: string): Record<string, string> {
@@ -119,19 +120,23 @@ export async function ingestHandler(
  
   const envelope = validation.data;
  
-  // ---------- IP masking ----------
-  // Extract from headers BEFORE the data leaves this function's memory
+  // ---------- IP masking + geolocation ----------
+  // Extract from headers BEFORE the data leaves this function's memory.
+  // Geo lookup MUST happen on the raw IP — masking is one-way and irreversible.
   const rawIp = extractClientIp(request.headers);
+  const geo = lookupGeo(rawIp);
   const ipMasked = maskIp(rawIp);
- 
+
   // ---------- Build queue message ----------
   const userAgent = (request.headers.get("user-agent") ?? "").substring(0, 500);
- 
+
   const message: QueueMessage = {
     envelope,
     ipMasked,
     receivedAt: new Date().toISOString(),
     userAgent,
+    city: geo.city,
+    country: geo.country,
   };
  
   // ---------- Enqueue ----------

@@ -13,6 +13,20 @@
 // =============================================================================
 
 /**
+ * Strip transport noise (port suffix, leading/trailing whitespace) from a raw
+ * X-Forwarded-For style IP string so it's safe to pass to maskIp() or a geoip
+ * lookup. Returns the cleaned IPv4/IPv6 string, unchanged if already clean.
+ */
+export function cleanIp(ip: string | null | undefined): string {
+  if (!ip || typeof ip !== "string") return "";
+
+  // Strip any port suffix (e.g. "82.12.34.56:443" → "82.12.34.56")
+  return ip.split(",")[0].trim().split(":").length > 2
+    ? ip.split(",")[0].trim() // probably IPv6
+    : ip.split(",")[0].trim().split(":")[0]; // IPv4 with port
+}
+
+/**
  * Mask an IP address for GDPR-compliant storage.
  *
  * IPv4: "82.12.34.56"  →  "82.12.34.xxx"
@@ -24,20 +38,17 @@
 export function maskIp(ip: string | null | undefined): string {
   if (!ip || typeof ip !== "string") return "0.0.0.xxx";
 
-  // Strip any port suffix (e.g. "82.12.34.56:443" → "82.12.34.56")
-  const cleanIp = ip.split(",")[0].trim().split(":").length > 2
-    ? ip.split(",")[0].trim() // probably IPv6
-    : ip.split(",")[0].trim().split(":")[0]; // IPv4 with port
+  const cleanedIp = cleanIp(ip);
 
   // IPv4 detection (4 octets separated by dots)
-  const ipv4Match = cleanIp.match(/^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.\d{1,3}$/);
+  const ipv4Match = cleanedIp.match(/^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.\d{1,3}$/);
   if (ipv4Match) {
     return `${ipv4Match[1]}.${ipv4Match[2]}.${ipv4Match[3]}.xxx`;
   }
 
   // IPv6 — keep first two groups, mask the rest
-  if (cleanIp.includes(":")) {
-    const parts = cleanIp.split(":");
+  if (cleanedIp.includes(":")) {
+    const parts = cleanedIp.split(":");
     if (parts.length >= 2) {
       return `${parts[0]}:${parts[1]}::xxxx`;
     }

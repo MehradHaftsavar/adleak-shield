@@ -166,14 +166,16 @@ async function ensureSession(
     .input("adGroupId", mssql.NVarChar, session.adgroupId ?? null)
     .input("adId", mssql.NVarChar, session.adId ?? null)
     .input("adPosition", mssql.NVarChar, session.adPosition ?? null)
+    .input("city", mssql.NVarChar, msg.city ?? null)
+    .input("country", mssql.NVarChar, msg.country ?? null)
     .query(
       `INSERT INTO Sessions
           (tenant_id, campaign_id, session_fingerprint, keyword, match_type,
-           device, gclid, ip_masked, ad_group_id, ad_id, ad_position, is_bounce)
+           device, gclid, ip_masked, ad_group_id, ad_id, ad_position, city, country, is_bounce)
        OUTPUT INSERTED.session_id
        VALUES
           (@tenantId, @campaignId, @fp, @keyword, @matchType, @device,
-           @gclid, @ipMasked, @adGroupId, @adId, @adPosition, 1)`
+           @gclid, @ipMasked, @adGroupId, @adId, @adPosition, @city, @country, 1)`
     );
   
   const sessionId = created.recordset[0]?.session_id ?? null;

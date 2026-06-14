@@ -150,6 +150,9 @@ CREATE TABLE Sessions (
     gclid               NVARCHAR(100)    NULL,
     -- ip_masked: last octet already removed before storage, e.g. "82.12.34.xxx"
     ip_masked           NVARCHAR(20)     NULL,
+    -- city/country: resolved via offline geoip lookup on the raw IP, before masking
+    city                NVARCHAR(100)    NULL,
+    country             NVARCHAR(2)      NULL, -- ISO 3166-1 alpha-2, e.g. "GB"
     started_at          DATETIMEOFFSET   NOT NULL DEFAULT SYSDATETIMEOFFSET(),
     -- total_duration_ms: populated when session ends or heartbeat stops
     total_duration_ms   INT              NULL,

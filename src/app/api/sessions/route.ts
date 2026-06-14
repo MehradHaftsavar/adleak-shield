@@ -32,6 +32,7 @@ export async function GET(request: NextRequest) {
     const adGroupId  = searchParams.get('adGroupId')  || '';
     const adId       = searchParams.get('adId')       || '';
     const adPosition = searchParams.get('adPosition') || ''; // exact value e.g. "1t1"
+    const country    = searchParams.get('country')    || ''; // ISO 3166-1 alpha-2, e.g. "GB"
     const startDate  = searchParams.get('start');
     const endDate    = searchParams.get('end');
 
@@ -56,6 +57,8 @@ export async function GET(request: NextRequest) {
       adGroup:   's.ad_group_id',
       adId:      's.ad_id',
       position:  's.ad_position',
+      location:  's.city',
+      country:   's.country',
       outcome:   `CASE WHEN EXISTS (SELECT 1 FROM JourneyEvents je WHERE je.session_id = s.session_id AND je.event_type = 'success_event') THEN 2 WHEN s.is_bounce = 1 THEN 0 ELSE 1 END`,
     };
     const sortKeyParam = searchParams.get('sortKey') || 'date';
@@ -123,6 +126,11 @@ export async function GET(request: NextRequest) {
         conditions.push('s.ad_position = @adPosition');
       }
 
+      if (country) {
+        req.input('country', mssql.NVarChar(2), country);
+        conditions.push('s.country = @country');
+      }
+
       const where = conditions.join(' AND ');
 
       const countResult = await req.query(`
@@ -148,6 +156,8 @@ export async function GET(request: NextRequest) {
           s.ad_group_id,
           s.ad_id,
           s.ad_position,
+          s.city,
+          s.country,
           c.google_campaign_id,
           c.campaign_id AS campaign_uuid,
           (
@@ -178,6 +188,8 @@ export async function GET(request: NextRequest) {
           adGroupId:         row.ad_group_id  ?? null,
           adId:              row.ad_id        ?? null,
           adPosition:        row.ad_position  ?? null,
+          city:              row.city         ?? null,
+          country:           row.country      ?? null,
           googleCampaignId:  row.google_campaign_id,
           campaignId:        row.campaign_uuid,
           eventCount:        row.event_count,
