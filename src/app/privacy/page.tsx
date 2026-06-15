@@ -24,8 +24,8 @@ export default function PrivacyPage() {
               </p>
               <p className="mt-2">
                 Contact:{' '}
-                <a href="mailto:privacy@adleakshield.com" className="text-blue-600 hover:underline">
-                  privacy@adleakshield.com
+                <a href="mailto:info@adleakshield.com" className="text-blue-600 hover:underline">
+                  info@adleakshield.com
                 </a>
               </p>
             </section>
@@ -182,8 +182,8 @@ export default function PrivacyPage() {
               </ul>
               <p className="mt-3">
                 To exercise any of these rights, email{' '}
-                <a href="mailto:privacy@adleakshield.com" className="text-blue-600 hover:underline">
-                  privacy@adleakshield.com
+                <a href="mailto:info@adleakshield.com" className="text-blue-600 hover:underline">
+                  info@adleakshield.com
                 </a>. We will respond within 30 days. You also have the right to lodge a complaint with the
                 Information Commissioner's Office (ICO) at{' '}
                 <a href="https://ico.org.uk" target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">
@@ -221,8 +221,8 @@ export default function PrivacyPage() {
                 AdLeak Shield collects only the minimum data necessary (masked IP, keyword, device type, page
                 paths). No full IP addresses or personally identifiable visitor information is stored. You may
                 request a Data Processing Agreement (DPA) by emailing{' '}
-                <a href="mailto:privacy@adleakshield.com" className="text-blue-600 hover:underline">
-                  privacy@adleakshield.com
+                <a href="mailto:info@adleakshield.com" className="text-blue-600 hover:underline">
+                  info@adleakshield.com
                 </a>.
               </p>
             </section>
@@ -235,8 +235,8 @@ export default function PrivacyPage() {
                 encryption in transit (TLS), hashed password storage (bcrypt), row-level security on our
                 database (tenant data is fully isolated), and regular automated data purges. However, no system
                 is 100% secure. If you discover a security issue, please disclose it responsibly to{' '}
-                <a href="mailto:security@adleakshield.com" className="text-blue-600 hover:underline">
-                  security@adleakshield.com
+                <a href="mailto:info@adleakshield.com" className="text-blue-600 hover:underline">
+                  info@adleakshield.com
                 </a>.
               </p>
             </section>
@@ -270,8 +270,8 @@ export default function PrivacyPage() {
               <address className="mt-2 not-italic text-gray-600">
                 <strong>AdLeak Shield — Privacy</strong><br />
                 Email:{' '}
-                <a href="mailto:privacy@adleakshield.com" className="text-blue-600 hover:underline">
-                  privacy@adleakshield.com
+                <a href="mailto:info@adleakshield.com" className="text-blue-600 hover:underline">
+                  info@adleakshield.com
                 </a><br />
                 Manchester, United Kingdom
               </address>

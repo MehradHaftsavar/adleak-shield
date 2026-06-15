@@ -156,8 +156,8 @@ export default function TermsPage() {
                 For the purposes of UK/EU GDPR, you are the <strong>data controller</strong> and AdLeak
                 Shield is the <strong>data processor</strong> with respect to your visitors' data. A Data
                 Processing Agreement (DPA) is available upon request at{' '}
-                <a href="mailto:privacy@adleakshield.com" className="text-blue-600 hover:underline">
-                  privacy@adleakshield.com
+                <a href="mailto:info@adleakshield.com" className="text-blue-600 hover:underline">
+                  info@adleakshield.com
                 </a>.
               </p>
 
@@ -262,8 +262,8 @@ export default function TermsPage() {
               </p>
               <p className="mt-2">
                 Before initiating formal proceedings, you agree to contact us at{' '}
-                <a href="mailto:legal@adleakshield.com" className="text-blue-600 hover:underline">
-                  legal@adleakshield.com
+                <a href="mailto:info@adleakshield.com" className="text-blue-600 hover:underline">
+                  info@adleakshield.com
                 </a>{' '}
                 to attempt to resolve the dispute informally. We will endeavour to resolve any complaint
                 within 14 days.
@@ -284,8 +284,8 @@ export default function TermsPage() {
               <address className="not-italic text-gray-600">
                 <strong>AdLeak Shield — Legal</strong><br />
                 Email:{' '}
-                <a href="mailto:legal@adleakshield.com" className="text-blue-600 hover:underline">
-                  legal@adleakshield.com
+                <a href="mailto:info@adleakshield.com" className="text-blue-600 hover:underline">
+                  info@adleakshield.com
                 </a><br />
                 Manchester, United Kingdom
               </address>

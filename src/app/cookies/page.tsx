@@ -174,8 +174,8 @@ export default function CookiesPage() {
               <h2 className="text-lg font-semibold text-gray-900 mb-3">7. Contact</h2>
               <p>
                 For any questions about our use of cookies:{' '}
-                <a href="mailto:privacy@adleakshield.com" className="text-blue-600 hover:underline">
-                  privacy@adleakshield.com
+                <a href="mailto:info@adleakshield.com" className="text-blue-600 hover:underline">
+                  info@adleakshield.com
                 </a>
               </p>
             </section>

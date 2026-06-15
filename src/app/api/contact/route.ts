@@ -35,7 +35,7 @@ export async function POST(request: NextRequest) {
 
     await resend.emails.send({
       from: process.env.RESEND_FROM_EMAIL ?? 'AdLeak Shield <notifications@adleakshield.com>',
-      to: 'mehradhaftsavar@outlook.com',
+      to: 'info@adleakshield.com',
       reply_to: email,
       subject: `New contact form message from ${name}`,
       html: `
