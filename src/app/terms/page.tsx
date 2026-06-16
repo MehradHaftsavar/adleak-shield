@@ -2,6 +2,7 @@ import { MarketingShell } from '@/components/layout/MarketingShell';
 
 export const metadata = {
   title: 'Terms of Service — AdLeak Shield',
+  robots: { index: false, follow: false },
 };
 
 export default function TermsPage() {
