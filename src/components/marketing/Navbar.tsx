@@ -5,9 +5,10 @@ import Link from 'next/link';
 
 const NAV_LINKS = [
   { label: 'Features', href: '#features' },
-  { label: 'Pricing', href: '#pricing' },
-  { label: 'FAQ',      href: '#faq' },
-  { label: 'Contact',  href: '#contact' },
+  { label: 'Pricing',  href: '#pricing'  },
+  { label: 'Blog',     href: '/blog'     },
+  { label: 'FAQ',      href: '#faq'      },
+  { label: 'Contact',  href: '#contact'  },
 ];
 
 export function Navbar() {

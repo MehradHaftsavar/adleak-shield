@@ -10,12 +10,17 @@ export default function sitemap(): MetadataRoute.Sitemap {
       changeFrequency: 'monthly',
       priority: 1.0,
     },
-    // TODO: Add blog index and individual blog posts here when the blog is built
-    // {
-    //   url: `${BASE_URL}/blog`,
-    //   lastModified: new Date(),
-    //   changeFrequency: 'weekly',
-    //   priority: 0.8,
-    // },
+    {
+      url: `${BASE_URL}/blog`,
+      lastModified: new Date(),
+      changeFrequency: 'weekly',
+      priority: 0.8,
+    },
+    {
+      url: `${BASE_URL}/blog/google-ads-clicks-but-no-calls`,
+      lastModified: new Date('2026-06-16'),
+      changeFrequency: 'monthly',
+      priority: 0.7,
+    },
   ];
 }

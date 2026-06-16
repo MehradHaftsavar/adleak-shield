@@ -66,11 +66,19 @@ Single plan — everything included, no feature gating.
 - Operated by Mehrad Haftsavar (trading as AdLeak Shield), Manchester, United Kingdom.
 - ICO registered: C1953337.
 
+## Blog
+
+AdLeak Shield publishes practical guides for small businesses running Google Ads. Articles are written for business owners and marketing managers, not developers. Topics include wasted ad spend, click fraud, keyword intent, landing page optimisation, and conversion tracking.
+
+- Blog index: https://adleakshield.com/blog
+- Why Your Google Ads Are Getting Clicks But No Calls: https://adleakshield.com/blog/google-ads-clicks-but-no-calls
+
 ## Links
 
 - Homepage: https://adleakshield.com
 - Start free trial: https://adleakshield.com/auth/signup
+- Blog: https://adleakshield.com/blog
 - Privacy Policy: https://adleakshield.com/privacy
 - Terms of Service: https://adleakshield.com/terms
 - Cookie Policy: https://adleakshield.com/cookies
-- Contact / support: privacy@adleakshield.com
+- Contact / support: info@adleakshield.com

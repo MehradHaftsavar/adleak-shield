@@ -17,8 +17,10 @@ import Script from 'next/script';
 
 const NAV_LINKS = [
   { label: 'Features', href: '/#features' },
-  { label: 'Pricing',  href: '/#pricing' },
-  { label: 'Contact',  href: '/#contact' },
+  { label: 'Pricing',  href: '/#pricing'  },
+  { label: 'Blog',     href: '/blog'      },
+  { label: 'FAQ',      href: '/#faq'      },
+  { label: 'Contact',  href: '/#contact'  },
 ];
 
 // -----------------------------------------------------------------------------
