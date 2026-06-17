@@ -16,6 +16,7 @@ import {
 import { withTenantDb, withAdminDb } from "../lib/db.js";
 
 const THANK_YOU_PATHS = [
+  // Order / purchase confirmations
   '/thank-you', '/thankyou', '/thank_you', '/thanks',
   '/order-confirmed', '/order-confirmation', '/order-complete', '/order-completed',
   '/order-success', '/order-placed',
@@ -24,6 +25,19 @@ const THANK_YOU_PATHS = [
   '/payment-success', '/payment-confirmed', '/payment-complete',
   '/purchase-success', '/purchase-confirmed', '/purchase-complete',
   '/confirmation', '/confirmed', '/receipt',
+  // Signup / registration (SaaS)
+  '/signup', '/sign-up', '/sign_up', '/register', '/registration',
+  '/get-started', '/get_started', '/onboarding', '/welcome',
+  '/success', '/account-created', '/account/created',
+  // Contact / enquiry (service businesses)
+  '/contact', '/contact-us', '/contact_us', '/contactus',
+  '/enquiry', '/enquire', '/enquiry-sent', '/enquiry-received',
+  '/message-sent', '/message-received',
+  // Quote / booking (trades)
+  '/quote', '/get-a-quote', '/free-quote', '/request-a-quote', '/quote-request',
+  '/book', '/booking', '/book-now', '/book-online', '/book-appointment',
+  '/appointment', '/appointment-confirmed', '/appointment-booked',
+  '/callback', '/request-callback', '/call-back',
 ];
 
 function isThankYouPage(path: string | null | undefined): boolean {
