@@ -331,7 +331,8 @@ export async function queueWorkerHandler(
       return;
     }
 
-    if (env.domain.toLowerCase() !== campaign.domainName.toLowerCase()) {
+    const normaliseDomain = (d: string) => d.toLowerCase().replace(/^www\./, '');
+    if (normaliseDomain(env.domain) !== normaliseDomain(campaign.domainName)) {
       context.log("[Worker] Domain mismatch — logging", {
         campaignId: googleCampaignId,
         sentDomain: env.domain,
@@ -366,7 +367,7 @@ export async function queueWorkerHandler(
       env.payload.session?.sessionFingerprint;
     if (!fp) return;
 
-    const sessionInfo = await withAdminDb(async (request) => {
+    const lookupByFp = () => withAdminDb(async (request) => {
       const result = await request
         .input("fp", mssql.NVarChar, fp.substring(0, 64))
         .query(
@@ -376,16 +377,26 @@ export async function queueWorkerHandler(
       return result.recordset[0] ?? null;
     });
 
+    let sessionInfo = await lookupByFp();
+
     if (!sessionInfo) {
-      // Could be a race condition — session_start hasn't been processed yet.
-      // Throw so Azure retries this message after the visibility timeout (~30s),
-      // by which time session_start will have been committed to the DB.
-      // page_end retries too — for short sessions it's the ONLY source of
-      // dwell time, and dropping it silently leaves total_duration_ms NULL
-      // (shown as "< 1s" even for real 2-3s visits).
-      throw new Error(
-        `[Worker] Orphan ${env.eventType} — session not found, will retry`
-      );
+      // Race condition: session_start may still be in-flight through the queue.
+      // Poll in-process for up to 3s before giving up — avoids noisy Azure
+      // error logs and dead-letter queue buildup from retry exhaustion.
+      for (let attempt = 0; attempt < 6; attempt++) {
+        await new Promise(r => setTimeout(r, 500));
+        sessionInfo = await lookupByFp();
+        if (sessionInfo) break;
+      }
+      if (!sessionInfo) {
+        // session_start was legitimately dropped (domain mismatch, unregistered
+        // campaign, ineligible tenant) — drop follow-on events silently too.
+        context.warn(
+          `[Worker] Orphan ${env.eventType} — no session after 3s, dropping`,
+          { domain: env.domain, eventType: env.eventType }
+        );
+        return;
+      }
     }
 
     campaign = {
@@ -394,6 +405,32 @@ export async function queueWorkerHandler(
       domainName: env.domain,
       googleCampaignId: googleCampaignId,
     };
+  }
+
+  // For non-session_start events, poll outside the transaction to avoid holding
+  // an open DB connection for up to 3s while waiting for session_start to commit.
+  if (env.eventType !== "session_start") {
+    const fp = env.payload.sessionFingerprint ?? env.payload.session?.sessionFingerprint;
+    if (fp) {
+      let sessionExists = false;
+      for (let attempt = 0; attempt <= 6; attempt++) {
+        if (attempt > 0) await new Promise(r => setTimeout(r, 500));
+        const exists = await withAdminDb(async (request) => {
+          const result = await request
+            .input("fp", mssql.NVarChar, fp.substring(0, 64))
+            .query(`SELECT TOP 1 1 FROM Sessions WHERE session_fingerprint = @fp`);
+          return result.recordset.length > 0;
+        });
+        if (exists) { sessionExists = true; break; }
+      }
+      if (!sessionExists) {
+        context.warn(
+          `[Worker] Orphan ${env.eventType} — no session after 3s, dropping`,
+          { domain: env.domain, eventType: env.eventType }
+        );
+        return;
+      }
+    }
   }
 
   try {
@@ -410,10 +447,10 @@ export async function queueWorkerHandler(
           context.log("[Worker] Could not create session — missing payload, skipping");
           return;
         }
-        // Race condition: session_start hasn't committed yet. Throw so Azure
-        // Functions retries this message after the visibility timeout (~30s),
-        // by which time session_start will be committed.
-        throw new Error(`[Worker] Session not found for ${env.eventType} — will retry`);
+        // Pre-check above guarantees session exists by this point.
+        // If we still get null here, the payload is genuinely malformed.
+        context.warn(`[Worker] ensureSession returned null for ${env.eventType} despite pre-check — skipping`);
+        return;
       }
 
       switch (env.eventType) {
