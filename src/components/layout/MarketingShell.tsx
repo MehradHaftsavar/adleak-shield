@@ -178,6 +178,8 @@ export function MarketingShell({ children }: { children: React.ReactNode }) {
         data-website-id="b04d6612-6e8a-444f-90fd-7a74f0133857"
         strategy="afterInteractive"
       />
+      {/* AdLeak Shield tracker */}
+      <Script src="https://www.adleakshield.com/tracker.js" strategy="afterInteractive" />
     </div>
   );
 }
