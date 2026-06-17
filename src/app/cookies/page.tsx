@@ -11,7 +11,7 @@ export default function CookiesPage() {
       <div className="bg-gray-50">
         <div className="max-w-3xl mx-auto px-6 py-16">
           <h1 className="text-3xl font-bold text-gray-900 mb-2">Cookie Policy</h1>
-          <p className="text-sm text-gray-500 mb-10">Last updated: June 2025</p>
+          <p className="text-sm text-gray-500 mb-10">Last updated: June 2026</p>
 
           <div className="space-y-10 text-sm text-gray-700 leading-relaxed">
 
@@ -73,16 +73,33 @@ export default function CookiesPage() {
                 </table>
               </div>
 
-              {/* Analytics — placeholder */}
-              <h3 className="font-semibold text-gray-800 mb-2">2.2 Analytics and Performance Cookies</h3>
-              <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 text-amber-800">
-                <p className="font-semibold mb-1">Coming soon</p>
-                <p>
-                  We may introduce analytics cookies in the future to understand how users interact with the
-                  dashboard and improve the Service. When we do, we will update this policy and ask for your
-                  consent through an in-app cookie banner before setting any analytics cookies. No analytics
-                  cookies are currently active.
-                </p>
+              {/* Analytics — Umami */}
+              <h3 className="font-semibold text-gray-800 mb-2">2.2 Analytics and Performance</h3>
+              <p className="mb-3">
+                We use <strong>Umami Analytics</strong> on our public marketing pages to understand how
+                visitors find and use the website (page views, referrer, browser, device type). Umami is
+                self-hosted on our own infrastructure and is <strong>cookieless by design</strong> — it does
+                not set any cookies on your device and does not track you across websites. All data is
+                anonymised and aggregated. No consent banner is required because no cookies or persistent
+                identifiers are used.
+              </p>
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm border border-gray-200 rounded-lg overflow-hidden">
+                  <thead className="bg-gray-50">
+                    <tr>
+                      <th className="text-left px-4 py-2 text-gray-700 font-medium">Service</th>
+                      <th className="text-left px-4 py-2 text-gray-700 font-medium">Purpose</th>
+                      <th className="text-left px-4 py-2 text-gray-700 font-medium">Cookies set</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr>
+                      <td className="px-4 py-2 font-medium">Umami Analytics (self-hosted)</td>
+                      <td className="px-4 py-2">Anonymised page view and referrer tracking on public marketing pages only</td>
+                      <td className="px-4 py-2">None</td>
+                    </tr>
+                  </tbody>
+                </table>
               </div>
 
               {/* Marketing — placeholder */}
@@ -140,9 +157,9 @@ export default function CookiesPage() {
                 <li><a href="https://support.microsoft.com/en-us/microsoft-edge/delete-cookies-in-microsoft-edge-63947406-40ac-c3b8-57b9-2a946a29ae09" target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">Microsoft Edge</a></li>
               </ul>
               <p className="mt-3">
-                When we introduce optional analytics or marketing cookies, a cookie banner will appear on the
-                website allowing you to accept or decline them. You will be able to change your preferences at
-                any time.
+                Our current analytics (Umami) are cookieless and require no action from you. If we introduce
+                optional marketing cookies in the future, a cookie banner will appear allowing you to accept
+                or decline them before any such cookies are set.
               </p>
             </section>
 

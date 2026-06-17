@@ -64,7 +64,7 @@ export default function TermsPage() {
             <section>
               <h2 className="text-lg font-semibold text-gray-900 mb-3">4. Free Trial</h2>
               <p>
-                New accounts receive a <strong>14-day free trial</strong>. No payment information is required
+                New accounts receive a <strong>7-day free trial</strong>. No payment information is required
                 to start a trial. During the trial:
               </p>
               <ul className="list-disc list-inside mt-2 space-y-1 ml-2">
