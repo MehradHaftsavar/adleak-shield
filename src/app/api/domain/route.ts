@@ -267,18 +267,8 @@ export async function DELETE(request: NextRequest) {
         await req.query(`DELETE FROM Campaigns WHERE campaign_id = @${paramName}`);
       }
 
-      // 5. Delete UnregisteredTrafficLog entries for these google_campaign_ids
-      for (let i = 0; i < googleCampaignIds.length; i++) {
-        const googleCampaignId = googleCampaignIds[i];
-        const paramName = `gcid${i}`;
-        
-        req.input(paramName, mssql.NVarChar, googleCampaignId);
-        
-        await req.query(`
-          DELETE FROM UnregisteredTrafficLog 
-          WHERE unrecognised_campaign_id = @${paramName}
-        `);
-      }
+      // 5. Delete ALL unregistered traffic logs for this tenant (RLS handles tenant filter)
+      await req.query(`DELETE FROM UnregisteredTrafficLog`);
 
       // 6. Finally delete the domain
       const deleteResult = await req.query(`DELETE FROM Domains`);
@@ -287,11 +277,10 @@ export async function DELETE(request: NextRequest) {
         throw new Error('NOT_FOUND');
       }
 
-      return { 
-        success: true, 
+      return {
+        success: true,
         message: 'Domain, campaigns, and unregistered traffic logs deleted successfully',
         deletedCampaigns: campaignIds.length,
-        cleanedUnregisteredLogs: googleCampaignIds.length,
       };
     });
 
