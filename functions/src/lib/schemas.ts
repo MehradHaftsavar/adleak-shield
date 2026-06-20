@@ -19,6 +19,7 @@ const EVENT_TYPES = [
   "click",
   "success_event",
   "page_end",
+  "form_interact",
 ] as const;
 
 // Session payload (sent on session_start only)

@@ -491,6 +491,12 @@ export async function queueWorkerHandler(
                  AND status = 'awaiting_data'`
             );
           break;
+        case "form_interact":
+          await insertJourneyEvent(tx, msg, campaign!.tenantId, sessionId, env.eventType);
+          await new mssql.Request(tx)
+            .input("sessionId", mssql.UniqueIdentifier, sessionId)
+            .query(`UPDATE Sessions SET is_bounce = 0 WHERE session_id = @sessionId AND is_bounce = 1`);
+          break;
         case "pageview":
         case "click":
         case "success_event":
