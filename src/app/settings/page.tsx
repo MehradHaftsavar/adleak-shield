@@ -94,7 +94,6 @@ export default function SettingsPage() {
         )}
         {activeTab === 'campaigns' && (
           <CampaignStep
-            domain={domain}
             onComplete={() => setActiveTab('snippet')}
             onBack={() => setActiveTab('domain')}
           />

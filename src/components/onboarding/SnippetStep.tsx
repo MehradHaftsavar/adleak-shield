@@ -23,6 +23,8 @@ export function SnippetStep({ domain, onComplete, onBack }: SnippetStepProps) {
   const [testResult, setTestResult] = useState<'idle' | 'testing' | 'success' | 'failed'>('idle');
   const [testMessage, setTestMessage] = useState('');
   const [testProtocol, setTestProtocol] = useState<'https' | 'http'>('https');
+  const [testDomainId, setTestDomainId] = useState('');
+  const [testCampaignDbId, setTestCampaignDbId] = useState('');
 
   useEffect(() => {
     loadSnippet();
@@ -30,12 +32,24 @@ export function SnippetStep({ domain, onComplete, onBack }: SnippetStepProps) {
 
   const loadSnippet = async () => {
     try {
-      const res = await fetch('/api/snippet');
-      if (res.ok) {
-        const data = await res.json();
+      const [snippetRes, campaignsRes] = await Promise.all([
+        fetch('/api/snippet'),
+        fetch('/api/campaigns'),
+      ]);
+      if (snippetRes.ok) {
+        const data = await snippetRes.json();
         setSnippet(data.snippet);
         setTemplate(data.template);
         setCampaigns(data.campaigns || []);
+      }
+      if (campaignsRes.ok) {
+        const data = await campaignsRes.json();
+        const list = data.campaigns ?? [];
+        setCampaigns(list);
+        if (list.length > 0) {
+          setTestDomainId(list[0].domainId);
+          setTestCampaignDbId(list[0].googleCampaignId);
+        }
       }
     } catch (err) {
       console.error('Failed to load snippet:', err);
@@ -70,9 +84,11 @@ export function SnippetStep({ domain, onComplete, onBack }: SnippetStepProps) {
     setTestResult('testing');
     setTestMessage('Opening test page...');
 
-    // Generate test URL with first campaign ID
-    const testCampaignId = campaigns[0].id;
-    const testUrl = `${testProtocol}://${domain}/?keyword=adleak_test&campaignid=${testCampaignId}&adgroupid=test_group_001&adid=test_ad_001&adposition=1t1&gclid=test_${Date.now()}&matchtype=exact`;
+    const selectedCampaign = campaigns.find((c: any) => c.googleCampaignId === testCampaignDbId) ?? campaigns[0];
+    const selectedDomain = campaigns.find((c: any) => c.domainId === testDomainId) ?? campaigns[0];
+    const testDomainName = selectedDomain?.domainName ?? domain;
+    const testCampaignId = selectedCampaign?.googleCampaignId ?? campaigns[0]?.googleCampaignId;
+    const testUrl = `${testProtocol}://${testDomainName}/?keyword=adleak_test&campaignid=${testCampaignId}&adgroupid=test_group_001&adid=test_ad_001&adposition=1t1&gclid=test_${Date.now()}&matchtype=exact`;
 
     // Open test URL in new tab
     const testWindow = window.open(testUrl, '_blank');
@@ -338,6 +354,48 @@ export function SnippetStep({ domain, onComplete, onBack }: SnippetStepProps) {
               Click the button below to verify your tracking snippet is installed correctly.
               This will open your website with test parameters and check if we receive the data.
             </p>
+
+            {/* Domain + campaign selectors */}
+            {campaigns.length > 0 && (() => {
+              const uniqueDomains = Array.from(
+                new Map(campaigns.map((c: any) => [c.domainId, { domainId: c.domainId, domainName: c.domainName }])).values()
+              );
+              const campaignsForDomain = campaigns.filter((c: any) => c.domainId === testDomainId);
+              return (
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-4">
+                  <div>
+                    <label className="block text-xs font-medium text-gray-600 mb-1">Test domain</label>
+                    <select
+                      value={testDomainId}
+                      onChange={e => {
+                        setTestDomainId(e.target.value);
+                        const first = campaigns.find((c: any) => c.domainId === e.target.value);
+                        if (first) setTestCampaignDbId(first.googleCampaignId);
+                      }}
+                      className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg bg-white focus:ring-2 focus:ring-purple-500"
+                    >
+                      {uniqueDomains.map((d: any) => (
+                        <option key={d.domainId} value={d.domainId}>{d.domainName}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-gray-600 mb-1">Test campaign</label>
+                    <select
+                      value={testCampaignDbId}
+                      onChange={e => setTestCampaignDbId(e.target.value)}
+                      className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg bg-white focus:ring-2 focus:ring-purple-500"
+                    >
+                      {campaignsForDomain.map((c: any) => (
+                        <option key={c.id} value={c.googleCampaignId}>
+                          Campaign {c.slotNumber} ({c.googleCampaignId})
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+              );
+            })()}
 
             <div className="flex items-center gap-3 mb-4">
               <span className="text-sm text-gray-600 font-medium">My site uses:</span>

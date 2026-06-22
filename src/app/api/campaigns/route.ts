@@ -72,32 +72,48 @@ export async function POST(request: NextRequest) {
     const planType  = await getActivePlanType(tenantId, session.user.tenantId as string, session.user.planType);
     const maxAllowed = PLAN_LIMITS[planType].campaignsPerDomain;
 
-    const result = await withTenantDb(tenantId, async (req) => {
-      const domainResult = await req.query(`SELECT domain_id FROM Domains`);
-      const domain = domainResult.recordset?.[0];
-      if (!domain) throw new Error('DOMAIN_REQUIRED');
+    const { domainId: bodyDomainId } = body;
 
+    const result = await withTenantDb(tenantId, async (req) => {
+      // Resolve target domain — use provided domainId or fall back to first domain
+      let domainId: string;
+      if (bodyDomainId) {
+        req.input('reqDomainId', mssql.UniqueIdentifier, bodyDomainId);
+        const check = await req.query(`SELECT domain_id FROM Domains WHERE domain_id = @reqDomainId`);
+        if (check.recordset.length === 0) throw new Error('DOMAIN_REQUIRED');
+        domainId = bodyDomainId;
+      } else {
+        const domainResult = await req.query(`SELECT domain_id FROM Domains`);
+        const firstDomain = domainResult.recordset?.[0];
+        if (!firstDomain) throw new Error('DOMAIN_REQUIRED');
+        domainId = firstDomain.domain_id;
+      }
+
+      // Enforce per-domain campaign limit
+      req.input('domainId', mssql.UniqueIdentifier, domainId);
       const existingResult = await req.query(`
-        SELECT campaign_id, google_campaign_id, slot_number, status FROM Campaigns
+        SELECT campaign_id, google_campaign_id, slot_number, status FROM Campaigns WHERE domain_id = @domainId
       `);
       const existingCampaigns = existingResult.recordset ?? [];
 
       if (existingCampaigns.length >= maxAllowed) throw new Error('MAX_CAMPAIGNS');
 
-      const duplicate = existingCampaigns.find((c: any) => c.google_campaign_id === validatedData.googleCampaignId);
-      if (duplicate) throw new Error('DUPLICATE_CAMPAIGN');
+      // Also check for duplicate across all domains for this tenant
+      req.input('googleCampaignId', mssql.NVarChar, validatedData.googleCampaignId);
+      const dupCheck = await req.query(`
+        SELECT 1 FROM Campaigns WHERE google_campaign_id = @googleCampaignId
+      `);
+      if (dupCheck.recordset.length > 0) throw new Error('DUPLICATE_CAMPAIGN');
 
-      // Find the lowest unused slot number
+      // Find the lowest unused slot number for this domain
       const usedSlots = existingCampaigns.map((c: any) => c.slot_number);
       let slotNumber = 1;
       for (let i = 1; i <= maxAllowed; i++) {
         if (!usedSlots.includes(i)) { slotNumber = i; break; }
       }
 
-      req.input('domainId',        mssql.UniqueIdentifier, domain.domain_id);
-      req.input('googleCampaignId', mssql.NVarChar,         validatedData.googleCampaignId);
-      req.input('slotNumber',       mssql.Int,              slotNumber);
-      req.input('avgCpc',           mssql.Decimal(10, 2),   validatedData.avgCpc);
+      req.input('slotNumber', mssql.Int,            slotNumber);
+      req.input('avgCpc',     mssql.Decimal(10, 2), validatedData.avgCpc);
 
       await req.query(`
         INSERT INTO Campaigns (tenant_id, domain_id, google_campaign_id, slot_number, status, avg_cpc, created_at)
@@ -174,9 +190,11 @@ export async function GET(_request: NextRequest) {
 
     const result = await withTenantDb(tenantId, async (req) => {
       const campaignsResult = await req.query(`
-        SELECT campaign_id, google_campaign_id, slot_number, domain_id, created_at, status, avg_cpc
-        FROM   Campaigns
-        ORDER BY slot_number
+        SELECT c.campaign_id, c.google_campaign_id, c.slot_number, c.domain_id,
+               d.domain_name, c.created_at, c.status, c.avg_cpc
+        FROM   Campaigns c
+        INNER JOIN Domains d ON d.domain_id = c.domain_id
+        ORDER BY d.domain_name, c.slot_number
       `);
       return {
         campaigns: (campaignsResult.recordset ?? []).map((c: any) => ({
@@ -184,7 +202,8 @@ export async function GET(_request: NextRequest) {
           googleCampaignId: c.google_campaign_id,
           slotNumber:       c.slot_number,
           domainId:         c.domain_id,
-          createdAt:        c.createdAt,
+          domainName:       c.domain_name,
+          createdAt:        c.created_at,
           status:           c.status,
           avgCpc:           c.avg_cpc,
         })),
