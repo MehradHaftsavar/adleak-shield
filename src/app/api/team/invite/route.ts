@@ -111,8 +111,8 @@ export async function POST(request: NextRequest) {
       req.input('email',         mssql.NVarChar(255),    email);
       req.input('role',          mssql.NVarChar(50),     role);
       await req.query(`
-        INSERT INTO TeamMembers (tenant_id, email, role)
-        VALUES (@tenantId, @email, @role)
+        INSERT INTO TeamMembers (tenant_id, email, role, invited_by)
+        VALUES (@tenantId, @email, @role, @tenantId)
       `);
 
       const memberRow = await req.query(`
