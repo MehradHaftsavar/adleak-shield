@@ -54,6 +54,7 @@ function PlanCard({
           £{limits.priceGbp.toFixed(2)}
           <span className="text-sm font-normal text-gray-500">/mo</span>
         </p>
+        <p className="text-xs text-gray-400 mt-0.5">incl. applicable taxes</p>
       </div>
 
       <ul className="space-y-2 flex-1">

@@ -282,12 +282,15 @@ function Pricing() {
                 <h3 className={`text-lg font-bold mb-1 ${plan.highlight ? 'text-white' : 'text-slate-900'}`}>
                   {plan.name}
                 </h3>
-                <div className="flex items-baseline gap-1 mb-2">
+                <div className="flex items-baseline gap-1 mb-1">
                   <span className={`text-3xl font-bold ${plan.highlight ? 'text-white' : 'text-slate-900'}`}>
                     {plan.price}
                   </span>
                   <span className={plan.highlight ? 'text-blue-200 text-sm' : 'text-slate-500 text-sm'}>/mo</span>
                 </div>
+                <p className={`text-xs mb-2 ${plan.highlight ? 'text-blue-200' : 'text-slate-400'}`}>
+                  incl. applicable taxes
+                </p>
                 <p className={`text-sm ${plan.highlight ? 'text-blue-100' : 'text-slate-500'}`}>{plan.desc}</p>
               </div>
 
