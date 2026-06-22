@@ -23,14 +23,14 @@ export async function GET(_request: NextRequest) {
         const r = await req
           .input('tenantId', mssql.UniqueIdentifier, tenantId)
           .query(`
-            SELECT tm.member_id, tm.email, tm.role, tm.added_at, tm.accepted_at,
+            SELECT tm.member_id, tm.email, tm.role, tm.created_at, tm.accepted_at,
                    (SELECT STRING_AGG(d.domain_name, ', ')
                     FROM MemberDomainAccess mda
                     INNER JOIN Domains d ON d.domain_id = mda.domain_id
                     WHERE mda.member_id = tm.member_id) AS domains
             FROM   TeamMembers tm
             WHERE  tm.tenant_id = @tenantId
-            ORDER  BY tm.added_at DESC
+            ORDER  BY tm.created_at DESC
           `);
         return r.recordset;
       }),
@@ -56,7 +56,7 @@ export async function GET(_request: NextRequest) {
         memberId:    m.member_id,
         email:       m.email,
         role:        m.role,
-        addedAt:     m.added_at,
+        addedAt:     m.created_at,
         acceptedAt:  m.accepted_at,
         domains:     m.domains ?? '',
         status:      m.accepted_at ? 'active' : 'pending',

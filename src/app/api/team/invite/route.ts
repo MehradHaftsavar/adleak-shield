@@ -118,7 +118,7 @@ export async function POST(request: NextRequest) {
       const memberRow = await req.query(`
         SELECT member_id FROM TeamMembers
         WHERE tenant_id = @tenantId AND email = @email AND accepted_at IS NULL
-        ORDER BY added_at DESC
+        ORDER BY created_at DESC
       `);
       memberId = memberRow.recordset[0]?.member_id as string;
       if (!memberId) throw new Error('Failed to retrieve member_id');

@@ -160,11 +160,11 @@ export interface TeamMember {
   tenant_id: string;
   email: string;
   role: "editor" | "visitor";
-  added_at: Date;
+  created_at: Date;
   accepted_at: Date | null;
 }
 
-export type NewTeamMember = Omit<TeamMember, "member_id" | "added_at"> & {
+export type NewTeamMember = Omit<TeamMember, "member_id" | "created_at"> & {
   member_id?: string;
 };
 
