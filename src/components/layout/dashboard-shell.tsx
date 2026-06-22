@@ -304,12 +304,12 @@ export function DashboardShell({ email, tenantId, children }: DashboardShellProp
                 <Link href="/settings" className="text-sm text-gray-600 hover:text-gray-900 transition-colors">
                   Setup
                 </Link>
-                {isOwner && isViewingOwnTenant && (
+                {isOwner && (
                   <Link href="/settings/team" className="text-sm text-gray-600 hover:text-gray-900 transition-colors">
                     Team
                   </Link>
                 )}
-                {isOwner && isViewingOwnTenant && (
+                {isOwner && (
                   <Link href="/settings/subscription" className="text-sm text-gray-600 hover:text-gray-900 transition-colors">
                     Subscription
                   </Link>
@@ -363,13 +363,13 @@ export function DashboardShell({ email, tenantId, children }: DashboardShellProp
                 className="block px-2 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-50 rounded-lg transition-colors">
                 Setup
               </Link>
-              {isOwner && isViewingOwnTenant && (
+              {isOwner && (
                 <Link href="/settings/team" onClick={() => setMenuOpen(false)}
                   className="block px-2 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-50 rounded-lg transition-colors">
                   Team
                 </Link>
               )}
-              {isOwner && isViewingOwnTenant && (
+              {isOwner && (
                 <Link href="/settings/subscription" onClick={() => setMenuOpen(false)}
                   className="block px-2 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-50 rounded-lg transition-colors">
                   Subscription
