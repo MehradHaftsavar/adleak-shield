@@ -17,7 +17,7 @@ export function buildTeamInvitationEmail(opts: TeamInvitationEmailOptions): {
     ? 'view data and manage campaigns'
     : 'view data (read-only)';
 
-  const subject = `You've been invited to AdLeak Shield`;
+  const subject = `${inviterEmail} shared AdLeak Shield access with you`;
 
   const html = `<!DOCTYPE html>
 <html lang="en">

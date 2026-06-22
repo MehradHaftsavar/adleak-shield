@@ -35,11 +35,15 @@ export default function TeamPage() {
   const [error,       setError]       = useState('');
 
   // Invite form
-  const [inviteEmail, setInviteEmail] = useState('');
-  const [inviteRole,  setInviteRole]  = useState<'editor' | 'visitor'>('editor');
-  const [inviting,    setInviting]    = useState(false);
-  const [inviteMsg,   setInviteMsg]   = useState('');
-  const [inviteError, setInviteError] = useState('');
+  const [inviteEmail,     setInviteEmail]     = useState('');
+  const [inviteRole,      setInviteRole]      = useState<'editor' | 'visitor'>('editor');
+  const [inviteDomainIds, setInviteDomainIds] = useState<string[]>([]); // empty = all
+  const [inviting,        setInviting]        = useState(false);
+  const [inviteMsg,       setInviteMsg]       = useState('');
+  const [inviteError,     setInviteError]     = useState('');
+
+  // Owner's domains (for invite domain picker)
+  const [ownerDomains, setOwnerDomains] = useState<{ domainId: string; domainName: string }[]>([]);
 
   useEffect(() => {
     if (status === 'authenticated' && !session?.user?.isOwner) {
@@ -50,6 +54,9 @@ export default function TeamPage() {
   useEffect(() => {
     if (status === 'authenticated' && session?.user?.isOwner) {
       loadTeam();
+      fetch('/api/domain').then(r => r.ok ? r.json() : null).then(data => {
+        if (data?.domains) setOwnerDomains(data.domains);
+      });
     }
   }, [status, session]);
 
@@ -79,7 +86,11 @@ export default function TeamPage() {
       const res  = await fetch('/api/team/invite', {
         method:  'POST',
         headers: { 'Content-Type': 'application/json' },
-        body:    JSON.stringify({ email: inviteEmail, role: inviteRole }),
+        body:    JSON.stringify({
+          email:     inviteEmail,
+          role:      inviteRole,
+          domainIds: inviteDomainIds.length > 0 ? inviteDomainIds : undefined,
+        }),
       });
       const data = await res.json();
       if (!res.ok) {
@@ -170,30 +181,73 @@ export default function TeamPage() {
             Seat limit reached ({limits.seats} seats on {limits.label}). Upgrade your plan to add more members.
           </div>
         ) : (
-          <form onSubmit={handleInvite} className="flex flex-col sm:flex-row gap-3">
-            <input
-              type="email"
-              required
-              value={inviteEmail}
-              onChange={e => setInviteEmail(e.target.value)}
-              placeholder="colleague@example.com"
-              className="flex-1 px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-            />
-            <select
-              value={inviteRole}
-              onChange={e => setInviteRole(e.target.value as 'editor' | 'visitor')}
-              className="px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-            >
-              <option value="editor">Editor</option>
-              <option value="visitor">Viewer</option>
-            </select>
-            <button
-              type="submit"
-              disabled={inviting}
-              className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-60 text-white text-sm font-semibold rounded-lg transition-colors whitespace-nowrap"
-            >
-              {inviting ? 'Sending…' : 'Send invite'}
-            </button>
+          <form onSubmit={handleInvite} className="space-y-3">
+            <div className="flex flex-col sm:flex-row gap-3">
+              <input
+                type="email"
+                required
+                value={inviteEmail}
+                onChange={e => setInviteEmail(e.target.value)}
+                placeholder="colleague@example.com"
+                className="flex-1 px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              />
+              <select
+                value={inviteRole}
+                onChange={e => setInviteRole(e.target.value as 'editor' | 'visitor')}
+                className="px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              >
+                <option value="editor">Editor</option>
+                <option value="visitor">Viewer</option>
+              </select>
+              <button
+                type="submit"
+                disabled={inviting}
+                className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-60 text-white text-sm font-semibold rounded-lg transition-colors whitespace-nowrap"
+              >
+                {inviting ? 'Sending…' : 'Send invite'}
+              </button>
+            </div>
+
+            {/* Domain access picker — only shown when owner has 2+ domains */}
+            {ownerDomains.length > 1 && (
+              <div className="border border-gray-200 rounded-lg p-3 bg-gray-50">
+                <p className="text-xs font-medium text-gray-700 mb-2">
+                  Domain access
+                  <span className="ml-1 font-normal text-gray-400">
+                    {inviteDomainIds.length === 0 ? '(all domains)' : `(${inviteDomainIds.length} selected)`}
+                  </span>
+                </p>
+                <div className="flex flex-wrap gap-2">
+                  {ownerDomains.map(d => {
+                    const checked = inviteDomainIds.length === 0 || inviteDomainIds.includes(d.domainId);
+                    return (
+                      <label key={d.domainId} className="flex items-center gap-1.5 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={checked}
+                          onChange={() => {
+                            if (inviteDomainIds.length === 0) {
+                              // Was "all" — uncheck this one means select all others
+                              setInviteDomainIds(ownerDomains.map(x => x.domainId).filter(id => id !== d.domainId));
+                            } else if (inviteDomainIds.includes(d.domainId)) {
+                              const next = inviteDomainIds.filter(id => id !== d.domainId);
+                              // If none left selected, revert to "all"
+                              setInviteDomainIds(next.length > 0 ? next : []);
+                            } else {
+                              const next = [...inviteDomainIds, d.domainId];
+                              // If all selected, revert to "all"
+                              setInviteDomainIds(next.length === ownerDomains.length ? [] : next);
+                            }
+                          }}
+                          className="w-3.5 h-3.5 rounded accent-indigo-600"
+                        />
+                        <span className="text-xs text-gray-700">{d.domainName}</span>
+                      </label>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
           </form>
         )}
 

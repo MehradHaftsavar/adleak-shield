@@ -12,8 +12,9 @@ import type { PlanType } from '@/types/auth';
 const resend = new Resend(process.env.RESEND_API_KEY);
 
 const inviteSchema = z.object({
-  email: z.string().email('Invalid email address').toLowerCase(),
-  role:  z.enum(['editor', 'visitor']),
+  email:     z.string().email('Invalid email address').toLowerCase(),
+  role:      z.enum(['editor', 'visitor']),
+  domainIds: z.array(z.string().uuid()).optional(), // if omitted, grant all domains
 });
 
 export async function POST(request: NextRequest) {
@@ -33,7 +34,7 @@ export async function POST(request: NextRequest) {
     if (!validation.success) {
       return NextResponse.json({ error: validation.error.errors[0].message }, { status: 400 });
     }
-    const { email, role } = validation.data;
+    const { email, role, domainIds } = validation.data;
 
     const tenantId = session.user.tenantId as string;
     const planType = (session.user.planType ?? 'starter') as PlanType;
@@ -85,13 +86,16 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'A pending invite already exists for this email' }, { status: 409 });
     }
 
-    // Load tenant's current domains (to grant access to all of them)
-    const domains = await withAdminDb(async (req) => {
+    // Load tenant's current domains, then narrow to selected ones if specified
+    const allDomains = await withAdminDb(async (req) => {
       const r = await req
         .input('tid', mssql.UniqueIdentifier, tenantId)
         .query(`SELECT domain_id FROM Domains WHERE tenant_id = @tid`);
       return r.recordset.map((d: any) => d.domain_id as string);
     });
+    const domains = domainIds && domainIds.length > 0
+      ? allDomains.filter(id => domainIds.includes(id))
+      : allDomains;
 
     // Generate secure token
     const rawToken  = crypto.randomBytes(32).toString('base64url');
@@ -123,6 +127,7 @@ export async function POST(request: NextRequest) {
       memberId = memberRow.recordset[0]?.member_id as string;
       if (!memberId) throw new Error('Failed to retrieve member_id');
 
+      req.input('memberId',  mssql.UniqueIdentifier,   memberId);
       req.input('tokenHash', mssql.NVarChar(64),        tokenHash);
       req.input('invitedBy', mssql.UniqueIdentifier,   tenantId);
       req.input('expiresAt', mssql.DateTime2,           expiresAt);
@@ -158,10 +163,12 @@ export async function POST(request: NextRequest) {
 
     try {
       await resend.emails.send({
-        from:    'noreply@adleakshield.com',
-        to:      email,
+        from:     'AdLeak Shield <noreply@adleakshield.com>',
+        reply_to: session.user.email ?? undefined,
+        to:       email,
         subject,
         html,
+        text:     `${session.user.email} has invited you to join their AdLeak Shield workspace as a ${role}.\n\nAccept your invitation here:\n${acceptUrl}\n\nThis link expires in 7 days. If you weren't expecting this, you can safely ignore it.`,
       });
     } catch (emailErr) {
       // Non-fatal — invitation is created; user can resend later
