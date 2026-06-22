@@ -2,6 +2,9 @@
 
 import { useState, useEffect } from 'react';
 import { Target, Trash2, Plus, Pencil, Check, X } from 'lucide-react';
+import { useSession } from 'next-auth/react';
+import { PLAN_LIMITS } from '@/lib/planLimits';
+import type { PlanType } from '@/types/auth';
 
 interface CampaignStepProps {
   domain: string;
@@ -10,6 +13,9 @@ interface CampaignStepProps {
 }
 
 export function CampaignStep({ domain, onComplete, onBack }: CampaignStepProps) {
+  const { data: session } = useSession();
+  const planType = (session?.user?.planType ?? 'starter') as PlanType;
+  const maxCampaigns = PLAN_LIMITS[planType].campaignsPerDomain;
   const [campaigns, setCampaigns] = useState<any[]>([]);
   const [newCampaignId, setNewCampaignId] = useState('');
   const [newAvgCpc, setNewAvgCpc] = useState('');
@@ -311,7 +317,7 @@ export function CampaignStep({ domain, onComplete, onBack }: CampaignStepProps) 
         </ol>
       </div>
 
-      {campaigns.length < 3 && (
+      {campaigns.length < maxCampaigns && (
         <form onSubmit={handleAddCampaign} className="space-y-4 mb-6">
           <div>
             <label htmlFor="campaignId" className="block text-sm font-medium text-gray-700 mb-2">
@@ -395,7 +401,7 @@ export function CampaignStep({ domain, onComplete, onBack }: CampaignStepProps) 
 
       {/* Counter */}
       <p className="text-center text-sm text-gray-600 mt-4">
-        {campaigns.length} / 3 campaigns registered
+        {campaigns.length} / {maxCampaigns} campaigns registered
       </p>
     </div>
 

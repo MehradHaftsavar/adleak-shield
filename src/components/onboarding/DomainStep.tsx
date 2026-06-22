@@ -2,6 +2,9 @@
 
 import { useState, useEffect } from 'react';
 import { Globe, Trash2, Plus, AlertTriangle } from 'lucide-react';
+import { useSession } from 'next-auth/react';
+import { PLAN_LIMITS } from '@/lib/planLimits';
+import type { PlanType } from '@/types/auth';
 
 interface DomainStepProps {
   onComplete: (domain: string) => void;
@@ -9,6 +12,9 @@ interface DomainStepProps {
 }
 
 export function DomainStep({ onComplete, existingDomain }: DomainStepProps) {
+  const { data: session } = useSession();
+  const planType = (session?.user?.planType ?? 'starter') as PlanType;
+  const limits = PLAN_LIMITS[planType];
   const [domain, setDomain] = useState('');
   const [newDomain, setNewDomain] = useState('');
   const [error, setError] = useState('');
@@ -187,7 +193,7 @@ export function DomainStep({ onComplete, existingDomain }: DomainStepProps) {
 
       <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
         <p className="text-sm text-blue-800">
-          <strong>Starter Plan:</strong> You can register 1 domain and up to 3 campaigns.
+          <strong>{limits.label} Plan:</strong> You can register {limits.domains} domain{limits.domains !== 1 ? 's' : ''} and up to {limits.campaignsPerDomain} campaigns per domain.
         </p>
       </div>
 
@@ -201,7 +207,7 @@ export function DomainStep({ onComplete, existingDomain }: DomainStepProps) {
       </button>
 
       <p className="text-center text-sm text-gray-600 mt-4">
-        {domain ? '1 / 1 domain registered' : '0 / 1 domain registered'}
+        {domain ? `1 / ${limits.domains} domain${limits.domains !== 1 ? 's' : ''} registered` : `0 / ${limits.domains} domain${limits.domains !== 1 ? 's' : ''} registered`}
       </p>
     </div>
 
