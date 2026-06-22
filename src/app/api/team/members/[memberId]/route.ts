@@ -24,17 +24,23 @@ export async function DELETE(
       req.input('memberId', mssql.UniqueIdentifier, memberId);
       req.input('tenantId', mssql.UniqueIdentifier, tenantId);
 
-      // Verify the member belongs to this tenant before deleting
+      // Verify the member belongs to this tenant and get their email
       const check = await req.query(`
-        SELECT member_id FROM TeamMembers WHERE member_id = @memberId AND tenant_id = @tenantId
+        SELECT member_id, email FROM TeamMembers WHERE member_id = @memberId AND tenant_id = @tenantId
       `);
       if (check.recordset.length === 0) throw new Error('NOT_FOUND');
+
+      const memberEmail = check.recordset[0].email as string;
+      req.input('memberEmail', mssql.NVarChar(255), memberEmail);
 
       // Remove domain access first (FK constraint)
       await req.query(`DELETE FROM MemberDomainAccess WHERE member_id = @memberId`);
 
-      // Remove any pending invitations for this member
-      await req.query(`DELETE FROM TeamInvitations WHERE member_id = @memberId`);
+      // Remove any pending invitations by email (TeamInvitations has no member_id column)
+      await req.query(`
+        DELETE FROM TeamInvitations
+        WHERE tenant_id = @tenantId AND invited_email = @memberEmail AND accepted_at IS NULL
+      `);
 
       // Remove the member
       await req.query(`DELETE FROM TeamMembers WHERE member_id = @memberId AND tenant_id = @tenantId`);

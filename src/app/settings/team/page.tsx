@@ -41,6 +41,9 @@ export default function TeamPage() {
   const [inviting,        setInviting]        = useState(false);
   const [inviteMsg,       setInviteMsg]       = useState('');
   const [inviteError,     setInviteError]     = useState('');
+  const [actionError,     setActionError]     = useState('');
+  const [confirmRemove,   setConfirmRemove]   = useState<{ memberId: string; email: string } | null>(null);
+  const [confirmCancel,   setConfirmCancel]   = useState<{ invitationId: string; email: string } | null>(null);
 
   // Owner's domains (for invite domain picker)
   const [ownerDomains, setOwnerDomains] = useState<{ domainId: string; domainName: string }[]>([]);
@@ -102,32 +105,44 @@ export default function TeamPage() {
   }
 
   async function handleRemoveMember(memberId: string, email: string) {
-    if (!confirm(`Remove ${email} from your team?`)) return;
+    setConfirmRemove({ memberId, email });
+  }
+
+  async function confirmRemoveMember() {
+    if (!confirmRemove) return;
+    setActionError('');
     try {
-      const res = await fetch(`/api/team/members/${memberId}`, { method: 'DELETE' });
+      const res = await fetch(`/api/team/members/${confirmRemove.memberId}`, { method: 'DELETE' });
       if (!res.ok) {
         const d = await res.json();
-        alert(d.error || 'Failed to remove member');
+        setActionError(d.error || 'Failed to remove member');
         return;
       }
+      setConfirmRemove(null);
       loadTeam();
     } catch {
-      alert('Network error. Please try again.');
+      setActionError('Network error. Please try again.');
     }
   }
 
   async function handleCancelInvite(invitationId: string, email: string) {
-    if (!confirm(`Cancel invitation for ${email}?`)) return;
+    setConfirmCancel({ invitationId, email });
+  }
+
+  async function confirmCancelInvite() {
+    if (!confirmCancel) return;
+    setActionError('');
     try {
-      const res = await fetch(`/api/team/invite/${invitationId}`, { method: 'DELETE' });
+      const res = await fetch(`/api/team/invite/${confirmCancel.invitationId}`, { method: 'DELETE' });
       if (!res.ok) {
         const d = await res.json();
-        alert(d.error || 'Failed to cancel invitation');
+        setActionError(d.error || 'Failed to cancel invitation');
         return;
       }
+      setConfirmCancel(null);
       loadTeam();
     } catch {
-      alert('Network error. Please try again.');
+      setActionError('Network error. Please try again.');
     }
   }
 
@@ -160,6 +175,65 @@ export default function TeamPage() {
       {error && (
         <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg">
           <p className="text-sm text-red-700">{error}</p>
+        </div>
+      )}
+
+      {actionError && (
+        <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg flex items-center justify-between">
+          <p className="text-sm text-red-700">{actionError}</p>
+          <button onClick={() => setActionError('')} className="text-red-400 hover:text-red-600 ml-4 text-xs">Dismiss</button>
+        </div>
+      )}
+
+      {/* Confirm remove member */}
+      {confirmRemove && (
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
+          <div className="bg-white rounded-xl shadow-xl p-6 max-w-sm w-full mx-4">
+            <h3 className="text-base font-semibold text-gray-900 mb-2">Remove team member?</h3>
+            <p className="text-sm text-gray-600 mb-5">
+              <strong>{confirmRemove.email}</strong> will lose access to your workspace immediately.
+            </p>
+            <div className="flex gap-3 justify-end">
+              <button
+                onClick={() => setConfirmRemove(null)}
+                className="px-4 py-2 text-sm text-gray-600 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={confirmRemoveMember}
+                className="px-4 py-2 text-sm text-white bg-red-600 hover:bg-red-700 rounded-lg transition-colors"
+              >
+                Remove
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Confirm cancel invite */}
+      {confirmCancel && (
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
+          <div className="bg-white rounded-xl shadow-xl p-6 max-w-sm w-full mx-4">
+            <h3 className="text-base font-semibold text-gray-900 mb-2">Cancel invitation?</h3>
+            <p className="text-sm text-gray-600 mb-5">
+              The invitation for <strong>{confirmCancel.email}</strong> will be cancelled and the link will no longer work.
+            </p>
+            <div className="flex gap-3 justify-end">
+              <button
+                onClick={() => setConfirmCancel(null)}
+                className="px-4 py-2 text-sm text-gray-600 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors"
+              >
+                Keep
+              </button>
+              <button
+                onClick={confirmCancelInvite}
+                className="px-4 py-2 text-sm text-white bg-red-600 hover:bg-red-700 rounded-lg transition-colors"
+              >
+                Cancel invite
+              </button>
+            </div>
+          </div>
         </div>
       )}
 
