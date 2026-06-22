@@ -148,6 +148,7 @@ export function DashboardShell({ email, tenantId, children }: DashboardShellProp
   const [stoppingImp,     setStoppingImp]     = useState(false);
   const [checkoutLoading, setCheckoutLoading] = useState(false);
   const [menuOpen,        setMenuOpen]        = useState(false);
+  const [switching,       setSwitching]       = useState(false);
   const [justSubscribed,  setJustSubscribed]  = useState<boolean>(() => {
     if (typeof window === "undefined") return false;
     if (new URLSearchParams(window.location.search).get("payment") === "success") {
@@ -172,8 +173,8 @@ export function DashboardShell({ email, tenantId, children }: DashboardShellProp
   const isOwner        = session?.user?.isOwner as boolean | undefined;
 
   async function handleDomainSwitch(newTenantId: string) {
+    setSwitching(true);
     await update({ activeTenantId: newTenantId });
-    // Reload the page so SWR and server components pick up the new effective tenant
     window.location.reload();
   }
 
@@ -258,6 +259,13 @@ export function DashboardShell({ email, tenantId, children }: DashboardShellProp
 
   return (
     <SWRConfig value={swrConfig}>
+      {/* Domain switch overlay — prevents error flash during reload */}
+      {switching && (
+        <div className="fixed inset-0 z-[100] bg-white flex items-center justify-center">
+          <span className="w-8 h-8 border-4 border-gray-200 border-t-indigo-600 rounded-full animate-spin" />
+        </div>
+      )}
+
       {/* Thaw progress bar */}
       {thawVisible && (
         <div
