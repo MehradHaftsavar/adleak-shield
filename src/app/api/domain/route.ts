@@ -112,32 +112,6 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    // If this was a newly created domain (not idempotent re-register), grant access
-    // to all existing accepted team members so they don't have a blind spot.
-    if (result.domainId && result.message !== 'Domain already registered') {
-      try {
-        await withAdminDb(async (req) => {
-          req.input('grantTenantId', mssql.UniqueIdentifier, session.user.tenantId);
-          req.input('grantDomainId', mssql.UniqueIdentifier, result.domainId);
-          await req.query(`
-            INSERT INTO MemberDomainAccess (member_id, domain_id)
-            SELECT tm.member_id, @grantDomainId
-            FROM   TeamMembers tm
-            WHERE  tm.tenant_id  = @grantTenantId
-              AND  tm.accepted_at IS NOT NULL
-              AND  NOT EXISTS (
-                SELECT 1 FROM MemberDomainAccess mda
-                WHERE  mda.member_id = tm.member_id
-                  AND  mda.domain_id = @grantDomainId
-              )
-          `);
-        });
-      } catch (err) {
-        // Non-fatal — domain was created successfully. Members can regain access by re-login.
-        console.error('[domain POST] MemberDomainAccess grant failed (non-fatal):', err);
-      }
-    }
-
     return NextResponse.json(result);
 
   } catch (error) {
