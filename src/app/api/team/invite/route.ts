@@ -24,11 +24,6 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    // Only the account owner can invite team members
-    if (!session.user.isOwner) {
-      return NextResponse.json({ error: 'Only account owners can invite team members' }, { status: 403 });
-    }
-
     const body = await request.json();
     const validation = inviteSchema.safeParse(body);
     if (!validation.success) {

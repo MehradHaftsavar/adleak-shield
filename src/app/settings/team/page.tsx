@@ -46,13 +46,7 @@ export default function TeamPage() {
   const [ownerDomains, setOwnerDomains] = useState<{ domainId: string; domainName: string }[]>([]);
 
   useEffect(() => {
-    if (status === 'authenticated' && !session?.user?.isOwner) {
-      router.replace('/settings');
-    }
-  }, [status, session, router]);
-
-  useEffect(() => {
-    if (status === 'authenticated' && session?.user?.isOwner) {
+    if (status === 'authenticated' && session?.user?.tenantId) {
       loadTeam();
       fetch('/api/domain').then(r => r.ok ? r.json() : null).then(data => {
         if (data?.domains) setOwnerDomains(data.domains);
@@ -137,7 +131,7 @@ export default function TeamPage() {
     }
   }
 
-  if (status === 'loading' || (status === 'authenticated' && !session?.user?.isOwner)) {
+  if (status === 'loading' || (status === 'authenticated' && !session?.user?.tenantId)) {
     return (
       <div className="flex items-center justify-center py-24">
         <span className="w-8 h-8 border-4 border-gray-200 border-t-indigo-600 rounded-full animate-spin" />

@@ -12,10 +12,6 @@ export async function GET(_request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    if (!session.user.isOwner) {
-      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
-    }
-
     const tenantId = session.user.tenantId as string;
 
     const [members, invitations] = await Promise.all([

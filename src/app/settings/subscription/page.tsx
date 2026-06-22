@@ -88,12 +88,6 @@ export default function SubscriptionPage() {
   const [message, setMessage] = useState('');
 
   useEffect(() => {
-    if (status === 'authenticated' && !session?.user?.isOwner) {
-      router.replace('/settings');
-    }
-  }, [status, session, router]);
-
-  useEffect(() => {
     // Fetch current usage to show alongside plan limits
     async function load() {
       try {
@@ -109,7 +103,7 @@ export default function SubscriptionPage() {
         });
       } catch { /* non-fatal */ }
     }
-    if (status === 'authenticated' && session?.user?.isOwner) load();
+    if (status === 'authenticated' && session?.user?.tenantId) load();
   }, [status, session]);
 
   async function handlePlanSelect(plan: PlanType) {
@@ -160,7 +154,7 @@ export default function SubscriptionPage() {
     } catch { /* non-fatal */ }
   }
 
-  if (status === 'loading' || (status === 'authenticated' && !session?.user?.isOwner)) {
+  if (status === 'loading' || (status === 'authenticated' && !session?.user?.tenantId)) {
     return (
       <div className="flex items-center justify-center py-24">
         <span className="w-8 h-8 border-4 border-gray-200 border-t-indigo-600 rounded-full animate-spin" />
