@@ -73,7 +73,7 @@ export async function POST(request: NextRequest) {
         .query(`
           SELECT 'member' AS kind FROM TeamMembers    WHERE tenant_id = @tenantId AND email = @email
           UNION ALL
-          SELECT 'invite' AS kind FROM TeamInvitations WHERE tenant_id = @tenantId AND email = @email AND accepted_at IS NULL AND expires_at > GETUTCDATE()
+          SELECT 'invite' AS kind FROM TeamInvitations WHERE tenant_id = @tenantId AND invited_email = @email AND accepted_at IS NULL AND expires_at > GETUTCDATE()
         `);
       return r.recordset;
     });
@@ -123,13 +123,12 @@ export async function POST(request: NextRequest) {
       memberId = memberRow.recordset[0]?.member_id as string;
       if (!memberId) throw new Error('Failed to retrieve member_id');
 
-      req.input('memberId',     mssql.UniqueIdentifier, memberId);
-      req.input('tokenHash',    mssql.NVarChar(64),     tokenHash);
-      req.input('inviterEmail', mssql.NVarChar(255),    session.user.email ?? '');
-      req.input('expiresAt',    mssql.DateTime2,        expiresAt);
+      req.input('tokenHash', mssql.NVarChar(64),        tokenHash);
+      req.input('invitedBy', mssql.UniqueIdentifier,   tenantId);
+      req.input('expiresAt', mssql.DateTime2,           expiresAt);
       await req.query(`
-        INSERT INTO TeamInvitations (tenant_id, member_id, token_hash, invited_by_email, email, role, expires_at)
-        VALUES (@tenantId, @memberId, @tokenHash, @inviterEmail, @email, @role, @expiresAt)
+        INSERT INTO TeamInvitations (tenant_id, invited_email, role, token_hash, invited_by, expires_at)
+        VALUES (@tenantId, @email, @role, @tokenHash, @invitedBy, @expiresAt)
       `);
 
       for (let i = 0; i < domains.length; i++) {

@@ -26,10 +26,9 @@ export async function POST(request: NextRequest) {
 
       // Look up the invitation
       const inv = await req.query(`
-        SELECT ti.invitation_id, ti.member_id, ti.tenant_id, ti.email, ti.role,
-               ti.accepted_at, ti.expires_at
-        FROM   TeamInvitations ti
-        WHERE  ti.token_hash = @tokenHash
+        SELECT invitation_id, tenant_id, invited_email, role, accepted_at, expires_at
+        FROM   TeamInvitations
+        WHERE  token_hash = @tokenHash
       `);
 
       const invitation = inv.recordset[0];
@@ -38,17 +37,24 @@ export async function POST(request: NextRequest) {
       if (new Date(invitation.expires_at) < new Date()) throw new Error('EXPIRED');
 
       // Verify this invitation belongs to the logged-in user's email
-      if ((invitation.email as string).toLowerCase() !== userEmail) {
+      if ((invitation.invited_email as string).toLowerCase() !== userEmail) {
         throw new Error('EMAIL_MISMATCH');
       }
 
       const now = new Date();
-      req.input('memberId',     mssql.UniqueIdentifier, invitation.member_id);
+      req.input('invitedEmail', mssql.NVarChar(255),    invitation.invited_email);
+      req.input('invTenantId',  mssql.UniqueIdentifier, invitation.tenant_id);
       req.input('invitationId', mssql.UniqueIdentifier, invitation.invitation_id);
-      req.input('acceptedAt',   mssql.DateTime2,         now);
+      req.input('acceptedAt',   mssql.DateTime2,        now);
 
-      // Accept both rows
-      await req.query(`UPDATE TeamMembers    SET accepted_at = @acceptedAt WHERE member_id   = @memberId`);
+      // Accept both rows — look up TeamMember by email since invitation has no member_id
+      await req.query(`
+        UPDATE TeamMembers
+        SET    accepted_at = @acceptedAt
+        WHERE  tenant_id   = @invTenantId
+          AND  email        = @invitedEmail
+          AND  accepted_at IS NULL
+      `);
       await req.query(`UPDATE TeamInvitations SET accepted_at = @acceptedAt WHERE invitation_id = @invitationId`);
 
       return { tenantId: invitation.tenant_id, role: invitation.role };

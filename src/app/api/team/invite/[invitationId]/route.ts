@@ -25,20 +25,30 @@ export async function DELETE(
       req.input('invitationId', mssql.UniqueIdentifier, invitationId);
       req.input('tenantId',     mssql.UniqueIdentifier, tenantId);
 
-      // Verify ownership
+      // Verify ownership and get the invited email so we can look up the member row
       const inv = await req.query(`
-        SELECT member_id FROM TeamInvitations
+        SELECT invited_email FROM TeamInvitations
         WHERE invitation_id = @invitationId AND tenant_id = @tenantId AND accepted_at IS NULL
       `);
       if (inv.recordset.length === 0) throw new Error('NOT_FOUND');
 
-      const memberId = inv.recordset[0].member_id as string;
+      const invitedEmail = inv.recordset[0].invited_email as string;
+
+      // Look up the pending TeamMember row by email
+      req.input('invitedEmail', mssql.NVarChar(255), invitedEmail);
+      const memberRow = await req.query(`
+        SELECT member_id FROM TeamMembers
+        WHERE tenant_id = @tenantId AND email = @invitedEmail AND accepted_at IS NULL
+      `);
+      const memberId = memberRow.recordset[0]?.member_id as string | undefined;
 
       // Delete domain access, invitation, and the pending member row
-      req.input('memberId', mssql.UniqueIdentifier, memberId);
-      await req.query(`DELETE FROM MemberDomainAccess WHERE member_id = @memberId`);
+      if (memberId) {
+        req.input('memberId', mssql.UniqueIdentifier, memberId);
+        await req.query(`DELETE FROM MemberDomainAccess WHERE member_id = @memberId`);
+        await req.query(`DELETE FROM TeamMembers WHERE member_id = @memberId AND tenant_id = @tenantId AND accepted_at IS NULL`);
+      }
       await req.query(`DELETE FROM TeamInvitations WHERE invitation_id = @invitationId AND tenant_id = @tenantId`);
-      await req.query(`DELETE FROM TeamMembers WHERE member_id = @memberId AND tenant_id = @tenantId AND accepted_at IS NULL`);
     });
 
     return NextResponse.json({ success: true, message: 'Invitation cancelled' });

@@ -38,14 +38,13 @@ export async function GET(_request: NextRequest) {
         const r = await req
           .input('tenantId', mssql.UniqueIdentifier, tenantId)
           .query(`
-            SELECT invitation_id, email, role,
-                   DATEADD(day, -7, expires_at) AS created_at,
-                   expires_at, accepted_at
+            SELECT invitation_id, invited_email AS email, role,
+                   created_at, expires_at, accepted_at
             FROM   TeamInvitations
             WHERE  tenant_id = @tenantId
               AND  accepted_at IS NULL
               AND  expires_at > GETUTCDATE()
-            ORDER  BY expires_at DESC
+            ORDER  BY created_at DESC
           `);
         return r.recordset;
       }),
