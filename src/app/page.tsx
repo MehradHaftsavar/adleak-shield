@@ -192,18 +192,64 @@ function Features() {
 // =============================================================================
 // PRICING
 // =============================================================================
-const PLAN_FEATURES = [
-  '1 domain',
-  'Up to 3 Google Ads campaigns',
-  'Wasted Spend Leak Table',
-  'Visitor Journey Timeline',
-  'Monday morning email report',
-  '7-day free trial (no card required)',
-  'Cookieless tracking — no consent banner required',
-  'GDPR compliant by design',
-  'Unregistered traffic alerts',
-  'Cancel anytime via billing portal',
-  'Right to erasure — delete your account instantly',
+const PLANS = [
+  {
+    name:     'Starter',
+    price:    '£12.99',
+    desc:     'Perfect for a single business running Google Ads on one website.',
+    features: [
+      '1 domain',
+      'Up to 3 Google Ads campaigns',
+      'Wasted Spend Leak Table',
+      'Visitor Journey Timeline',
+      'Monday morning email report',
+      'CSV data export',
+      'Cookieless tracking — no consent banner needed',
+      'GDPR compliant by design',
+      'Unregistered traffic alerts',
+      'Cancel anytime',
+    ],
+    highlight: false,
+    cta: 'Start free 7-day trial',
+  },
+  {
+    name:     'Freelancer',
+    price:    '£29.99',
+    desc:     'For freelancers and consultants managing multiple client accounts.',
+    features: [
+      'Up to 5 domains',
+      'Up to 5 Google Ads campaigns per domain',
+      'Up to 3 team seats',
+      'Wasted Spend Leak Table',
+      'Visitor Journey Timeline',
+      'Monday morning email report',
+      'CSV data export',
+      'Cookieless tracking — no consent banner needed',
+      'GDPR compliant by design',
+      'Cancel anytime',
+    ],
+    highlight: true,
+    cta: 'Start free 7-day trial',
+  },
+  {
+    name:     'Agency',
+    price:    '£59.99',
+    desc:     'For agencies managing many clients with large teams.',
+    features: [
+      'Up to 15 domains',
+      'Up to 10 Google Ads campaigns per domain',
+      'Up to 15 team seats',
+      'Wasted Spend Leak Table',
+      'Visitor Journey Timeline',
+      'Monday morning email report',
+      'CSV data export',
+      'Cookieless tracking — no consent banner needed',
+      'GDPR compliant by design',
+      'Cancel anytime',
+    ],
+    highlight: false,
+    cta: 'Start free 7-day trial',
+  },
 ];
 
 function Pricing() {
@@ -214,39 +260,68 @@ function Pricing() {
           <h2 className="text-3xl md:text-4xl font-bold text-slate-900 mb-4">
             Simple, transparent pricing
           </h2>
-          <p className="text-slate-600">One plan. Everything included. No surprises.</p>
+          <p className="text-slate-600">No hidden fees. Cancel anytime. All plans include a 7-day free trial — no card required.</p>
         </div>
 
-        <div className="max-w-md mx-auto">
-          <div className="bg-white border-2 border-blue-600 rounded-2xl p-8 shadow-lg">
-            <div className="flex items-baseline gap-1 mb-1">
-              <span className="text-4xl font-bold text-slate-900">£12.99</span>
-              {/* text-slate-600 passes contrast on white (6.6:1) */}
-              <span className="text-slate-600">/month</span>
-            </div>
-            <p className="text-sm text-slate-600 mb-6">per month</p>
-
-            <div className="space-y-3 mb-8">
-              {PLAN_FEATURES.map(f => (
-                <div key={f} className="flex items-start gap-3">
-                  <svg className="w-5 h-5 text-blue-600 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                  </svg>
-                  <span className="text-sm text-slate-700">{f}</span>
-                </div>
-              ))}
-            </div>
-
-            <Link
-              href="/auth/signup"
-              className="block w-full text-center px-6 py-3.5 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg transition-colors"
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 max-w-5xl mx-auto">
+          {PLANS.map(plan => (
+            <div
+              key={plan.name}
+              className={`relative rounded-2xl p-8 flex flex-col ${
+                plan.highlight
+                  ? 'bg-blue-600 text-white shadow-xl border-2 border-blue-600'
+                  : 'bg-white border-2 border-slate-200 shadow-sm'
+              }`}
             >
-              Start free 7-day trial
-            </Link>
-            {/* text-slate-500 still slightly fails; use text-slate-600 for safe contrast */}
-            <p className="text-center text-xs text-slate-600 mt-3">No credit card required to start</p>
-          </div>
+              {plan.highlight && (
+                <span className="absolute -top-3.5 left-1/2 -translate-x-1/2 bg-amber-400 text-amber-900 text-xs font-bold px-3 py-1 rounded-full whitespace-nowrap">
+                  Most popular
+                </span>
+              )}
+              <div className="mb-6">
+                <h3 className={`text-lg font-bold mb-1 ${plan.highlight ? 'text-white' : 'text-slate-900'}`}>
+                  {plan.name}
+                </h3>
+                <div className="flex items-baseline gap-1 mb-2">
+                  <span className={`text-3xl font-bold ${plan.highlight ? 'text-white' : 'text-slate-900'}`}>
+                    {plan.price}
+                  </span>
+                  <span className={plan.highlight ? 'text-blue-200 text-sm' : 'text-slate-500 text-sm'}>/mo</span>
+                </div>
+                <p className={`text-sm ${plan.highlight ? 'text-blue-100' : 'text-slate-500'}`}>{plan.desc}</p>
+              </div>
+
+              <ul className="space-y-2 flex-1 mb-8">
+                {plan.features.map(f => (
+                  <li key={f} className="flex items-start gap-2 text-sm">
+                    <svg
+                      className={`w-4 h-4 flex-shrink-0 mt-0.5 ${plan.highlight ? 'text-blue-200' : 'text-blue-500'}`}
+                      fill="none" viewBox="0 0 24 24" stroke="currentColor"
+                    >
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                    </svg>
+                    <span className={plan.highlight ? 'text-blue-50' : 'text-slate-600'}>{f}</span>
+                  </li>
+                ))}
+              </ul>
+
+              <Link
+                href="/auth/signup"
+                className={`block w-full text-center px-6 py-3 font-semibold rounded-lg transition-colors text-sm ${
+                  plan.highlight
+                    ? 'bg-white text-blue-600 hover:bg-blue-50'
+                    : 'bg-blue-600 text-white hover:bg-blue-700'
+                }`}
+              >
+                {plan.cta}
+              </Link>
+            </div>
+          ))}
         </div>
+
+        <p className="text-center text-xs text-slate-500 mt-6">
+          All plans include a 7-day free trial · No credit card required to start · Cancel anytime via billing portal
+        </p>
       </div>
     </section>
   );
@@ -286,7 +361,7 @@ const FAQS = [
   },
   {
     q: "How much does it cost and is there a free trial?",
-    a: "AdLeak Shield is £12.99 per month, with everything included — no feature tiers, no per-click charges. You get a full 7-day free trial with no credit card required. You'll see real data from your campaigns before you decide whether to continue.",
+    a: "AdLeak Shield has three plans: Starter at £12.99/mo (1 domain, 3 campaigns, 1 seat), Freelancer at £29.99/mo (5 domains, 5 campaigns, 3 seats), and Agency at £59.99/mo (15 domains, 10 campaigns, 15 seats). All plans come with a full 7-day free trial — no credit card required. You'll see real data from your campaigns before you decide whether to continue.",
   },
 ];
 

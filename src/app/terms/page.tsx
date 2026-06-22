@@ -81,10 +81,23 @@ export default function TermsPage() {
 
             <section>
               <h2 className="text-lg font-semibold text-gray-900 mb-3">5. Subscription and Payment</h2>
+              <p className="mb-3">
+                AdLeak Shield is offered on three subscription tiers, billed monthly:
+              </p>
+              <ul className="list-disc list-inside space-y-1 ml-2 mb-4">
+                <li><strong>Starter — £12.99/mo</strong>: 1 domain, up to 3 campaigns, 1 seat</li>
+                <li><strong>Freelancer — £29.99/mo</strong>: up to 5 domains, 5 campaigns per domain, 3 seats</li>
+                <li><strong>Agency — £59.99/mo</strong>: up to 15 domains, 10 campaigns per domain, 15 seats</li>
+              </ul>
               <ul className="list-disc list-inside space-y-2 ml-2">
                 <li>
-                  The current subscription price is <strong>£12.99 per month</strong> (inclusive of any
-                  applicable VAT). Prices may change with 30 days' notice.
+                  All prices are in GBP and inclusive of any applicable VAT. Prices may change with
+                  30 days' notice sent to your registered email address.
+                </li>
+                <li>
+                  You may upgrade or downgrade your plan at any time from Settings → Subscription.
+                  Upgrades take effect immediately and are prorated for the remainder of the current billing
+                  period. Downgrades take effect at the next billing cycle.
                 </li>
                 <li>
                   Subscriptions are billed monthly in advance via Stripe. Your first payment is due at the
@@ -99,7 +112,7 @@ export default function TermsPage() {
                 </li>
                 <li>
                   If payment fails, we will retry the charge. If payment remains unsuccessful after reasonable
-                  attempts, your account will be downgraded and data collection will pause.
+                  attempts, your account will be downgraded to Starter access and data collection will pause.
                 </li>
                 <li>
                   All payments are processed by Stripe. By subscribing, you also agree to{' '}

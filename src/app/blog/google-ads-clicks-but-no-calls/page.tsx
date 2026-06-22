@@ -1,15 +1,16 @@
-﻿import Link from 'next/link';
+import Link from 'next/link';
 import { MarketingShell } from '@/components/layout/MarketingShell';
 import { Metadata } from 'next';
 
 export const metadata: Metadata = {
   title: 'Why Your Google Ads Are Getting Clicks But No Calls | AdLeak Shield',
-  description: "Spending on Google Ads but the phone isn't ringing? Discover the six most common reasons your campaign is leaking budget, and how to fix each one.",
+  description: "Spending on Google Ads but the phone isn't ringing? Discover the six most common reasons your campaign is leaking budget,and how to fix each one.",
   openGraph: {
     title: 'Why Your Google Ads Are Getting Clicks But No Calls',
-    description: "Spending on Google Ads but the phone isn't ringing? Discover the six most common reasons your campaign is leaking budget, and how to fix each one.",
+    description: "Spending on Google Ads but the phone isn't ringing? Discover the six most common reasons your campaign is leaking budget,and how to fix each one.",
     type: 'article',
     publishedTime: '2026-06-16',
+    authors: ['Mehrad Haftsavar'],
     siteName: 'AdLeak Shield',
   },
 };
@@ -39,7 +40,7 @@ const faqSchema = {
       name: 'Are invalid clicks in Google Ads refundable?',
       acceptedAnswer: {
         '@type': 'Answer',
-        text: 'Yes, in many cases. Google automatically filters some invalid traffic before charging for it, but a significant portion still slips through. If you can identify patterns of invalid click activity, unusual traffic spikes, near-100% bounce rates, or repeated clicks from the same source, you can apply for a credit through Google Ads support. Independent click tracking tools help you document these patterns with evidence.',
+        text: 'Yes, in many cases. Google automatically filters some invalid traffic before charging for it, but a significant portion still slips through. If you can identify patterns of invalid click activity,unusual traffic spikes, near-100% bounce rates, or repeated clicks from the same source,you can apply for a credit through Google Ads support. Independent click tracking tools help you document these patterns with evidence.',
       },
     },
     {
@@ -55,7 +56,7 @@ const faqSchema = {
       name: 'How can I see what visitors do after clicking my Google Ads?',
       acceptedAnswer: {
         '@type': 'Answer',
-        text: "Google Analytics shows aggregated behaviour, but session-level tracking tools, ones that tie each individual visitor's journey directly back to the specific keyword and ad that brought them, give you the clearest picture. They show whether each paid visitor scrolled to your phone number, clicked your contact button, or bounced within seconds, helping you pinpoint exactly where the drop-off happens for each keyword.",
+        text: "Google Analytics shows aggregated behaviour, but session-level tracking tools,ones that tie each individual visitor's journey directly back to the specific keyword and ad that brought them,give you the clearest picture. They show whether each paid visitor scrolled to your phone number, clicked your contact button, or bounced within seconds, helping you pinpoint exactly where the drop-off happens for each keyword.",
       },
     },
   ],
@@ -64,8 +65,8 @@ const faqSchema = {
 const articleSchema = {
   '@context': 'https://schema.org',
   '@type': 'Article',
-  headline: "Why Your Google Ads Are Getting Clicks But No Calls, And What's Really Draining Your Budget",
-  description: "Spending on Google Ads but the phone isn't ringing? Discover the six most common reasons your campaign is leaking budget, and how to fix each one.",
+  headline: "Why Your Google Ads Are Getting Clicks But No Calls,And What's Really Draining Your Budget",
+  description: "Spending on Google Ads but the phone isn't ringing? Discover the six most common reasons your campaign is leaking budget,and how to fix each one.",
   publisher: { '@type': 'Organization', name: 'AdLeak Shield', url: 'https://adleakshield.com' },
   datePublished: '2026-06-16',
   dateModified: '2026-06-16',
@@ -148,8 +149,8 @@ export default function BlogPostPage() {
             <section id="wrong-kind-of-click">
               <h2 className="text-2xl font-bold text-gray-900 mb-4">1. You&apos;re attracting the wrong kind of click</h2>
               <p className="mb-4">
-                Not all clicks are created equal. Google&apos;s broad match keyword targeting, turned on by default in most
-                campaigns, casts a wide net. Too wide, in many cases.
+                Not all clicks are created equal. Google&apos;s broad match keyword targeting,turned on by default in most
+                campaigns,casts a wide net. Too wide, in many cases.
               </p>
               <p className="mb-4">
                 A roofing company bidding on &ldquo;roof repair&rdquo; might find their ad appearing for &ldquo;DIY roof repair
@@ -160,7 +161,7 @@ export default function BlogPostPage() {
               <p>
                 This is the <strong>Google Ads high click-through rate, low conversions</strong> pattern in its most common
                 form. High CTR tells you your ad is attractive. Low conversions tell you the wrong people are clicking it. The
-                fix is tighter keyword matching, exact match and phrase match, combined with a well-maintained negative
+                fix is tighter keyword matching,exact match and phrase match,combined with a well-maintained negative
                 keyword list that filters out research-intent traffic before it costs you money.{' '}
                 <strong>Google Ads clicks but no conversions</strong> at this level usually means your targeting is letting in
                 everyone when you only want the people ready to buy.
@@ -172,13 +173,13 @@ export default function BlogPostPage() {
                 2. Your landing page breaks the promise your ad makes
               </h2>
               <p className="mb-4">
-                A user searches &ldquo;emergency plumber Manchester&rdquo;, clicks your ad, and lands on your homepage, a
+                A user searches &ldquo;emergency plumber Manchester,&rdquo; clicks your ad, and lands on your homepage,a
                 generic page about your company history with no phone number above the fold. They&apos;re gone within seconds.
               </p>
               <p className="mb-4">
                 This is message mismatch, and it silently kills conversion rates at scale. Your ad makes a specific promise
                 (&ldquo;Emergency plumber, available now&rdquo;). Your landing page needs to immediately deliver on that exact
-                promise, same service, same location, same urgency, with a phone number that&apos;s impossible to miss and a
+                promise,same service, same location, same urgency,with a phone number that&apos;s impossible to miss and a
                 single clear call to action.
               </p>
               <p>
@@ -187,7 +188,7 @@ export default function BlogPostPage() {
                 running multiple ad groups targeting different services or locations, each should ideally point to a dedicated
                 landing page, not a generic homepage. A 2026 industry benchmark found that a{' '}
                 <strong>high click-through rate with low conversions</strong> is now the single most reported pattern in small
-                business Google Ads accounts, and landing page mismatch is cited as the cause in over half of diagnosed cases.
+                business Google Ads accounts,and landing page mismatch is cited as the cause in over half of diagnosed cases.
               </p>
             </section>
 
@@ -202,7 +203,7 @@ export default function BlogPostPage() {
               <p className="mb-4">
                 <strong>Invalid clicks in Google Ads</strong> include bot traffic, accidental clicks (disproportionately common
                 on mobile), competitor click fraud, and automated scripts designed to exhaust competitor budgets. Google
-                estimates it catches and filters the majority of invalid traffic automatically, but &ldquo;majority&rdquo; is
+                estimates it catches and filters the majority of invalid traffic automatically,but &ldquo;majority&rdquo; is
                 doing a lot of heavy lifting in that sentence. Independent research suggests that over £13 billion in global ad
                 spend was lost to <strong>invalid clicks in Google Ads</strong> in 2024 alone, with small and medium businesses
                 absorbing a disproportionate share.
@@ -210,14 +211,14 @@ export default function BlogPostPage() {
               <p className="mb-4">
                 The signs are subtle: a high bounce rate from paid traffic, sessions that last under two seconds, spikes in
                 clicks with no corresponding increase in calls or enquiries. <strong>Invalid clicks in Google Ads</strong> are
-                particularly insidious because they inflate your cost-per-click over time, Google&apos;s algorithm interprets
+                particularly insidious because they inflate your cost-per-click over time,Google&apos;s algorithm interprets
                 the high bounce rate as a signal that your ad isn&apos;t relevant and raises your bids accordingly.
               </p>
               <p>
                 For small businesses with modest budgets, even a handful of invalid clicks per day compounds into hundreds of
                 pounds of <strong>wasted Google Ads budget</strong> per month. Google&apos;s own reporting won&apos;t surface
-                this clearly. That&apos;s why independent session-level tracking, something that shows you what each ad click
-                actually did on your site, is increasingly essential, not optional.
+                this clearly. That&apos;s why independent session-level tracking,something that shows you what each ad click
+                actually did on your site,is increasingly essential, not optional.
               </p>
             </section>
 
@@ -245,7 +246,7 @@ export default function BlogPostPage() {
               </h2>
               <p className="mb-4">
                 It&apos;s remarkably common: conversion tracking that was set up once, never verified, and quietly stopped
-                working after a website update. Or tracking that fires on the wrong event, &ldquo;page loaded&rdquo; instead
+                working after a website update. Or tracking that fires on the wrong event,&ldquo;page loaded&rdquo; instead
                 of &ldquo;form submitted.&rdquo; Or call tracking with a duration threshold set so high that real enquiries
                 don&apos;t register as conversions.
               </p>
@@ -253,7 +254,7 @@ export default function BlogPostPage() {
                 If your conversion tracking is unreliable, you can&apos;t diagnose any of the problems above. Before adjusting
                 bids, pausing keywords, or rewriting ad copy, verify your tracking is actually recording what you think it is.
                 A 2026 audit of small business Google Ads accounts found that over 40% had some form of tracking
-                misconfiguration, meaning nearly half of advertisers were optimising campaigns based on incomplete or
+                misconfiguration,meaning nearly half of advertisers were optimising campaigns based on incomplete or
                 inaccurate data.
               </p>
             </section>
@@ -264,14 +265,14 @@ export default function BlogPostPage() {
               </h2>
               <p className="mb-4">
                 Most businesses running Google Ads know their click volume and their cost per click. Very few know what those
-                visitors actually <em>did</em> on their site, which pages they visited, whether they scrolled to the phone
+                visitors actually <em>did</em> on their site,which pages they visited, whether they scrolled to the phone
                 number, whether they tried to call and couldn&apos;t find it, or whether they bounced within three seconds of
                 landing.
               </p>
               <p>
                 This is the core of the <strong>wasted Google Ads budget</strong> problem: without visibility into the
                 post-click journey for each individual visitor, tied back to the specific keyword and ad that brought them, you
-                can&apos;t identify where the drop-off is happening. You end up guessing, pausing keywords that might have
+                can&apos;t identify where the drop-off is happening. You end up guessing,pausing keywords that might have
                 been fine, keeping the ones that are the actual culprit, rewriting ad copy when the real issue is the landing
                 page. Session-level tracking tools that show you the full journey for every paid visitor give you the evidence
                 to make those decisions correctly rather than by instinct.
@@ -282,17 +283,17 @@ export default function BlogPostPage() {
               <h2 className="text-2xl font-bold text-gray-900 mb-4">The bottom line</h2>
               <p className="mb-4">
                 If your <strong>Google Ads are getting clicks but no calls</strong>, it&apos;s rarely one thing. It&apos;s
-                usually a combination, wrong-intent traffic, a landing page that doesn&apos;t convert, a handful of invalid
+                usually a combination,wrong-intent traffic, a landing page that doesn&apos;t convert, a handful of invalid
                 clicks quietly inflating your costs, and tracking that doesn&apos;t give you the visibility to diagnose any
                 of it.
               </p>
               <p>
                 Start by auditing your keyword match types and negative keyword list. Check that your landing page continues
-                the exact message from your ad. Verify your conversion tracking is firing correctly. Then, once you&apos;ve
-                fixed the obvious, look deeper at session-level data to understand what real visitors from your ads are
+                the exact message from your ad. Verify your conversion tracking is firing correctly. Then,once you&apos;ve
+                fixed the obvious,look deeper at session-level data to understand what real visitors from your ads are
                 actually doing once they arrive. The businesses that get the most out of Google Ads aren&apos;t necessarily
                 spending more. They&apos;re the ones who can see exactly where their{' '}
-                <strong>wasted Google Ads budget</strong> is going, and stop it.
+                <strong>wasted Google Ads budget</strong> is going,and stop it.
               </p>
             </section>
           </div>
@@ -316,7 +317,7 @@ export default function BlogPostPage() {
               See exactly where your Google Ads budget is going
             </h3>
             <p className="text-blue-100 mb-8 max-w-xl mx-auto leading-relaxed">
-              AdLeak Shield shows you a session-level journey for every ad click, which keyword brought them, what they did
+              AdLeak Shield shows you a session-level journey for every ad click,which keyword brought them, what they did
               next, and whether they called, enquired, or left within seconds. No cookies. No complex setup. 7-day free trial.
             </p>
             <div className="flex flex-col sm:flex-row gap-3 justify-center">
@@ -324,7 +325,7 @@ export default function BlogPostPage() {
                 href="/auth/signup"
                 className="bg-white text-blue-600 font-semibold px-6 py-3 rounded-lg hover:bg-blue-50 transition-colors"
               >
-                Start free trial, no card needed
+                Start free trial,no card needed
               </Link>
               <Link
                 href="/#features"

@@ -1,38 +1,25 @@
 "use client";
-// =============================================================================
-// AdLeak Shield — Dashboard Shell
-// src/components/layout/dashboard-shell.tsx
-//
-// This is a CLIENT COMPONENT — it runs in the browser.
-// It wraps the entire dashboard with:
-//   1. SWR Provider — enables data fetching with cache across all child components
-//   2. Trial/expiry banner
-//   3. Navigation bar
-//   4. Thaw progress bar (appears only if DB takes > 2s)
-//
-// Phase 1.2: Skeleton loaders
-// Phase 3.2: Accepts children to render actual dashboard content
-// =============================================================================
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { SWRConfig } from "swr";
 import { signOut, useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { LegalFooter } from "@/components/layout/LegalFooter";
+import type { AccessibleDomain } from "@/types/auth";
 
-const IMP_LABEL_COOKIE = 'als_imp_label';
+const IMP_LABEL_COOKIE = "als_imp_label";
 
 function ManageSubscriptionButton() {
   const [loading, setLoading] = useState(false);
   async function handlePortal() {
     setLoading(true);
     try {
-      const res = await fetch('/api/stripe/portal', { method: 'POST' });
+      const res  = await fetch("/api/stripe/portal", { method: "POST" });
       const data = await res.json();
-      if (data.url) window.open(data.url, '_blank', 'noopener,noreferrer');
+      if (data.url) window.open(data.url, "_blank", "noopener,noreferrer");
     } catch (err) {
-      console.error('Portal error:', err);
+      console.error("Portal error:", err);
     } finally {
       setLoading(false);
     }
@@ -50,12 +37,102 @@ function ManageSubscriptionButton() {
 }
 
 function getImpLabel(): string | null {
-  if (typeof document === 'undefined') return null;
+  if (typeof document === "undefined") return null;
   const match = document.cookie
-    .split(';')
+    .split(";")
     .map(c => c.trim())
-    .find(c => c.startsWith(IMP_LABEL_COOKIE + '='));
-  return match ? decodeURIComponent(match.split('=')[1] ?? '') : null;
+    .find(c => c.startsWith(IMP_LABEL_COOKIE + "="));
+  return match ? decodeURIComponent(match.split("=")[1] ?? "") : null;
+}
+
+const ROLE_BADGE: Record<string, { label: string; cls: string }> = {
+  owner:   { label: "Owner",  cls: "bg-indigo-100 text-indigo-700" },
+  editor:  { label: "Editor", cls: "bg-blue-100 text-blue-700" },
+  visitor: { label: "Viewer", cls: "bg-gray-100 text-gray-600" },
+};
+
+function DomainDropdown({
+  domains,
+  activeTenantId,
+  ownTenantId,
+  onSwitch,
+}: {
+  domains:        AccessibleDomain[];
+  activeTenantId: string;
+  ownTenantId:    string;
+  onSwitch:       (tenantId: string) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    function handleClick(e: MouseEvent) {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    }
+    if (open) document.addEventListener("mousedown", handleClick);
+    return () => document.removeEventListener("mousedown", handleClick);
+  }, [open]);
+
+  const active = domains.find(d => d.tenantId === activeTenantId);
+  const displayLabel = active
+    ? `${active.domainName}`
+    : domains.find(d => d.tenantId === ownTenantId)?.domainName ?? "My account";
+
+  if (domains.length === 0) return null;
+
+  return (
+    <div className="relative" ref={ref}>
+      <button
+        type="button"
+        onClick={() => setOpen(v => !v)}
+        className="flex items-center gap-2 px-3 py-1.5 text-sm bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors max-w-[200px]"
+      >
+        <span className="truncate font-medium text-gray-800">{displayLabel}</span>
+        {active && (
+          <span className={`flex-shrink-0 text-[10px] font-semibold px-1.5 py-0.5 rounded-full ${ROLE_BADGE[active.role]?.cls ?? ''}`}>
+            {ROLE_BADGE[active.role]?.label}
+          </span>
+        )}
+        <svg className="w-3.5 h-3.5 text-gray-500 flex-shrink-0" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+        </svg>
+      </button>
+
+      {open && (
+        <div className="absolute left-0 top-full mt-1 z-40 bg-white border border-gray-200 rounded-xl shadow-lg min-w-[220px] py-1 overflow-hidden">
+          {/* Group by tenantOwnerEmail */}
+          {Array.from(new Set(domains.map(d => d.tenantOwnerEmail))).map(ownerEmail => {
+            const group = domains.filter(d => d.tenantOwnerEmail === ownerEmail);
+            const isOwner = group[0]?.role === 'owner';
+            return (
+              <div key={ownerEmail}>
+                <div className="px-3 py-1.5 text-[11px] font-semibold text-gray-400 uppercase tracking-wider bg-gray-50">
+                  {isOwner ? "My account" : ownerEmail}
+                </div>
+                {group.map(d => (
+                  <button
+                    key={d.domainId}
+                    type="button"
+                    onClick={() => { onSwitch(d.tenantId); setOpen(false); }}
+                    className={`w-full flex items-center justify-between gap-2 px-3 py-2 text-sm text-left transition-colors ${
+                      d.tenantId === activeTenantId
+                        ? "bg-indigo-50 text-indigo-700 font-medium"
+                        : "text-gray-700 hover:bg-gray-50"
+                    }`}
+                  >
+                    <span className="truncate">{d.domainName}</span>
+                    <span className={`flex-shrink-0 text-[10px] font-semibold px-1.5 py-0.5 rounded-full ${ROLE_BADGE[d.role]?.cls ?? ''}`}>
+                      {ROLE_BADGE[d.role]?.label}
+                    </span>
+                  </button>
+                ))}
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
 }
 
 interface DashboardShellProps {
@@ -64,60 +141,53 @@ interface DashboardShellProps {
   children: React.ReactNode;
 }
 
-export function DashboardShell({
-  email,
-  tenantId,
-  children,
-}: DashboardShellProps) {
+export function DashboardShell({ email, tenantId, children }: DashboardShellProps) {
   const [thawVisible,     setThawVisible]     = useState(false);
   const [thawProgress,    setThawProgress]    = useState(0);
   const [impLabel,        setImpLabel]        = useState<string | null>(null);
   const [stoppingImp,     setStoppingImp]     = useState(false);
   const [checkoutLoading, setCheckoutLoading] = useState(false);
   const [menuOpen,        setMenuOpen]        = useState(false);
-  // Optimistically treat subscription as active the moment Stripe redirects back,
-  // before update() has had a chance to refresh the JWT. Without this the nav shows
-  // the "Subscribe" button for ~300–500ms while the session is being refreshed.
-  // We persist in sessionStorage so the flag survives the router.replace that strips
-  // ?payment=success from the URL (which can remount this component with a fresh
-  // window.location.search that no longer contains the param).
   const [justSubscribed,  setJustSubscribed]  = useState<boolean>(() => {
-    if (typeof window === 'undefined') return false;
-    if (new URLSearchParams(window.location.search).get('payment') === 'success') {
-      sessionStorage.setItem('als_just_subscribed', 'true');
+    if (typeof window === "undefined") return false;
+    if (new URLSearchParams(window.location.search).get("payment") === "success") {
+      sessionStorage.setItem("als_just_subscribed", "true");
       return true;
     }
-    return sessionStorage.getItem('als_just_subscribed') === 'true';
+    return sessionStorage.getItem("als_just_subscribed") === "true";
   });
 
   const router = useRouter();
   const { data: session, status, update } = useSession();
+
   const subscriptionStatus = session?.user?.subscriptionStatus as string | undefined;
+  const isActive    = subscriptionStatus === "active" || justSubscribed;
+  const isCancelled = subscriptionStatus === "canceled";
 
-  // Redirect to login if the session expires while the user is on the page
+  // Domain switching state
+  const allDomains     = (session?.user?.allAccessibleDomains ?? []) as AccessibleDomain[];
+  const activeTenantId = (session?.user?.activeTenantId ?? tenantId) as string;
+  const ownTenantId    = (session?.user?.tenantId ?? tenantId) as string;
+  const isViewingOwnTenant = activeTenantId === ownTenantId;
+  const isOwner        = session?.user?.isOwner as boolean | undefined;
+
+  async function handleDomainSwitch(newTenantId: string) {
+    await update({ activeTenantId: newTenantId });
+    // Reload the page so SWR and server components pick up the new effective tenant
+    window.location.reload();
+  }
+
   useEffect(() => {
-    if (status === 'unauthenticated') {
-      router.push('/auth/login');
-    }
+    if (status === "unauthenticated") router.push("/auth/login");
   }, [status, router]);
-  const isActive = subscriptionStatus === 'active' || justSubscribed;
-  const isCancelled = subscriptionStatus === 'canceled';
 
-  // After returning from Stripe checkout, force a session refresh so the
-  // subscribe button reflects the new subscription status immediately.
-  // NOTE: do NOT strip ?payment=success here — DashboardContent reads it via
-  // useSearchParams to show the success banner, then clears it via router.replace.
-  // Calling replaceState here races against that read and can swallow the banner.
-  // Once update() resolves the JWT now has the real subscriptionStatus='active',
-  // so we clear the optimistic justSubscribed flag (isActive will remain true via
-  // the real session data).
   useEffect(() => {
-    if (typeof window === 'undefined') return;
+    if (typeof window === "undefined") return;
     const params = new URLSearchParams(window.location.search);
-    if (params.get('payment') === 'success') {
+    if (params.get("payment") === "success") {
       update().then(() => {
         setJustSubscribed(false);
-        sessionStorage.removeItem('als_just_subscribed');
+        sessionStorage.removeItem("als_just_subscribed");
       });
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -126,7 +196,7 @@ export function DashboardShell({
   async function handleSubscribe() {
     setCheckoutLoading(true);
     try {
-      const res = await fetch('/api/stripe/checkout', { method: 'POST' });
+      const res  = await fetch("/api/stripe/checkout", { method: "POST" });
       const data = await res.json();
       if (data.url) window.location.href = data.url;
     } finally {
@@ -134,7 +204,6 @@ export function DashboardShell({
     }
   }
 
-  // Check for impersonation cookie on mount
   useEffect(() => {
     setImpLabel(getImpLabel());
   }, []);
@@ -142,23 +211,16 @@ export function DashboardShell({
   async function stopImpersonation() {
     setStoppingImp(true);
     try {
-      await fetch('/api/admin/impersonate/stop', { method: 'POST' });
-      // Redirect back to admin panel — not a reload
-      window.location.href = '/admin';
+      await fetch("/api/admin/impersonate/stop", { method: "POST" });
+      window.location.href = "/admin";
     } finally {
       setStoppingImp(false);
     }
   }
 
-  // ===========================================================================
-  // THAW DETECTION
-  // On dashboard load, ping the wake endpoint to check DB status.
-  // If it takes > 2 seconds, show the progress bar.
-  // ===========================================================================
   useEffect(() => {
-    const start = Date.now();
+    const start    = Date.now();
     const thawTimer = setTimeout(() => {
-      // DB taking more than 2s — show the progress bar
       setThawVisible(true);
       setThawProgress(30);
       setTimeout(() => setThawProgress(90), 500);
@@ -167,14 +229,9 @@ export function DashboardShell({
     fetch("/api/wake")
       .then(() => {
         clearTimeout(thawTimer);
-        const elapsed = Date.now() - start;
-        if (elapsed > 2000) {
-          // DB was slow — snap progress bar to 100% then hide
+        if (Date.now() - start > 2000) {
           setThawProgress(100);
-          setTimeout(() => {
-            setThawVisible(false);
-            setThawProgress(0);
-          }, 400);
+          setTimeout(() => { setThawVisible(false); setThawProgress(0); }, 400);
         }
       })
       .catch(() => clearTimeout(thawTimer));
@@ -182,48 +239,39 @@ export function DashboardShell({
     return () => clearTimeout(thawTimer);
   }, []);
 
-  // ===========================================================================
-  // SWR GLOBAL CONFIGURATION
-  // fetcher: the default function SWR uses to fetch data
-  // revalidateOnFocus: refresh data when user switches back to the tab
-  // dedupingInterval: don't make the same request more than once per 30s
-  // ===========================================================================
   const swrConfig = {
-    fetcher: (url: string) => fetch(url).then((r) => r.json()),
+    fetcher: (url: string) => fetch(url).then(r => r.json()),
     revalidateOnFocus: true,
     dedupingInterval: 30_000,
   };
 
+  // Subscription buttons only shown when viewing own account as owner
+  const showSubscriptionControls = isViewingOwnTenant && isOwner;
+
   return (
     <SWRConfig value={swrConfig}>
-      {/* Thaw progress bar — only visible when DB is waking up */}
+      {/* Thaw progress bar */}
       {thawVisible && (
         <div
           className="fixed left-0 top-0 z-50 h-1 bg-indigo-500 transition-all"
           style={{
             width: `${thawProgress}%`,
-            transitionDuration:
-              thawProgress === 90 ? "25000ms" : "500ms",
-            transitionTimingFunction:
-              thawProgress === 90
-                ? "linear"
-                : "cubic-bezier(0.4, 0, 0.2, 1)",
+            transitionDuration: thawProgress === 90 ? "25000ms" : "500ms",
+            transitionTimingFunction: thawProgress === 90 ? "linear" : "cubic-bezier(0.4, 0, 0.2, 1)",
           }}
         />
       )}
 
-      {/* Impersonation banner — only shown when admin is viewing as another user */}
+      {/* Impersonation banner */}
       {impLabel && (
         <div className="bg-amber-400 text-gray-900 px-4 py-2 text-center text-sm font-medium flex items-center justify-center gap-4">
-          <span>
-            👁 Viewing as <strong>{impLabel}</strong> — read-only, all writes blocked
-          </span>
+          <span>👁 Viewing as <strong>{impLabel}</strong> — read-only, all writes blocked</span>
           <button
             onClick={stopImpersonation}
             disabled={stoppingImp}
             className="bg-gray-900 text-amber-400 px-3 py-0.5 rounded text-xs font-semibold hover:bg-gray-800 transition-colors disabled:opacity-50"
           >
-            {stoppingImp ? 'Stopping…' : '← Back to admin'}
+            {stoppingImp ? "Stopping…" : "← Back to admin"}
           </button>
         </div>
       )}
@@ -233,39 +281,56 @@ export function DashboardShell({
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
 
-            {/* ── Left: logo + desktop nav links ── */}
-            <div className="flex items-center gap-6">
+            {/* ── Left: logo + nav links ── */}
+            <div className="flex items-center gap-4">
               <span className="text-base font-bold text-gray-900 tracking-tight whitespace-nowrap">
                 AdLeak Shield
               </span>
+
+              {/* Domain dropdown (shows when user has multiple domains) */}
+              {allDomains.length > 1 && (
+                <DomainDropdown
+                  domains={allDomains}
+                  activeTenantId={activeTenantId}
+                  ownTenantId={ownTenantId}
+                  onSwitch={handleDomainSwitch}
+                />
+              )}
+
               <div className="hidden md:flex items-center gap-5">
                 <Link href="/dashboard" className="text-sm text-gray-600 hover:text-gray-900 transition-colors">
                   Dashboard
                 </Link>
                 <Link href="/settings" className="text-sm text-gray-600 hover:text-gray-900 transition-colors">
-                  Manage Setup
+                  Setup
                 </Link>
+                {isOwner && (
+                  <Link href="/settings/team" className="text-sm text-gray-600 hover:text-gray-900 transition-colors">
+                    Team
+                  </Link>
+                )}
+                {isOwner && isViewingOwnTenant && (
+                  <Link href="/settings/subscription" className="text-sm text-gray-600 hover:text-gray-900 transition-colors">
+                    Subscription
+                  </Link>
+                )}
               </div>
             </div>
 
             {/* ── Right: desktop extras + hamburger ── */}
             <div className="flex items-center gap-3">
-
-              {/* Desktop-only: subscribe/manage + email + sign out */}
               <div className="hidden md:flex items-center gap-3">
-                {!isActive && (
+                {showSubscriptionControls && !isActive && (
                   <button
                     onClick={handleSubscribe}
                     disabled={checkoutLoading}
                     className="flex items-center gap-1.5 px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-60 text-white text-sm font-semibold rounded-lg transition-colors whitespace-nowrap"
                   >
-                    {checkoutLoading
-                      ? <span className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                      : null}
-                    {isCancelled ? 'Resubscribe' : 'Subscribe — £12.99/mo'}
+                    {checkoutLoading ? <span className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" /> : null}
+                    {isCancelled ? "Resubscribe" : "Subscribe — £12.99/mo"}
                   </button>
                 )}
-                {isActive && <ManageSubscriptionButton />}
+                {showSubscriptionControls && isActive && <ManageSubscriptionButton />}
                 <span className="text-xs text-gray-400 max-w-[160px] truncate">{email}</span>
                 <button
                   onClick={() => signOut({ callbackUrl: "/auth/login" })}
@@ -295,42 +360,45 @@ export function DashboardShell({
           </div>
         </div>
 
-        {/* Mobile dropdown menu */}
+        {/* Mobile dropdown */}
         {menuOpen && (
           <div className="md:hidden border-t border-gray-200 bg-white shadow-lg">
             <div className="px-4 py-3 space-y-1">
               <p className="text-xs text-gray-400 pb-2 border-b border-gray-100 truncate">{email}</p>
 
-              <Link
-                href="/dashboard"
-                onClick={() => setMenuOpen(false)}
-                className="block px-2 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-50 rounded-lg transition-colors"
-              >
+              <Link href="/dashboard" onClick={() => setMenuOpen(false)}
+                className="block px-2 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-50 rounded-lg transition-colors">
                 Dashboard
               </Link>
-              <Link
-                href="/settings"
-                onClick={() => setMenuOpen(false)}
-                className="block px-2 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-50 rounded-lg transition-colors"
-              >
-                Manage Setup
+              <Link href="/settings" onClick={() => setMenuOpen(false)}
+                className="block px-2 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-50 rounded-lg transition-colors">
+                Setup
               </Link>
+              {isOwner && (
+                <Link href="/settings/team" onClick={() => setMenuOpen(false)}
+                  className="block px-2 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-50 rounded-lg transition-colors">
+                  Team
+                </Link>
+              )}
+              {isOwner && isViewingOwnTenant && (
+                <Link href="/settings/subscription" onClick={() => setMenuOpen(false)}
+                  className="block px-2 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-50 rounded-lg transition-colors">
+                  Subscription
+                </Link>
+              )}
 
-              {/* Subscribe / Manage — mobile only, lives here not in the nav bar */}
               <div className="pt-2 border-t border-gray-100">
-                {!isActive && (
+                {showSubscriptionControls && !isActive && (
                   <button
                     onClick={() => { setMenuOpen(false); handleSubscribe(); }}
                     disabled={checkoutLoading}
                     className="w-full flex items-center justify-center gap-2 px-3 py-2.5 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-60 text-white text-sm font-semibold rounded-lg transition-colors"
                   >
-                    {checkoutLoading
-                      ? <span className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                      : null}
-                    {isCancelled ? 'Resubscribe' : 'Subscribe — £12.99/mo'}
+                    {checkoutLoading ? <span className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" /> : null}
+                    {isCancelled ? "Resubscribe" : "Subscribe — £12.99/mo"}
                   </button>
                 )}
-                {isActive && (
+                {showSubscriptionControls && isActive && (
                   <div onClick={() => setMenuOpen(false)}>
                     <ManageSubscriptionButton />
                   </div>

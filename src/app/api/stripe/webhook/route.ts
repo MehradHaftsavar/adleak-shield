@@ -3,6 +3,7 @@ import Stripe from 'stripe';
 import { stripe } from '@/lib/stripe';
 import { withAdminDb } from '@/lib/db/client';
 import * as mssql from 'mssql';
+import { getPlanFromPriceId } from '@/lib/planLimits';
 
 export const dynamic = 'force-dynamic';
 
@@ -75,7 +76,7 @@ export async function POST(request: NextRequest) {
 
       case 'checkout.session.completed': {
         const session = event.data.object as Stripe.Checkout.Session;
-        const tenantId = session.metadata?.tenantId;
+        const tenantId   = session.metadata?.tenantId;
         const customerId = session.customer as string;
 
         if (!tenantId) {
@@ -83,21 +84,25 @@ export async function POST(request: NextRequest) {
           break;
         }
 
+        const plan = session.metadata?.plan ?? 'starter';
+
         await withAdminDb(async (req) => {
           await req
-            .input('customerId', mssql.NVarChar(50), customerId)
-            .input('tenantId', mssql.UniqueIdentifier, tenantId)
+            .input('customerId', mssql.NVarChar(50),    customerId)
+            .input('tenantId',   mssql.UniqueIdentifier, tenantId)
+            .input('planType',   mssql.NVarChar(20),    plan)
             .query(`
               UPDATE Tenants
               SET stripe_customer_id        = @customerId,
                   subscription_status       = 'active',
+                  plan_type                 = @planType,
                   subscription_cancelled_at = NULL,
                   data_deletion_warned_at   = NULL
               WHERE tenant_id = @tenantId
             `);
         });
 
-        console.log(`[stripe/webhook] Tenant ${tenantId} activated. Customer: ${customerId}`);
+        console.log(`[stripe/webhook] Tenant ${tenantId} activated plan=${plan}. Customer: ${customerId}`);
         break;
       }
 
@@ -117,34 +122,37 @@ export async function POST(request: NextRequest) {
         };
 
         const mappedStatus = statusMap[subscription.status] ?? 'canceled';
-        const isCanceled = mappedStatus === 'canceled';
-        const isActive   = mappedStatus === 'active';
+        const isCanceled   = mappedStatus === 'canceled';
+        const isActive     = mappedStatus === 'active';
+
+        // Derive plan from the subscription's price ID
+        const priceId  = subscription.items.data[0]?.price?.id ?? '';
+        const planType = getPlanFromPriceId(priceId);
+        if (!priceId) {
+          console.warn('[stripe/webhook] subscription.updated: no price ID on subscription items');
+        }
 
         await withAdminDb(async (req) => {
           req
             .input('customerId', mssql.NVarChar(50), customerId)
-            .input('status',     mssql.NVarChar(20), mappedStatus);
+            .input('status',     mssql.NVarChar(20), mappedStatus)
+            .input('planType',   mssql.NVarChar(20), planType);
 
           if (isCanceled) {
-            // Stamp cancellation date (once only) + clear any previous warning flag
-            // so they get a fresh 90-day window and a new warning email if they
-            // resubscribe and cancel again.
-            // Skip deleted tenants — account deletion cancels the Stripe sub as a
-            // side-effect; we don't want the webhook to overwrite 'deleted' → 'canceled'.
             await req.query(`
               UPDATE Tenants
               SET subscription_status        = @status,
+                  plan_type                  = 'starter',
                   subscription_cancelled_at  = ISNULL(subscription_cancelled_at, GETUTCDATE()),
                   data_deletion_warned_at    = NULL
               WHERE stripe_customer_id = @customerId
                 AND deleted_at IS NULL
             `);
           } else if (isActive) {
-            // Resubscribed — clear retention-related stamps so the 90-day clock
-            // resets if they ever cancel again in the future.
             await req.query(`
               UPDATE Tenants
               SET subscription_status        = @status,
+                  plan_type                  = @planType,
                   subscription_cancelled_at  = NULL,
                   data_deletion_warned_at    = NULL
               WHERE stripe_customer_id = @customerId
@@ -153,14 +161,15 @@ export async function POST(request: NextRequest) {
           } else {
             await req.query(`
               UPDATE Tenants
-              SET subscription_status = @status
+              SET subscription_status = @status,
+                  plan_type           = @planType
               WHERE stripe_customer_id = @customerId
                 AND deleted_at IS NULL
             `);
           }
         });
 
-        console.log(`[stripe/webhook] Subscription updated for ${customerId}: ${subscription.status} → ${mappedStatus}`);
+        console.log(`[stripe/webhook] Subscription updated for ${customerId}: ${subscription.status} → ${mappedStatus}, plan=${planType}`);
         break;
       }
 

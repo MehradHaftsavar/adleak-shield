@@ -1,11 +1,6 @@
 // =============================================================================
 // AdLeak Shield — Database Schema Types
 // src/lib/db/schema.ts
-//
-// Drizzle ORM's mssql-core module is not yet stable.
-// We define our table structure as plain TypeScript types that mirror
-// the SQL schema in infra/sql/01_schema.sql exactly.
-// These types are used throughout the application for type safety.
 // =============================================================================
 
 // =============================================================================
@@ -20,6 +15,7 @@ export interface Tenant {
   stripe_customer_id: string | null;
   subscription_status: "trialing" | "active" | "past_due" | "canceled";
   is_owner: boolean;
+  plan_type: "starter" | "freelancer" | "agency";
 }
 
 export type NewTenant = Omit<Tenant, "tenant_id" | "created_at"> & {
@@ -66,7 +62,7 @@ export interface Campaign {
   tenant_id: string;
   domain_id: string;
   google_campaign_id: string;
-  slot_number: 1 | 2 | 3;
+  slot_number: number; // 1–10 depending on plan
   created_at: Date;
   status: "awaiting_data" | "active" | "unregistered_traffic_detected";
 }
@@ -110,7 +106,6 @@ export interface ClickLog {
   landing_page_path: string | null;
   clicked_at: Date;
   estimated_cpc_gbp: number | null;
-  // Phase 3.1 additions
   is_validated: boolean;
   validation_failure_reason: string | null;
   session_duration: number;
@@ -134,7 +129,6 @@ export interface JourneyEvent {
   scroll_depth_pct: number | null;
   dwell_time_ms: number | null;
   occurred_at: Date;
-  // Phase 3.1 addition
   is_success_event: boolean;
 }
 
@@ -159,16 +153,69 @@ export type NewUnregisteredTrafficLog = Omit<
 > & { log_id?: string };
 
 // =============================================================================
+// TEAM MEMBERS
+// =============================================================================
+export interface TeamMember {
+  member_id: string;
+  tenant_id: string;
+  email: string;
+  role: "editor" | "visitor";
+  added_at: Date;
+  accepted_at: Date | null;
+}
+
+export type NewTeamMember = Omit<TeamMember, "member_id" | "added_at"> & {
+  member_id?: string;
+};
+
+// =============================================================================
+// TEAM INVITATIONS
+// =============================================================================
+export interface TeamInvitation {
+  invitation_id: string;
+  tenant_id: string;
+  member_id: string;
+  token_hash: string;
+  invited_by_email: string;
+  email: string;
+  role: "editor" | "visitor";
+  expires_at: Date;
+  created_at: Date;
+  accepted_at: Date | null;
+}
+
+export type NewTeamInvitation = Omit<
+  TeamInvitation,
+  "invitation_id" | "created_at"
+> & { invitation_id?: string };
+
+// =============================================================================
+// MEMBER DOMAIN ACCESS
+// =============================================================================
+export interface MemberDomainAccess {
+  access_id: string;
+  member_id: string;
+  domain_id: string;
+  granted_at: Date;
+}
+
+export type NewMemberDomainAccess = Omit<MemberDomainAccess, "access_id" | "granted_at"> & {
+  access_id?: string;
+};
+
+// =============================================================================
 // TABLE NAME CONSTANTS
-// Use these instead of typing raw strings to prevent typos in queries.
 // =============================================================================
 export const Tables = {
-  Tenants: "Tenants",
-  PasswordResetTokens: "PasswordResetTokens",
-  Domains: "Domains",
-  Campaigns: "Campaigns",
-  Sessions: "Sessions",
-  ClickLogs: "ClickLogs",
-  JourneyEvents: "JourneyEvents",
+  Tenants:               "Tenants",
+  PasswordResetTokens:   "PasswordResetTokens",
+  Domains:               "Domains",
+  Campaigns:             "Campaigns",
+  Sessions:              "Sessions",
+  ClickLogs:             "ClickLogs",
+  JourneyEvents:         "JourneyEvents",
   UnregisteredTrafficLog: "UnregisteredTrafficLog",
+  TeamMembers:           "TeamMembers",
+  TeamInvitations:       "TeamInvitations",
+  MemberDomainAccess:    "MemberDomainAccess",
 } as const;

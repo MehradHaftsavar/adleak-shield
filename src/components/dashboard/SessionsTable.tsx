@@ -15,6 +15,7 @@ import {
   ChevronDown,
   ChevronsUpDown,
   Columns,
+  Download,
 } from 'lucide-react';
 
 type ColKey = 'matchType' | 'date' | 'campaign' | 'device' | 'location' | 'duration' | 'adGroup' | 'adId' | 'position';
@@ -186,9 +187,32 @@ function OutcomeBadge({ isBounce, hasSuccessEvent }: { isBounce: boolean; hasSuc
 }
 
 export function SessionsTable({ campaigns, dateRange, refreshTrigger }: SessionsTableProps) {
-  const [sessions,   setSessions]   = useState<Session[]>([]);
-  const [isLoading,  setIsLoading]  = useState(true);
-  const [error,      setError]      = useState('');
+  const [sessions,      setSessions]      = useState<Session[]>([]);
+  const [isLoading,     setIsLoading]     = useState(true);
+  const [error,         setError]         = useState('');
+  const [csvLoading,    setCsvLoading]    = useState(false);
+
+  async function handleExportCSV() {
+    setCsvLoading(true);
+    try {
+      const params = new URLSearchParams({ start: dateRange.start, end: dateRange.end });
+      const res  = await fetch(`/api/export/sessions?${params}`);
+      if (!res.ok) throw new Error('Export failed');
+      const blob = await res.blob();
+      const url  = URL.createObjectURL(blob);
+      const a    = document.createElement('a');
+      a.href     = url;
+      a.download = `sessions_${dateRange.start}_to_${dateRange.end}.csv`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error('CSV export error:', err);
+    } finally {
+      setCsvLoading(false);
+    }
+  }
 
   // Filters — main
   const [keyword,    setKeyword]    = useState('');
@@ -362,6 +386,21 @@ export function SessionsTable({ campaigns, dateRange, refreshTrigger }: Sessions
                 <h2 className="text-xl font-bold text-gray-900">All Sessions</h2>
                 <p className="text-sm text-gray-600">Every visit from your Google Ads campaigns</p>
               </div>
+            </div>
+
+            {/* Download CSV */}
+            <div className="flex items-center gap-2 flex-shrink-0">
+              <button
+                type="button"
+                onClick={handleExportCSV}
+                disabled={csvLoading}
+                className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors text-gray-600 disabled:opacity-50"
+              >
+                {csvLoading
+                  ? <span className="w-3.5 h-3.5 border-2 border-gray-400 border-t-transparent rounded-full animate-spin" />
+                  : <Download className="w-3.5 h-3.5" />}
+                Export CSV
+              </button>
             </div>
 
             {/* Column picker */}
