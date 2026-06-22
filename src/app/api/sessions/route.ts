@@ -3,7 +3,7 @@ import { auth } from '@/lib/auth';
 import { withTenantDb } from '@/lib/db/client';
 import * as mssql from 'mssql';
 import { isPaywalled } from '@/lib/paywallCheck';
-import { getEffectiveTenantId } from '@/lib/adminAuth';
+import { getEffectiveTenantId, buildDomainFilter } from '@/lib/adminAuth';
 
 export async function GET(request: NextRequest) {
   try {
@@ -13,7 +13,7 @@ export async function GET(request: NextRequest) {
     }
 
     // Resolve effective tenant (supports admin impersonation)
-    const { tenantId, activeDomainId, isImpersonating } = await getEffectiveTenantId(
+    const { tenantId, activeDomainId, memberDomainIds, isImpersonating } = await getEffectiveTenantId(
       session.user.tenantId as string,
       session.user.isOwner as boolean
     );
@@ -74,7 +74,14 @@ export async function GET(request: NextRequest) {
         's.started_at <= @endDate',
         's.keyword IS NOT NULL',
         "s.keyword <> 'adleak_test'",
-        ...(activeDomainId ? [`c.domain_id = '${activeDomainId}'`] : []),
+        ...(activeDomainId
+          ? [`c.domain_id = '${activeDomainId}'`]
+          : memberDomainIds === null
+            ? []
+            : memberDomainIds.length === 0
+              ? ['1=0']
+              : [`c.domain_id IN (${memberDomainIds.map(id => `'${id}'`).join(', ')})`]
+        ),
       ];
 
       if (keyword) {

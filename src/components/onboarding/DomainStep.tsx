@@ -1,15 +1,21 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Globe, Trash2, Plus, AlertTriangle } from 'lucide-react';
+import { Globe, Trash2, Plus, AlertTriangle, Users } from 'lucide-react';
 import { useSession } from 'next-auth/react';
 import { PLAN_LIMITS } from '@/lib/planLimits';
-import type { PlanType } from '@/types/auth';
+import type { PlanType, AccessibleDomain } from '@/types/auth';
 
 interface DomainEntry {
   domainId: string;
   domainName: string;
   verified: boolean;
+}
+
+interface InvitedWorkspace {
+  tenantId: string;
+  ownerEmail: string;
+  domains: AccessibleDomain[];
 }
 
 interface DomainStepProps {
@@ -28,6 +34,21 @@ export function DomainStep({ onComplete, existingDomain }: DomainStepProps) {
   const [isLoading, setIsLoading] = useState(false);
   const [isFetching, setIsFetching] = useState(true);
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
+
+  // Invited workspaces come directly from the JWT — no extra API call needed
+  const invitedWorkspaces: InvitedWorkspace[] = (() => {
+    const all = session?.user?.allAccessibleDomains ?? [];
+    const ownTenantId = session?.user?.tenantId;
+    const invited = all.filter(d => d.tenantId !== ownTenantId);
+    const map = new Map<string, InvitedWorkspace>();
+    for (const d of invited) {
+      if (!map.has(d.tenantId)) {
+        map.set(d.tenantId, { tenantId: d.tenantId, ownerEmail: d.tenantOwnerEmail, domains: [] });
+      }
+      map.get(d.tenantId)!.domains.push(d);
+    }
+    return Array.from(map.values());
+  })();
 
   useEffect(() => {
     fetchDomains();
@@ -105,12 +126,16 @@ export function DomainStep({ onComplete, existingDomain }: DomainStepProps) {
   };
 
   const handleContinue = () => {
-    if (domains.length === 0) {
+    const hasDomains = domains.length > 0 || invitedWorkspaces.length > 0;
+    if (!hasDomains) {
       setError('Please add a domain to continue');
       return;
     }
-    onComplete(domains[0].domainName);
+    onComplete(domains[0]?.domainName ?? invitedWorkspaces[0]?.domains[0]?.domainName ?? '');
   };
+
+  const roleLabel = (role: string) =>
+    role === 'editor' ? 'Editor' : role === 'visitor' ? 'Viewer' : role;
 
   const confirmDelete = domains.find(d => d.domainId === confirmDeleteId);
 
@@ -144,27 +169,39 @@ export function DomainStep({ onComplete, existingDomain }: DomainStepProps) {
         </div>
       </div>
 
-      {/* Registered domains list */}
-      {domains.length > 0 && (
-        <div className="mb-6 space-y-2">
-          {domains.map(d => (
-            <div key={d.domainId} className="flex items-center justify-between p-4 bg-gray-50 rounded-lg border border-gray-200">
-              <div>
-                <p className="font-semibold text-gray-900">{d.domainName}</p>
-                {d.verified && <p className="text-xs text-green-600 mt-0.5">Verified</p>}
-              </div>
-              <button
-                onClick={() => setConfirmDeleteId(d.domainId)}
-                className="text-red-600 hover:text-red-700 p-2"
-                title="Remove domain"
-                disabled={isFetching || isLoading}
-              >
-                <Trash2 className="w-5 h-5" />
-              </button>
-            </div>
-          ))}
+      {/* ── YOUR DOMAINS ───────────────────────────────────────────── */}
+      <div className="mb-6">
+        <div className="flex items-center gap-2 mb-3">
+          <span className="text-xs font-semibold uppercase tracking-wide text-blue-700 bg-blue-50 border border-blue-200 px-2.5 py-0.5 rounded-full">
+            Registered by you
+          </span>
+          <span className="text-xs text-gray-400">
+            {domains.length} / {limits.domains} on {limits.label} plan
+          </span>
         </div>
-      )}
+        {domains.length > 0 ? (
+          <div className="space-y-2">
+            {domains.map(d => (
+              <div key={d.domainId} className="flex items-center justify-between p-4 bg-gray-50 rounded-lg border border-gray-200">
+                <div>
+                  <p className="font-semibold text-gray-900">{d.domainName}</p>
+                  {d.verified && <p className="text-xs text-green-600 mt-0.5">Verified</p>}
+                </div>
+                <button
+                  onClick={() => setConfirmDeleteId(d.domainId)}
+                  className="text-red-600 hover:text-red-700 p-2"
+                  title="Remove domain"
+                  disabled={isFetching || isLoading}
+                >
+                  <Trash2 className="w-5 h-5" />
+                </button>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <p className="text-sm text-gray-400 italic px-1">No domains registered yet</p>
+        )}
+      </div>
 
       {/* Add domain form — shown when under the plan limit */}
       {domains.length < limits.domains && (
@@ -205,6 +242,44 @@ export function DomainStep({ onComplete, existingDomain }: DomainStepProps) {
         </div>
       )}
 
+      {/* ── INVITED WORKSPACES ─────────────────────────────────────── */}
+      {invitedWorkspaces.length > 0 && (
+        <div className="mb-6 border-t border-gray-100 pt-6">
+          <div className="flex items-center gap-2 mb-3">
+            <Users className="w-4 h-4 text-gray-400" />
+            <span className="text-xs font-semibold uppercase tracking-wide text-gray-500 bg-gray-100 border border-gray-200 px-2.5 py-0.5 rounded-full">
+              Invited workspaces
+            </span>
+          </div>
+          <p className="text-xs text-gray-500 mb-3">
+            Domains from accounts you've been invited to — switch workspace in the dashboard to manage their campaigns.
+          </p>
+          <div className="space-y-3">
+            {invitedWorkspaces.map(ws => (
+              <div key={ws.tenantId} className="rounded-lg border border-gray-200 overflow-hidden">
+                <div className="px-4 py-2 bg-gray-50 border-b border-gray-200">
+                  <p className="text-xs font-medium text-gray-600">{ws.ownerEmail}</p>
+                </div>
+                <div className="divide-y divide-gray-100">
+                  {ws.domains.map(d => (
+                    <div key={d.domainId} className="flex items-center justify-between px-4 py-3">
+                      <p className="text-sm text-gray-800">{d.domainName}</p>
+                      <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${
+                        d.role === 'editor'
+                          ? 'bg-amber-50 text-amber-700 border border-amber-200'
+                          : 'bg-gray-100 text-gray-600 border border-gray-200'
+                      }`}>
+                        {roleLabel(d.role)}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
         <p className="text-sm text-blue-800">
           <strong>{limits.label} Plan:</strong> You can register {limits.domains} domain{limits.domains !== 1 ? 's' : ''} and up to {limits.campaignsPerDomain} campaigns per domain.
@@ -213,7 +288,7 @@ export function DomainStep({ onComplete, existingDomain }: DomainStepProps) {
 
       <button
         onClick={handleContinue}
-        disabled={domains.length === 0 || isFetching}
+        disabled={(domains.length === 0 && invitedWorkspaces.length === 0) || isFetching}
         className="w-full bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white font-semibold py-3 px-6 rounded-lg transition-colors"
       >
         Continue to Campaigns →
@@ -221,6 +296,11 @@ export function DomainStep({ onComplete, existingDomain }: DomainStepProps) {
 
       <p className="text-center text-sm text-gray-600 mt-4">
         {domains.length} / {limits.domains} domain{limits.domains !== 1 ? 's' : ''} registered
+        {invitedWorkspaces.length > 0 && (
+          <span className="text-gray-400 ml-1">
+            · access to {invitedWorkspaces.reduce((n, ws) => n + ws.domains.length, 0)} invited domain{invitedWorkspaces.reduce((n, ws) => n + ws.domains.length, 0) !== 1 ? 's' : ''}
+          </span>
+        )}
       </p>
     </div>
 

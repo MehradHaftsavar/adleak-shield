@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@/lib/auth';
 import { withTenantDb } from '@/lib/db/client';
-import { getEffectiveTenantId } from '@/lib/adminAuth';
+import { getEffectiveTenantId, buildDomainFilter } from '@/lib/adminAuth';
 import * as mssql from 'mssql';
 
 export const dynamic = 'force-dynamic';
@@ -22,10 +22,11 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const { tenantId } = await getEffectiveTenantId(
+    const { tenantId, activeDomainId, memberDomainIds } = await getEffectiveTenantId(
       session.user.tenantId as string,
       session.user.isOwner as boolean
     );
+    const domainFilter = buildDomainFilter(activeDomainId, memberDomainIds, 'c.domain_id');
 
     const { searchParams } = new URL(request.url);
     const start      = searchParams.get('start')      || '1970-01-01';
@@ -83,6 +84,7 @@ export async function GET(request: NextRequest) {
         LEFT JOIN Campaigns c ON c.campaign_id = s.campaign_id
         WHERE s.started_at >= @start
           AND s.started_at <= @end
+          ${domainFilter}
           AND (@keyword    IS NULL OR s.keyword       LIKE '%' + @keyword + '%')
           AND (@campaignId IS NULL OR s.campaign_id   = CAST(@campaignId AS UNIQUEIDENTIFIER))
           AND (@matchType  IS NULL OR s.match_type    = @matchType)

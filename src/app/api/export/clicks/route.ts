@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@/lib/auth';
 import { withTenantDb } from '@/lib/db/client';
-import { getEffectiveTenantId } from '@/lib/adminAuth';
+import { getEffectiveTenantId, buildDomainFilter } from '@/lib/adminAuth';
 
 export const dynamic = 'force-dynamic';
 
@@ -21,7 +21,7 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const { tenantId } = await getEffectiveTenantId(
+    const { tenantId, activeDomainId, memberDomainIds } = await getEffectiveTenantId(
       session.user.tenantId as string,
       session.user.isOwner as boolean
     );
@@ -29,6 +29,8 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url);
     const start = searchParams.get('start') || '1970-01-01';
     const end   = searchParams.get('end')   || new Date().toISOString().slice(0, 10);
+
+    const domainFilter = buildDomainFilter(activeDomainId, memberDomainIds, 'c.domain_id');
 
     const rows = await withTenantDb(tenantId, async (req) => {
       req.input('start', start + 'T00:00:00Z');
@@ -49,6 +51,7 @@ export async function GET(request: NextRequest) {
         FROM ClickLogs cl
         LEFT JOIN Campaigns c ON c.campaign_id = cl.campaign_id
         WHERE cl.clicked_at >= @start AND cl.clicked_at <= @end
+          ${domainFilter}
         ORDER BY cl.clicked_at DESC
       `);
       return result.recordset;

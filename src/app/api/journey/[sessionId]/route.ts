@@ -3,6 +3,7 @@ import { auth } from '@/lib/auth';
 import { withTenantDb } from '@/lib/db/client';
 import * as mssql from 'mssql';
 import { isPaywalled } from '@/lib/paywallCheck';
+import { getEffectiveTenantId, buildDomainFilter } from '@/lib/adminAuth';
 
 export async function GET(
   request: NextRequest,
@@ -19,8 +20,13 @@ export async function GET(
     }
 
     const { sessionId } = await params;
+    const { tenantId, activeDomainId, memberDomainIds } = await getEffectiveTenantId(
+      session.user.tenantId as string,
+      session.user.isOwner as boolean
+    );
+    const domainFilter = buildDomainFilter(activeDomainId, memberDomainIds, 'c.domain_id');
 
-    const result = await withTenantDb(session.user.tenantId, async (req) => {
+    const result = await withTenantDb(tenantId, async (req) => {
       req.input('sessionId', mssql.UniqueIdentifier, sessionId);
 
       const sessionResult = await req.query(`
@@ -33,7 +39,9 @@ export async function GET(
           s.total_duration_ms,
           s.is_bounce
         FROM Sessions s
+        INNER JOIN Campaigns c ON c.campaign_id = s.campaign_id
         WHERE s.session_id = @sessionId
+          ${domainFilter}
       `);
 
       if (sessionResult.recordset.length === 0) {

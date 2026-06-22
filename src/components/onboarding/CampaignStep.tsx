@@ -34,6 +34,14 @@ export function CampaignStep({ onComplete, onBack }: CampaignStepProps) {
   const planType = (session?.user?.planType ?? 'starter') as PlanType;
   const maxCampaigns = PLAN_LIMITS[planType].campaignsPerDomain;
 
+  // Count invited workspaces for the info note
+  const invitedWorkspaceCount = (() => {
+    const all = session?.user?.allAccessibleDomains ?? [];
+    const ownTenantId = session?.user?.tenantId;
+    const tenantIds = new Set(all.filter(d => d.tenantId !== ownTenantId).map(d => d.tenantId));
+    return tenantIds.size;
+  })();
+
   const [domains, setDomains] = useState<DomainEntry[]>([]);
   const [campaigns, setCampaigns] = useState<Campaign[]>([]);
   const [selectedDomainId, setSelectedDomainId] = useState('');
@@ -346,6 +354,17 @@ export function CampaignStep({ onComplete, onBack }: CampaignStepProps) {
           </div>
         );
       })}
+
+      {/* Invited workspace note */}
+      {invitedWorkspaceCount > 0 && (
+        <div className="mb-4 flex items-start gap-2 bg-gray-50 border border-gray-200 rounded-lg px-4 py-3">
+          <span className="text-gray-400 mt-0.5">ℹ️</span>
+          <p className="text-xs text-gray-600">
+            You also have access to {invitedWorkspaceCount} invited workspace{invitedWorkspaceCount !== 1 ? 's' : ''}.
+            Switch workspace from the dashboard to view and manage campaigns there.
+          </p>
+        </div>
+      )}
 
       {/* Add campaign form */}
       <div className="border-t border-gray-100 pt-6">

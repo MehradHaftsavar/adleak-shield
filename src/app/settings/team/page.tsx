@@ -325,7 +325,12 @@ export default function TeamPage() {
           </form>
         )}
 
-        {inviteMsg   && <p className="mt-3 text-sm text-green-700">{inviteMsg}</p>}
+        {inviteMsg   && (
+          <div className="mt-3 space-y-1">
+            <p className="text-sm text-green-700">{inviteMsg}</p>
+            <p className="text-xs text-gray-500">📬 Ask them to check their spam folder if they don't see it within a few minutes.</p>
+          </div>
+        )}
         {inviteError && <p className="mt-3 text-sm text-red-600">{inviteError}</p>}
 
         <div className="mt-4 text-xs text-gray-500 space-y-1">

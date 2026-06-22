@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@/lib/auth';
 import { withTenantDb } from '@/lib/db/client';
 import * as mssql from 'mssql';
-import { getEffectiveTenantId } from '@/lib/adminAuth';
+import { getEffectiveTenantId, buildDomainFilter } from '@/lib/adminAuth';
 
 export async function GET(request: NextRequest) {
   try {
@@ -23,10 +23,12 @@ export async function GET(request: NextRequest) {
     const start = startDate || new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
     const end   = endDate   || new Date().toISOString();
 
-    const { tenantId } = await getEffectiveTenantId(
+    const { tenantId, activeDomainId, memberDomainIds } = await getEffectiveTenantId(
       session.user.tenantId as string,
       session.user.isOwner as boolean
     );
+
+    const domainFilter = buildDomainFilter(activeDomainId, memberDomainIds, 'c.domain_id');
 
     const result = await withTenantDb(tenantId, async (req) => {
       req.input('keyword',   mssql.NVarChar(255), keyword);
@@ -55,9 +57,11 @@ export async function GET(request: NextRequest) {
               AND je.event_type = 'success_event'
           ) AS success_count
         FROM Sessions s
+        INNER JOIN Campaigns c ON c.campaign_id = s.campaign_id
         WHERE s.keyword     = @keyword
           AND s.started_at >= @startDate
           AND s.started_at <= @endDate
+          ${domainFilter}
         ORDER BY s.started_at DESC
       `);
 

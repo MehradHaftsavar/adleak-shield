@@ -50,6 +50,10 @@ export async function getEffectiveTenantId(
 ): Promise<{
   tenantId: string;
   activeDomainId: string | null;
+  // null  = own tenant or impersonation — no domain restriction
+  // []    = member with no accessible domains
+  // [...] = member restricted to these domain IDs
+  memberDomainIds: string[] | null;
   isImpersonating: boolean;
   impersonatedEmail: string | null;
   role: 'owner' | 'editor' | 'visitor';
@@ -61,11 +65,12 @@ export async function getEffectiveTenantId(
     if (impCookie?.value) {
       const labelCookie = cookieStore.get(IMP_LABEL_COOKIE);
       return {
-        tenantId:         impCookie.value,
-        activeDomainId:   null, // impersonation sees all domains
-        isImpersonating:  true,
+        tenantId:          impCookie.value,
+        activeDomainId:    null,
+        memberDomainIds:   null, // impersonation sees all domains
+        isImpersonating:   true,
         impersonatedEmail: labelCookie?.value ?? null,
-        role:             'owner',
+        role:              'owner',
       };
     }
   }
@@ -91,12 +96,17 @@ export async function getEffectiveTenantId(
   if (effectiveId && effectiveId !== ownTenantId) {
     const entry = accessibleDomains.find(d => d.tenantId === effectiveId);
     if (entry) {
+      // Member viewing another workspace — collect their MDA-granted domain IDs
+      const memberDomainIds = accessibleDomains
+        .filter(d => d.tenantId === effectiveId)
+        .map(d => d.domainId);
       return {
-        tenantId:         effectiveId,
-        activeDomainId:   activeDomainId,
-        isImpersonating:  false,
+        tenantId:          effectiveId,
+        activeDomainId:    activeDomainId,
+        memberDomainIds,
+        isImpersonating:   false,
         impersonatedEmail: null,
-        role:             entry.role,
+        role:              entry.role,
       };
     }
     console.warn(`[Auth] activeTenantId ${effectiveId} not in allAccessibleDomains for ${ownTenantId}`);
@@ -104,12 +114,34 @@ export async function getEffectiveTenantId(
 
   // ── Default: own tenant ───────────────────────────────────────────────────
   return {
-    tenantId:         ownTenantId,
-    activeDomainId:   activeDomainId,
-    isImpersonating:  false,
+    tenantId:          ownTenantId,
+    activeDomainId:    activeDomainId,
+    memberDomainIds:   null, // own tenant — no restriction
+    isImpersonating:   false,
     impersonatedEmail: null,
-    role:             'owner',
+    role:              'owner',
   };
+}
+
+// ---------------------------------------------------------------------------
+// buildDomainFilter — produces a SQL AND clause that restricts rows to the
+// domains a member has access to. Safe to interpolate: values come from the
+// server-signed JWT, never from raw user input.
+//
+//   activeDomainId set  → filter to that single domain (takes priority)
+//   memberDomainIds null → own tenant / impersonation, no restriction
+//   memberDomainIds []   → member but no domains granted → AND 1=0 (empty result)
+//   memberDomainIds [...] → restrict to IN list
+// ---------------------------------------------------------------------------
+export function buildDomainFilter(
+  activeDomainId: string | null,
+  memberDomainIds: string[] | null,
+  column: string,
+): string {
+  if (activeDomainId) return `AND ${column} = '${activeDomainId}'`;
+  if (memberDomainIds === null) return '';
+  if (memberDomainIds.length === 0) return 'AND 1=0';
+  return `AND ${column} IN (${memberDomainIds.map(id => `'${id}'`).join(', ')})`;
 }
 
 // ---------------------------------------------------------------------------

@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@/lib/auth';
 import { withTenantDb, withAdminDb } from '@/lib/db/client';
 import * as mssql from 'mssql';
-import { getEffectiveTenantId } from '@/lib/adminAuth';
+import { getEffectiveTenantId, buildDomainFilter } from '@/lib/adminAuth';
 
 export async function GET(request: NextRequest) {
   try {
@@ -12,15 +12,14 @@ export async function GET(request: NextRequest) {
     }
 
     // Resolve effective tenant (supports admin impersonation)
-    const { tenantId: effectiveTenantId, activeDomainId } = await getEffectiveTenantId(
+    const { tenantId: effectiveTenantId, activeDomainId, memberDomainIds } = await getEffectiveTenantId(
       session.user.tenantId as string,
       session.user.isOwner as boolean
     );
 
     const result = await withTenantDb(effectiveTenantId, async (req) => {
-      const domainFilter = activeDomainId
-        ? `AND c.domain_id = '${activeDomainId}'`
-        : '';
+      const domainFilter = buildDomainFilter(activeDomainId, memberDomainIds, 'c.domain_id');
+      const domainFilterNaked = buildDomainFilter(activeDomainId, memberDomainIds, 'domain_id');
 
       // Self-heal: flip any campaign that has real sessions but is still
       // marked awaiting_data — catches legacy data and any queue worker gaps
@@ -28,7 +27,7 @@ export async function GET(request: NextRequest) {
         UPDATE Campaigns
         SET status = 'active'
         WHERE status = 'awaiting_data'
-          ${activeDomainId ? `AND domain_id = '${activeDomainId}'` : ''}
+          ${domainFilterNaked}
           AND EXISTS (
             SELECT 1 FROM Sessions s
             WHERE s.campaign_id = Campaigns.campaign_id

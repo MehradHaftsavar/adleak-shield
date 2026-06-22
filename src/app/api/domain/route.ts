@@ -151,10 +151,8 @@ export async function GET(_request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const { tenantId } = await getEffectiveTenantId(
-      session.user.tenantId as string,
-      session.user.isOwner as boolean
-    );
+    // Setup always operates on the user's own tenant — never the active switched workspace
+    const tenantId = session.user.tenantId as string;
 
     const result = await withTenantDb(tenantId, async (req) => {
       const domainResult = await req.query(`SELECT domain_id, domain_name, verified FROM Domains`);

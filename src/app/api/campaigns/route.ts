@@ -3,7 +3,7 @@ import { z } from 'zod';
 import { auth } from '@/lib/auth';
 import { withTenantDb, withAdminDb } from '@/lib/db/client';
 import * as mssql from 'mssql';
-import { getEffectiveTenantId, blockedInImpersonation, forbidden } from '@/lib/adminAuth';
+import { getEffectiveTenantId, blockedInImpersonation, forbidden, buildDomainFilter } from '@/lib/adminAuth';
 import { PLAN_LIMITS } from '@/lib/planLimits';
 import type { PlanType } from '@/types/auth';
 
@@ -183,12 +183,10 @@ export async function GET(_request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const { tenantId } = await getEffectiveTenantId(
-      session.user.tenantId as string,
-      session.user.isOwner as boolean
-    );
+    // Setup always operates on the user's own tenant — never the active switched workspace
+    const tenantId = session.user.tenantId as string;
 
-    const planType   = await getActivePlanType(tenantId, session.user.tenantId as string, session.user.planType);
+    const planType   = await getActivePlanType(tenantId, tenantId, session.user.planType);
     const maxAllowed = PLAN_LIMITS[planType].campaignsPerDomain;
 
     const result = await withTenantDb(tenantId, async (req) => {
@@ -230,7 +228,7 @@ export async function PATCH(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const { tenantId, isImpersonating, role } = await getEffectiveTenantId(
+    const { tenantId, isImpersonating, role, activeDomainId, memberDomainIds } = await getEffectiveTenantId(
       session.user.tenantId as string,
       session.user.isOwner as boolean
     );
@@ -241,6 +239,8 @@ export async function PATCH(request: NextRequest) {
     const { campaignId, avgCpc, name } = body;
 
     if (!campaignId) return NextResponse.json({ error: 'Campaign ID required' }, { status: 400 });
+
+    const domainFilter = buildDomainFilter(activeDomainId, memberDomainIds, 'domain_id');
 
     const result = await withTenantDb(tenantId, async (req) => {
       req.input('campaignId', mssql.UniqueIdentifier, campaignId);
@@ -260,7 +260,7 @@ export async function PATCH(request: NextRequest) {
       }
       if (sets.length === 0) throw new Error('NO_FIELDS');
 
-      const updateResult = await req.query(`UPDATE Campaigns SET ${sets.join(', ')} WHERE campaign_id = @campaignId`);
+      const updateResult = await req.query(`UPDATE Campaigns SET ${sets.join(', ')} WHERE campaign_id = @campaignId ${domainFilter}`);
       if (updateResult.rowsAffected[0] === 0) throw new Error('NOT_FOUND');
       return { success: true, avgCpc: avgCpc !== undefined ? parseFloat(avgCpc) : undefined, name: name ?? undefined };
     });
@@ -284,7 +284,7 @@ export async function DELETE(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const { tenantId, isImpersonating, role } = await getEffectiveTenantId(
+    const { tenantId, isImpersonating, role, activeDomainId, memberDomainIds } = await getEffectiveTenantId(
       session.user.tenantId as string,
       session.user.isOwner as boolean
     );
@@ -295,8 +295,13 @@ export async function DELETE(request: NextRequest) {
     const campaignDbId = searchParams.get('id');
     if (!campaignDbId) return NextResponse.json({ error: 'Campaign ID required' }, { status: 400 });
 
+    const domainFilter = buildDomainFilter(activeDomainId, memberDomainIds, 'domain_id');
+
     const result = await withTenantDb(tenantId, async (req) => {
       req.input('campaignId', mssql.UniqueIdentifier, campaignDbId);
+      // Verify the campaign belongs to an accessible domain before cascading deletes
+      const check = await req.query(`SELECT campaign_id FROM Campaigns WHERE campaign_id = @campaignId ${domainFilter}`);
+      if (check.recordset.length === 0) throw new Error('NOT_FOUND');
       await req.query(`DELETE FROM JourneyEvents WHERE session_id IN (SELECT session_id FROM Sessions WHERE campaign_id = @campaignId)`);
       await req.query(`DELETE FROM ClickLogs WHERE campaign_id = @campaignId`);
       await req.query(`DELETE FROM Sessions  WHERE campaign_id = @campaignId`);
