@@ -49,6 +49,7 @@ export async function getEffectiveTenantId(
   }
 ): Promise<{
   tenantId: string;
+  activeDomainId: string | null;
   isImpersonating: boolean;
   impersonatedEmail: string | null;
   role: 'owner' | 'editor' | 'visitor';
@@ -61,6 +62,7 @@ export async function getEffectiveTenantId(
       const labelCookie = cookieStore.get(IMP_LABEL_COOKIE);
       return {
         tenantId:         impCookie.value,
+        activeDomainId:   null, // impersonation sees all domains
         isImpersonating:  true,
         impersonatedEmail: labelCookie?.value ?? null,
         role:             'owner',
@@ -68,15 +70,16 @@ export async function getEffectiveTenantId(
     }
   }
 
-  // ── Resolve activeTenantId and accessible domains ─────────────────────────
+  // ── Resolve activeTenantId, activeDomainId, and accessible domains ────────
   let activeTenantId: string | undefined    = opts?.activeTenantId;
+  let activeDomainId: string | null         = null;
   let accessibleDomains: AccessibleDomain[] = opts?.allAccessibleDomains ?? [];
 
   if (!opts) {
-    // Auto-read from the current session so callers don't need to pass opts
     try {
       const session     = await auth();
       activeTenantId    = session?.user?.activeTenantId;
+      activeDomainId    = session?.user?.activeDomainId ?? null;
       accessibleDomains = session?.user?.allAccessibleDomains ?? [];
     } catch {
       // Non-fatal — falls through to own tenant
@@ -90,18 +93,19 @@ export async function getEffectiveTenantId(
     if (entry) {
       return {
         tenantId:         effectiveId,
+        activeDomainId:   activeDomainId,
         isImpersonating:  false,
         impersonatedEmail: null,
         role:             entry.role,
       };
     }
-    // activeTenantId is not in the accessible list — security: fall back to own
     console.warn(`[Auth] activeTenantId ${effectiveId} not in allAccessibleDomains for ${ownTenantId}`);
   }
 
   // ── Default: own tenant ───────────────────────────────────────────────────
   return {
     tenantId:         ownTenantId,
+    activeDomainId:   activeDomainId,
     isImpersonating:  false,
     impersonatedEmail: null,
     role:             'owner',

@@ -13,7 +13,7 @@ export async function GET(request: NextRequest) {
     }
 
     // Resolve effective tenant (supports admin impersonation)
-    const { tenantId, isImpersonating } = await getEffectiveTenantId(
+    const { tenantId, activeDomainId, isImpersonating } = await getEffectiveTenantId(
       session.user.tenantId as string,
       session.user.isOwner as boolean
     );
@@ -74,6 +74,7 @@ export async function GET(request: NextRequest) {
         's.started_at <= @endDate',
         's.keyword IS NOT NULL',
         "s.keyword <> 'adleak_test'",
+        ...(activeDomainId ? [`c.domain_id = '${activeDomainId}'`] : []),
       ];
 
       if (keyword) {

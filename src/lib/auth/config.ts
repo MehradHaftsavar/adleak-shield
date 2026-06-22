@@ -92,6 +92,9 @@ export const authConfig: NextAuthConfig = {
         token.onboardingCompleted = user.onboardingCompleted;
         token.allAccessibleDomains = (user.allAccessibleDomains ?? []) as AccessibleDomain[];
         token.activeTenantId    = user.tenantId; // default to own tenant
+        // Default active domain = first of user's own domains
+        const ownDomains = ((user.allAccessibleDomains ?? []) as AccessibleDomain[]).filter(d => d.tenantId === user.tenantId);
+        token.activeDomainId    = ownDomains[0]?.domainId ?? null;
         token.planType          = (user.planType ?? 'starter') as PlanType;
       }
 
@@ -107,28 +110,43 @@ export const authConfig: NextAuthConfig = {
           token.planType = session.planType as PlanType;
         }
 
-        // Domain switching — validate the requested tenant is actually accessible
-        if (session?.activeTenantId !== undefined) {
+        // Domain switching — validate the requested tenant+domain is actually accessible
+        if (session?.activeTenantId !== undefined || session?.activeDomainId !== undefined) {
           const domains = (token.allAccessibleDomains ?? []) as AccessibleDomain[];
           const ownTenantId = token.tenantId as string;
-          const requested = session.activeTenantId as string;
-          const allowed =
-            requested === ownTenantId ||
-            domains.some(d => d.tenantId === requested);
-          if (allowed) {
-            token.activeTenantId = requested;
+
+          if (session?.activeTenantId !== undefined) {
+            const requestedTenant = session.activeTenantId as string;
+            const allowed = requestedTenant === ownTenantId || domains.some(d => d.tenantId === requestedTenant);
+            if (allowed) token.activeTenantId = requestedTenant;
           }
-          // Silently ignore unauthorised switch attempts
+
+          if (session?.activeDomainId !== undefined) {
+            const requestedDomain = session.activeDomainId as string | null;
+            if (requestedDomain === null) {
+              token.activeDomainId = null;
+            } else {
+              const allowed = domains.some(d => d.domainId === requestedDomain);
+              if (allowed) token.activeDomainId = requestedDomain;
+            }
+          }
         }
 
         // Re-fetch all accessible domains (own + member) — used after invite accept or when empty
         if (session?.refreshAccessibleDomains) {
           try {
-            token.allAccessibleDomains = await loadAccessibleDomains(
+            const refreshed = await loadAccessibleDomains(
               token.email as string,
               token.tenantId as string,
               token.email as string,
             );
+            token.allAccessibleDomains = refreshed;
+            // If activeDomainId is no longer valid, reset to first own domain
+            const stillValid = refreshed.some(d => d.domainId === token.activeDomainId);
+            if (!stillValid) {
+              const ownDomains = refreshed.filter(d => d.tenantId === token.tenantId);
+              token.activeDomainId = ownDomains[0]?.domainId ?? null;
+            }
           } catch (err) {
             console.error('[Auth] refreshAccessibleDomains failed (non-fatal):', err);
           }
@@ -181,6 +199,7 @@ export const authConfig: NextAuthConfig = {
         session.user.onboardingCompleted = token.onboardingCompleted as boolean;
         session.user.allAccessibleDomains = ((token.allAccessibleDomains ?? []) as AccessibleDomain[]);
         session.user.activeTenantId     = ((token.activeTenantId ?? token.tenantId) as string);
+        session.user.activeDomainId     = (token.activeDomainId ?? null) as string | null;
         session.user.planType           = ((token.planType ?? 'starter') as PlanType);
       }
       return session;

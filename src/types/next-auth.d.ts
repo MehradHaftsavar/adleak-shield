@@ -16,6 +16,7 @@ declare module "next-auth" {
       onboardingCompleted: boolean;
       allAccessibleDomains: AccessibleDomain[];
       activeTenantId: string;
+      activeDomainId: string | null;
       planType: PlanType;
     } & DefaultSession["user"];
   }
@@ -40,6 +41,7 @@ declare module "next-auth/jwt" {
     onboardingCompleted: boolean;
     allAccessibleDomains: AccessibleDomain[];
     activeTenantId: string;
+    activeDomainId: string | null;
     planType: PlanType;
   }
 }

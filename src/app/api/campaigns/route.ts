@@ -15,6 +15,7 @@ const campaignSchema = z.object({
   avgCpc: z.number()
     .min(0.01, 'CPC must be at least £0.01')
     .max(1000, 'CPC must be less than £1000'),
+  name: z.string().max(100).optional(),
 });
 
 async function getActivePlanType(
@@ -112,16 +113,17 @@ export async function POST(request: NextRequest) {
         if (!usedSlots.includes(i)) { slotNumber = i; break; }
       }
 
-      req.input('slotNumber', mssql.Int,            slotNumber);
-      req.input('avgCpc',     mssql.Decimal(10, 2), validatedData.avgCpc);
+      req.input('slotNumber',    mssql.Int,            slotNumber);
+      req.input('avgCpc',        mssql.Decimal(10, 2), validatedData.avgCpc);
+      req.input('campaignName',  mssql.NVarChar(100),  validatedData.name ?? null);
 
       await req.query(`
-        INSERT INTO Campaigns (tenant_id, domain_id, google_campaign_id, slot_number, status, avg_cpc, created_at)
-        VALUES (CAST(SESSION_CONTEXT(N'TenantId') AS uniqueidentifier), @domainId, @googleCampaignId, @slotNumber, 'awaiting_data', @avgCpc, GETUTCDATE())
+        INSERT INTO Campaigns (tenant_id, domain_id, google_campaign_id, slot_number, status, avg_cpc, name, created_at)
+        VALUES (CAST(SESSION_CONTEXT(N'TenantId') AS uniqueidentifier), @domainId, @googleCampaignId, @slotNumber, 'awaiting_data', @avgCpc, @campaignName, GETUTCDATE())
       `);
 
       const selectResult = await req.query(`
-        SELECT campaign_id, google_campaign_id, slot_number, domain_id, created_at, status, avg_cpc
+        SELECT campaign_id, google_campaign_id, slot_number, domain_id, created_at, status, avg_cpc, name
         FROM   Campaigns WHERE google_campaign_id = @googleCampaignId
       `);
       const newCampaign = selectResult.recordset[0];
@@ -134,6 +136,7 @@ export async function POST(request: NextRequest) {
           id:               newCampaign.campaign_id,
           googleCampaignId: newCampaign.google_campaign_id,
           slotNumber:       newCampaign.slot_number,
+          name:             newCampaign.name ?? null,
           domainId:         newCampaign.domain_id,
           createdAt:        newCampaign.created_at,
           status:           newCampaign.status,
@@ -201,6 +204,7 @@ export async function GET(_request: NextRequest) {
           id:               c.campaign_id,
           googleCampaignId: c.google_campaign_id,
           slotNumber:       c.slot_number,
+          name:             c.name ?? null,
           domainId:         c.domain_id,
           domainName:       c.domain_name,
           createdAt:        c.created_at,
@@ -234,30 +238,42 @@ export async function PATCH(request: NextRequest) {
     if (role === 'visitor') return forbidden('Visitors cannot update campaigns');
 
     const body = await request.json();
-    const { campaignId, avgCpc } = body;
+    const { campaignId, avgCpc, name } = body;
 
     if (!campaignId) return NextResponse.json({ error: 'Campaign ID required' }, { status: 400 });
 
-    const parsedCpc = parseFloat(avgCpc);
-    if (isNaN(parsedCpc) || parsedCpc < 0.01 || parsedCpc > 1000) {
-      return NextResponse.json({ error: 'CPC must be between £0.01 and £1000' }, { status: 400 });
-    }
-
     const result = await withTenantDb(tenantId, async (req) => {
       req.input('campaignId', mssql.UniqueIdentifier, campaignId);
-      req.input('avgCpc',     mssql.Decimal(10, 2),  parsedCpc);
-      const updateResult = await req.query(`UPDATE Campaigns SET avg_cpc = @avgCpc WHERE campaign_id = @campaignId`);
+
+      const sets: string[] = [];
+      if (avgCpc !== undefined) {
+        const parsedCpc = parseFloat(avgCpc);
+        if (isNaN(parsedCpc) || parsedCpc < 0.01 || parsedCpc > 1000) {
+          throw new Error('INVALID_CPC');
+        }
+        req.input('avgCpc', mssql.Decimal(10, 2), parsedCpc);
+        sets.push('avg_cpc = @avgCpc');
+      }
+      if (name !== undefined) {
+        req.input('name', mssql.NVarChar(100), name || null);
+        sets.push('name = @name');
+      }
+      if (sets.length === 0) throw new Error('NO_FIELDS');
+
+      const updateResult = await req.query(`UPDATE Campaigns SET ${sets.join(', ')} WHERE campaign_id = @campaignId`);
       if (updateResult.rowsAffected[0] === 0) throw new Error('NOT_FOUND');
-      return { success: true, avgCpc: parsedCpc };
+      return { success: true, avgCpc: avgCpc !== undefined ? parseFloat(avgCpc) : undefined, name: name ?? undefined };
     });
 
     return NextResponse.json(result);
   } catch (error) {
-    console.error('Update CPC error:', error);
-    if (error instanceof Error && error.message === 'NOT_FOUND') {
-      return NextResponse.json({ error: 'Campaign not found or unauthorized' }, { status: 404 });
+    console.error('Update campaign error:', error);
+    if (error instanceof Error) {
+      if (error.message === 'NOT_FOUND')   return NextResponse.json({ error: 'Campaign not found or unauthorized' }, { status: 404 });
+      if (error.message === 'INVALID_CPC') return NextResponse.json({ error: 'CPC must be between £0.01 and £1000' }, { status: 400 });
+      if (error.message === 'NO_FIELDS')   return NextResponse.json({ error: 'No fields to update' }, { status: 400 });
     }
-    return NextResponse.json({ error: 'Failed to update CPC' }, { status: 500 });
+    return NextResponse.json({ error: 'Failed to update campaign' }, { status: 500 });
   }
 }
 

@@ -16,6 +16,7 @@ interface Campaign {
   id: string;
   googleCampaignId: string;
   slotNumber: number;
+  name: string | null;
   domainId: string;
   domainName: string;
   status: string;
@@ -37,6 +38,7 @@ export function CampaignStep({ onComplete, onBack }: CampaignStepProps) {
   const [campaigns, setCampaigns] = useState<Campaign[]>([]);
   const [selectedDomainId, setSelectedDomainId] = useState('');
   const [newCampaignId, setNewCampaignId] = useState('');
+  const [newCampaignName, setNewCampaignName] = useState('');
   const [newAvgCpc, setNewAvgCpc] = useState('');
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -109,6 +111,7 @@ export function CampaignStep({ onComplete, onBack }: CampaignStepProps) {
           googleCampaignId: newCampaignId,
           avgCpc: parseFloat(newAvgCpc),
           domainId: selectedDomainId,
+          name: newCampaignName.trim() || undefined,
         }),
       });
 
@@ -125,6 +128,7 @@ export function CampaignStep({ onComplete, onBack }: CampaignStepProps) {
         domainName: selectedDomain?.domainName ?? '',
       }]);
       setNewCampaignId('');
+      setNewCampaignName('');
       setNewAvgCpc('');
       setIsLoading(false);
     } catch {
@@ -286,8 +290,8 @@ export function CampaignStep({ onComplete, onBack }: CampaignStepProps) {
                   <div key={campaign.id} className="p-4 bg-gray-50 rounded-lg border border-gray-200">
                     <div className="flex items-center justify-between">
                       <div>
-                        <p className="font-semibold text-gray-900">Campaign {campaign.slotNumber}</p>
-                        <p className="text-sm text-gray-600">Campaign ID: {campaign.googleCampaignId}</p>
+                        <p className="font-semibold text-gray-900">{campaign.name ?? `Campaign ${campaign.slotNumber}`}</p>
+                        <p className="text-sm text-gray-600">ID: {campaign.googleCampaignId}</p>
                       </div>
                       <button
                         onClick={() => setConfirmDeleteId(campaign.id)}
@@ -378,6 +382,20 @@ export function CampaignStep({ onComplete, onBack }: CampaignStepProps) {
           {domains.length > 0 && !atLimit && (
             <>
               <div>
+                <label htmlFor="campaignName" className="block text-sm font-medium text-gray-700 mb-2">
+                  Campaign Name <span className="text-gray-400 font-normal">(optional)</span>
+                </label>
+                <input
+                  id="campaignName" type="text" value={newCampaignName}
+                  onChange={e => setNewCampaignName(e.target.value)}
+                  placeholder="e.g., Brand Keywords, Competitor, Remarketing"
+                  maxLength={100}
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                  disabled={isFetching || isLoading}
+                />
+              </div>
+
+              <div>
                 <label htmlFor="campaignId" className="block text-sm font-medium text-gray-700 mb-2">
                   Google Ads Campaign ID <span className="text-red-500">*</span>
                 </label>
@@ -457,9 +475,7 @@ export function CampaignStep({ onComplete, onBack }: CampaignStepProps) {
           </div>
           <h2 className="text-xl font-bold text-gray-900 text-center mb-2">Remove campaign?</h2>
           <p className="text-sm text-gray-600 text-center mb-6">
-            Campaign {confirmCampaign.slotNumber} — ID{' '}
-            <span className="font-mono font-semibold">{confirmCampaign.googleCampaignId}</span>{' '}
-            will be removed along with all its tracking history.
+            <strong>{confirmCampaign.name ?? `Campaign ${confirmCampaign.slotNumber}`}</strong> (ID: {confirmCampaign.googleCampaignId}) will be removed along with all its tracking history.
           </p>
           <div className="flex gap-3">
             <button onClick={() => setConfirmDeleteId(null)}

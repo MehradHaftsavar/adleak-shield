@@ -54,13 +54,15 @@ const ROLE_BADGE: Record<string, { label: string; cls: string }> = {
 function DomainDropdown({
   domains,
   activeTenantId,
+  activeDomainId,
   ownTenantId,
   onSwitch,
 }: {
   domains:        AccessibleDomain[];
   activeTenantId: string;
+  activeDomainId: string | null;
   ownTenantId:    string;
-  onSwitch:       (tenantId: string) => void;
+  onSwitch:       (tenantId: string, domainId: string) => void;
 }) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
@@ -73,10 +75,8 @@ function DomainDropdown({
     return () => document.removeEventListener("mousedown", handleClick);
   }, [open]);
 
-  const active = domains.find(d => d.tenantId === activeTenantId);
-  const displayLabel = active
-    ? `${active.domainName}`
-    : domains.find(d => d.tenantId === ownTenantId)?.domainName ?? "My account";
+  const active = domains.find(d => d.domainId === activeDomainId) ?? domains.find(d => d.tenantId === activeTenantId);
+  const displayLabel = active?.domainName ?? domains.find(d => d.tenantId === ownTenantId)?.domainName ?? "My account";
 
   if (domains.length === 0) return null;
 
@@ -113,7 +113,7 @@ function DomainDropdown({
                   <button
                     key={d.domainId}
                     type="button"
-                    onClick={() => { onSwitch(d.tenantId); setOpen(false); }}
+                    onClick={() => { onSwitch(d.tenantId, d.domainId); setOpen(false); }}
                     className={`w-full flex items-center justify-between gap-2 px-3 py-2 text-sm text-left transition-colors ${
                       d.tenantId === activeTenantId
                         ? "bg-indigo-50 text-indigo-700 font-medium"
@@ -168,13 +168,14 @@ export function DashboardShell({ email, tenantId, children }: DashboardShellProp
   // Domain switching state
   const allDomains     = (session?.user?.allAccessibleDomains ?? []) as AccessibleDomain[];
   const activeTenantId = (session?.user?.activeTenantId ?? tenantId) as string;
+  const activeDomainId = (session?.user?.activeDomainId ?? null) as string | null;
   const ownTenantId    = (session?.user?.tenantId ?? tenantId) as string;
   const isViewingOwnTenant = activeTenantId === ownTenantId;
   const isOwner        = session?.user?.isOwner as boolean | undefined;
 
-  async function handleDomainSwitch(newTenantId: string) {
+  async function handleDomainSwitch(newTenantId: string, newDomainId: string) {
     setSwitching(true);
-    await update({ activeTenantId: newTenantId });
+    await update({ activeTenantId: newTenantId, activeDomainId: newDomainId });
     window.location.reload();
   }
 
@@ -308,6 +309,7 @@ export function DashboardShell({ email, tenantId, children }: DashboardShellProp
                 <DomainDropdown
                   domains={allDomains}
                   activeTenantId={activeTenantId}
+                  activeDomainId={activeDomainId}
                   ownTenantId={ownTenantId}
                   onSwitch={handleDomainSwitch}
                 />

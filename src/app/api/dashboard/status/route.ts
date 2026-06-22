@@ -12,18 +12,23 @@ export async function GET(request: NextRequest) {
     }
 
     // Resolve effective tenant (supports admin impersonation)
-    const { tenantId: effectiveTenantId } = await getEffectiveTenantId(
+    const { tenantId: effectiveTenantId, activeDomainId } = await getEffectiveTenantId(
       session.user.tenantId as string,
       session.user.isOwner as boolean
     );
 
     const result = await withTenantDb(effectiveTenantId, async (req) => {
+      const domainFilter = activeDomainId
+        ? `AND c.domain_id = '${activeDomainId}'`
+        : '';
+
       // Self-heal: flip any campaign that has real sessions but is still
       // marked awaiting_data — catches legacy data and any queue worker gaps
       await req.query(`
         UPDATE Campaigns
         SET status = 'active'
         WHERE status = 'awaiting_data'
+          ${activeDomainId ? `AND domain_id = '${activeDomainId}'` : ''}
           AND EXISTS (
             SELECT 1 FROM Sessions s
             WHERE s.campaign_id = Campaigns.campaign_id
@@ -33,33 +38,38 @@ export async function GET(request: NextRequest) {
 
       // 1. Check if ANY real data received in last 24 hours (Live status)
       const liveCheckResult = await req.query(`
-        SELECT TOP 1 session_id
-        FROM Sessions
-        WHERE started_at >= DATEADD(hour, -24, GETUTCDATE())
-          AND keyword <> 'adleak_test'
+        SELECT TOP 1 s.session_id
+        FROM Sessions s
+        INNER JOIN Campaigns c ON c.campaign_id = s.campaign_id
+        WHERE s.started_at >= DATEADD(hour, -24, GETUTCDATE())
+          AND s.keyword <> 'adleak_test'
+          ${domainFilter}
       `);
 
       const isLive = liveCheckResult.recordset.length > 0;
 
-      // 2. Get all campaigns with their status
+      // 2. Get campaigns with their status (filtered by active domain)
       const campaignsResult = await req.query(`
-        SELECT 
+        SELECT
           c.campaign_id,
           c.google_campaign_id,
           c.slot_number,
+          c.name,
           c.status,
           d.domain_name,
           (SELECT COUNT(*) FROM Sessions s WHERE s.campaign_id = c.campaign_id AND s.keyword <> 'adleak_test') as session_count,
           (SELECT TOP 1 started_at FROM Sessions s WHERE s.campaign_id = c.campaign_id AND s.keyword <> 'adleak_test' ORDER BY started_at DESC) as last_session
         FROM Campaigns c
         INNER JOIN Domains d ON c.domain_id = d.domain_id
-        ORDER BY c.slot_number
+        WHERE 1=1 ${domainFilter}
+        ORDER BY d.domain_name, c.slot_number
       `);
 
       const campaigns = campaignsResult.recordset.map(c => ({
         id: c.campaign_id,
         googleCampaignId: c.google_campaign_id,
         slotNumber: c.slot_number,
+        name: c.name ?? null,
         domain: c.domain_name,
         status: c.status,
         sessionCount: c.session_count,
