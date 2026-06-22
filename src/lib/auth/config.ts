@@ -63,33 +63,48 @@ export const authConfig: NextAuthConfig = {
           // Silently ignore unauthorised switch attempts
         }
 
-        // Re-fetch member domains after accepting an invite
+        // Re-fetch all accessible domains (own + member) — used after invite accept or when empty
         if (session?.refreshAccessibleDomains) {
           try {
-            const memberRows = await withAdminDb(async (req) => {
-              const r = await req
-                .input('email', mssql.NVarChar(255), token.email as string)
-                .query(`
-                  SELECT tm.tenant_id, tm.role, t.email AS tenant_owner_email,
-                         d.domain_id, d.domain_name
-                  FROM   TeamMembers tm
-                  INNER JOIN Tenants t          ON t.tenant_id  = tm.tenant_id
-                  INNER JOIN MemberDomainAccess mda ON mda.member_id = tm.member_id
-                  INNER JOIN Domains d          ON d.domain_id  = mda.domain_id
-                  WHERE  tm.email = @email AND tm.accepted_at IS NOT NULL
-                `);
-              return r.recordset;
-            });
-            const ownDomains = ((token.allAccessibleDomains ?? []) as AccessibleDomain[])
-              .filter(d => d.role === 'owner');
-            const memberDomains: AccessibleDomain[] = memberRows.map((row: any) => ({
-              tenantId:        row.tenant_id,
-              domainId:        row.domain_id,
-              domainName:      row.domain_name,
-              role:            row.role as 'editor' | 'visitor',
-              tenantOwnerEmail: row.tenant_owner_email,
-            }));
-            token.allAccessibleDomains = [...ownDomains, ...memberDomains];
+            const [ownRows, memberRows] = await Promise.all([
+              withAdminDb(async (req) => {
+                const r = await req
+                  .input('tid', mssql.UniqueIdentifier, token.tenantId as string)
+                  .query(`SELECT domain_id, domain_name FROM Domains WHERE tenant_id = @tid`);
+                return r.recordset;
+              }),
+              withAdminDb(async (req) => {
+                const r = await req
+                  .input('email', mssql.NVarChar(255), token.email as string)
+                  .query(`
+                    SELECT tm.tenant_id, tm.role, t.email AS tenant_owner_email,
+                           d.domain_id, d.domain_name
+                    FROM   TeamMembers tm
+                    INNER JOIN Tenants t          ON t.tenant_id  = tm.tenant_id
+                    INNER JOIN MemberDomainAccess mda ON mda.member_id = tm.member_id
+                    INNER JOIN Domains d          ON d.domain_id  = mda.domain_id
+                    WHERE  tm.email = @email AND tm.accepted_at IS NOT NULL
+                  `);
+                return r.recordset;
+              }),
+            ]);
+            const tenantEmail = token.email as string;
+            token.allAccessibleDomains = [
+              ...ownRows.map((row: any) => ({
+                tenantId:         token.tenantId as string,
+                domainId:         row.domain_id,
+                domainName:       row.domain_name,
+                role:             'owner' as const,
+                tenantOwnerEmail: tenantEmail,
+              })),
+              ...memberRows.map((row: any) => ({
+                tenantId:         row.tenant_id,
+                domainId:         row.domain_id,
+                domainName:       row.domain_name,
+                role:             row.role as 'editor' | 'visitor',
+                tenantOwnerEmail: row.tenant_owner_email,
+              })),
+            ];
           } catch (err) {
             console.error('[Auth] refreshAccessibleDomains failed (non-fatal):', err);
           }

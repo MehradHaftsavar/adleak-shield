@@ -181,6 +181,14 @@ export function DashboardShell({ email, tenantId, children }: DashboardShellProp
     if (status === "unauthenticated") router.push("/auth/login");
   }, [status, router]);
 
+  // If domains failed to load at sign-in (silent catch in auth config), re-fetch them now
+  useEffect(() => {
+    if (status === "authenticated" && allDomains.length === 0) {
+      update({ refreshAccessibleDomains: true });
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [status]);
+
   useEffect(() => {
     if (typeof window === "undefined") return;
     const params = new URLSearchParams(window.location.search);
