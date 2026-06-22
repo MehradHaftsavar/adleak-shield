@@ -492,9 +492,9 @@ export function SnippetStep({ domain, onComplete, onBack }: SnippetStepProps) {
               ✓ Your Registered Campaigns:
             </h4>
             <ul className="text-sm text-green-800 space-y-1">
-              {campaigns.map((campaign, idx) => (
+              {campaigns.map((campaign: any, idx: number) => (
                 <li key={idx}>
-                  • Campaign {idx + 1} (ID: {campaign.id})
+                  • {campaign.name ?? `Campaign ${campaign.slotNumber ?? idx + 1}`} — Google ID: {campaign.googleCampaignId ?? campaign.id} ({campaign.domainName ?? ''})
                 </li>
               ))}
             </ul>
