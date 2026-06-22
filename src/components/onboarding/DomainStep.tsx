@@ -6,6 +6,12 @@ import { useSession } from 'next-auth/react';
 import { PLAN_LIMITS } from '@/lib/planLimits';
 import type { PlanType } from '@/types/auth';
 
+interface DomainEntry {
+  domainId: string;
+  domainName: string;
+  verified: boolean;
+}
+
 interface DomainStepProps {
   onComplete: (domain: string) => void;
   existingDomain?: string;
@@ -15,32 +21,32 @@ export function DomainStep({ onComplete, existingDomain }: DomainStepProps) {
   const { data: session } = useSession();
   const planType = (session?.user?.planType ?? 'starter') as PlanType;
   const limits = PLAN_LIMITS[planType];
-  const [domain, setDomain] = useState('');
+
+  const [domains, setDomains] = useState<DomainEntry[]>([]);
   const [newDomain, setNewDomain] = useState('');
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [isFetching, setIsFetching] = useState(true);
-  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
 
   useEffect(() => {
-    const fetchDomain = async () => {
-      setIsFetching(true);
-      try {
-        const res = await fetch('/api/domain');
-        if (res.ok) {
-          const data = await res.json();
-          if (data.domain) {
-            setDomain(data.domain);
-          }
-        }
-      } catch (err) {
-        console.error('Failed to fetch domain:', err);
-      } finally {
-        setIsFetching(false);
-      }
-    };
-    fetchDomain();
+    fetchDomains();
   }, []);
+
+  const fetchDomains = async () => {
+    setIsFetching(true);
+    try {
+      const res = await fetch('/api/domain');
+      if (res.ok) {
+        const data = await res.json();
+        setDomains(data.domains ?? []);
+      }
+    } catch (err) {
+      console.error('Failed to fetch domains:', err);
+    } finally {
+      setIsFetching(false);
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -62,22 +68,26 @@ export function DomainStep({ onComplete, existingDomain }: DomainStepProps) {
         return;
       }
 
-      setDomain(data.domain);
       setNewDomain('');
+      await fetchDomains();
       setIsLoading(false);
-    } catch (err) {
+    } catch {
       setError('Network error. Please try again.');
       setIsLoading(false);
     }
   };
 
-  const handleDelete = async () => {
-    setShowDeleteModal(false);
+  const handleDelete = async (domainId: string) => {
+    setConfirmDeleteId(null);
     setIsLoading(true);
     setError('');
 
     try {
-      const res = await fetch('/api/domain', { method: 'DELETE' });
+      const res = await fetch('/api/domain', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ domainId }),
+      });
       const data = await res.json();
 
       if (!res.ok) {
@@ -86,21 +96,23 @@ export function DomainStep({ onComplete, existingDomain }: DomainStepProps) {
         return;
       }
 
-      setDomain('');
+      await fetchDomains();
       setIsLoading(false);
-    } catch (err) {
+    } catch {
       setError('Network error. Please try again.');
       setIsLoading(false);
     }
   };
 
   const handleContinue = () => {
-    if (!domain) {
+    if (domains.length === 0) {
       setError('Please add a domain to continue');
       return;
     }
-    onComplete(domain);
+    onComplete(domains[0].domainName);
   };
+
+  const confirmDelete = domains.find(d => d.domainId === confirmDeleteId);
 
   return (
     <>
@@ -125,39 +137,41 @@ export function DomainStep({ onComplete, existingDomain }: DomainStepProps) {
           <Globe className="w-6 h-6 text-blue-600" />
         </div>
         <div>
-          <h2 className="text-2xl font-bold text-gray-900">Register Your Domain</h2>
+          <h2 className="text-2xl font-bold text-gray-900">Register Your Domains</h2>
           <p className="text-gray-600 mt-1">
-            Enter the website domain you're running Google Ads for
+            Enter the websites you're running Google Ads for
           </p>
         </div>
       </div>
 
-      {/* Existing domain */}
-      {domain && (
-        <div className="mb-6">
-          <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg border border-gray-200">
-            <div>
-              <p className="font-semibold text-gray-900">Your Domain</p>
-              <p className="text-sm text-gray-600">{domain}</p>
+      {/* Registered domains list */}
+      {domains.length > 0 && (
+        <div className="mb-6 space-y-2">
+          {domains.map(d => (
+            <div key={d.domainId} className="flex items-center justify-between p-4 bg-gray-50 rounded-lg border border-gray-200">
+              <div>
+                <p className="font-semibold text-gray-900">{d.domainName}</p>
+                {d.verified && <p className="text-xs text-green-600 mt-0.5">Verified</p>}
+              </div>
+              <button
+                onClick={() => setConfirmDeleteId(d.domainId)}
+                className="text-red-600 hover:text-red-700 p-2"
+                title="Remove domain"
+                disabled={isFetching || isLoading}
+              >
+                <Trash2 className="w-5 h-5" />
+              </button>
             </div>
-            <button
-              onClick={() => setShowDeleteModal(true)}
-              className="text-red-600 hover:text-red-700 p-2"
-              title="Remove domain"
-              disabled={isFetching || isLoading}
-            >
-              <Trash2 className="w-5 h-5" />
-            </button>
-          </div>
+          ))}
         </div>
       )}
 
-      {/* Add domain form - only show if no domain exists */}
-      {!domain && (
+      {/* Add domain form — shown when under the plan limit */}
+      {domains.length < limits.domains && (
         <form onSubmit={handleSubmit} className="space-y-4 mb-6">
           <div>
             <label htmlFor="domain" className="block text-sm font-medium text-gray-700 mb-2">
-              Website Domain <span className="text-red-500">*</span>
+              Add Domain <span className="text-red-500">*</span>
             </label>
             <input
               id="domain"
@@ -197,22 +211,21 @@ export function DomainStep({ onComplete, existingDomain }: DomainStepProps) {
         </p>
       </div>
 
-      {/* Continue button */}
       <button
         onClick={handleContinue}
-        disabled={!domain || isFetching}
+        disabled={domains.length === 0 || isFetching}
         className="w-full bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white font-semibold py-3 px-6 rounded-lg transition-colors"
       >
         Continue to Campaigns →
       </button>
 
       <p className="text-center text-sm text-gray-600 mt-4">
-        {domain ? `1 / ${limits.domains} domain${limits.domains !== 1 ? 's' : ''} registered` : `0 / ${limits.domains} domain${limits.domains !== 1 ? 's' : ''} registered`}
+        {domains.length} / {limits.domains} domain{limits.domains !== 1 ? 's' : ''} registered
       </p>
     </div>
 
     {/* Delete domain confirmation modal */}
-    {showDeleteModal && (
+    {confirmDelete && (
       <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4">
         <div className="bg-white rounded-2xl shadow-xl max-w-md w-full p-8">
           <div className="flex items-center justify-center w-14 h-14 rounded-full bg-red-100 mx-auto mb-5">
@@ -222,19 +235,19 @@ export function DomainStep({ onComplete, existingDomain }: DomainStepProps) {
             Remove domain?
           </h2>
           <p className="text-sm text-gray-600 text-center mb-6">
-            This will permanently delete <strong>{domain}</strong> and{' '}
+            This will permanently delete <strong>{confirmDelete.domainName}</strong> and{' '}
             <strong>all campaigns and tracking data</strong> associated with it.
             This cannot be undone.
           </p>
           <div className="flex gap-3">
             <button
-              onClick={() => setShowDeleteModal(false)}
+              onClick={() => setConfirmDeleteId(null)}
               className="flex-1 px-4 py-2.5 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors"
             >
               Cancel
             </button>
             <button
-              onClick={handleDelete}
+              onClick={() => handleDelete(confirmDelete.domainId)}
               className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 bg-red-600 hover:bg-red-700 text-white text-sm font-semibold rounded-lg transition-colors"
             >
               <Trash2 className="w-4 h-4" />

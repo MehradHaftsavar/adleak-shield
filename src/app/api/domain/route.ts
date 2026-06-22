@@ -218,42 +218,59 @@ export async function DELETE(request: NextRequest) {
     if (role === 'visitor') return forbidden('Visitors cannot delete domains');
     if (role === 'editor')  return forbidden('Editors cannot delete domains');
 
-    const result = await withTenantDb(session.user.tenantId, async (req) => {
-      const campaignsResult = await req.query(`SELECT campaign_id, google_campaign_id FROM Campaigns`);
-      const campaigns = campaignsResult.recordset;
-      const campaignIds = campaigns.map((c: any) => c.campaign_id);
+    // Optional domainId to delete a specific domain; if omitted, deletes all (legacy)
+    let targetDomainId: string | null = null;
+    try {
+      const body = await request.json();
+      if (body?.domainId) targetDomainId = body.domainId as string;
+    } catch { /* no body — legacy delete-all */ }
 
-      for (let i = 0; i < campaignIds.length; i++) {
-        const campaignId = campaignIds[i];
-        const paramName  = `cid${i}`;
-        req.input(paramName, mssql.UniqueIdentifier, campaignId);
-        await req.query(`DELETE FROM JourneyEvents WHERE session_id IN (SELECT session_id FROM Sessions WHERE campaign_id = @${paramName})`);
-        await req.query(`DELETE FROM ClickLogs   WHERE campaign_id = @${paramName}`);
-        await req.query(`DELETE FROM Sessions    WHERE campaign_id = @${paramName}`);
-        await req.query(`DELETE FROM Campaigns   WHERE campaign_id = @${paramName}`);
+    const result = await withTenantDb(session.user.tenantId, async (req) => {
+      // Resolve which domain(s) to delete
+      let domainIds: string[];
+      if (targetDomainId) {
+        req.input('targetDomainId', mssql.UniqueIdentifier, targetDomainId);
+        const check = await req.query(`SELECT domain_id FROM Domains WHERE domain_id = @targetDomainId`);
+        if (check.recordset.length === 0) throw new Error('NOT_FOUND');
+        domainIds = [targetDomainId];
+      } else {
+        const domainResult = await req.query(`SELECT domain_id FROM Domains`);
+        domainIds = (domainResult.recordset ?? []).map((d: any) => d.domain_id);
       }
 
-      await req.query(`DELETE FROM UnregisteredTrafficLog`);
-
-      // Get domain_id before deleting (for MemberDomainAccess cleanup)
-      const domainResult = await req.query(`SELECT domain_id FROM Domains`);
-      const domainIds = (domainResult.recordset ?? []).map((d: any) => d.domain_id);
-
-      // Clean up MemberDomainAccess rows (FK constraint)
+      // Delete campaigns and their data for the targeted domain(s)
       for (let i = 0; i < domainIds.length; i++) {
         const domainId  = domainIds[i];
-        const paramName = `did${i}`;
-        req.input(paramName, mssql.UniqueIdentifier, domainId);
-        await req.query(`DELETE FROM MemberDomainAccess WHERE domain_id = @${paramName}`);
+        const dParam    = `delDomain${i}`;
+        req.input(dParam, mssql.UniqueIdentifier, domainId);
+        const campaignsResult = await req.query(`SELECT campaign_id FROM Campaigns WHERE domain_id = @${dParam}`);
+        const campaignIds = (campaignsResult.recordset ?? []).map((c: any) => c.campaign_id);
+
+        for (let j = 0; j < campaignIds.length; j++) {
+          const campaignId = campaignIds[j];
+          const cParam     = `cid${i}_${j}`;
+          req.input(cParam, mssql.UniqueIdentifier, campaignId);
+          await req.query(`DELETE FROM JourneyEvents WHERE session_id IN (SELECT session_id FROM Sessions WHERE campaign_id = @${cParam})`);
+          await req.query(`DELETE FROM ClickLogs   WHERE campaign_id = @${cParam}`);
+          await req.query(`DELETE FROM Sessions    WHERE campaign_id = @${cParam}`);
+          await req.query(`DELETE FROM Campaigns   WHERE campaign_id = @${cParam}`);
+        }
+
+        // Clean up MemberDomainAccess rows (FK constraint)
+        await req.query(`DELETE FROM MemberDomainAccess WHERE domain_id = @${dParam}`);
+
+        const deleteResult = await req.query(`DELETE FROM Domains WHERE domain_id = @${dParam}`);
+        if (deleteResult.rowsAffected[0] === 0) throw new Error('NOT_FOUND');
       }
 
-      const deleteResult = await req.query(`DELETE FROM Domains`);
-      if (deleteResult.rowsAffected[0] === 0) throw new Error('NOT_FOUND');
+      // Only wipe UnregisteredTrafficLog when deleting all domains
+      if (!targetDomainId) {
+        await req.query(`DELETE FROM UnregisteredTrafficLog`);
+      }
 
       return {
         success: true,
         message: 'Domain, campaigns, and all related data deleted successfully',
-        deletedCampaigns: campaignIds.length,
       };
     });
 
