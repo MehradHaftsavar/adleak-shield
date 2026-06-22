@@ -1,6 +1,7 @@
 import { auth } from '@/lib/auth';
 import { redirect } from 'next/navigation';
 import { DashboardShell } from '@/components/layout/dashboard-shell';
+import { SettingsAuthGuard } from '@/components/layout/SettingsAuthGuard';
 
 export default async function SettingsLayout({
   children,
@@ -14,7 +15,7 @@ export default async function SettingsLayout({
 
   return (
     <DashboardShell email={email ?? ''} tenantId={tenantId}>
-      {children}
+      <SettingsAuthGuard>{children}</SettingsAuthGuard>
     </DashboardShell>
   );
 }

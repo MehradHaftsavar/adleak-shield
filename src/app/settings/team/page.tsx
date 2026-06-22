@@ -173,8 +173,14 @@ export default function TeamPage() {
       </div>
 
       {error && (
-        <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg">
+        <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg flex items-center justify-between gap-4">
           <p className="text-sm text-red-700">{error}</p>
+          <button
+            onClick={loadTeam}
+            className="flex-shrink-0 text-sm font-medium text-red-700 underline hover:text-red-900 transition-colors"
+          >
+            Try again
+          </button>
         </div>
       )}
 

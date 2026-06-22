@@ -194,7 +194,7 @@ export async function GET(_request: NextRequest) {
     const result = await withTenantDb(tenantId, async (req) => {
       const campaignsResult = await req.query(`
         SELECT c.campaign_id, c.google_campaign_id, c.slot_number, c.domain_id,
-               d.domain_name, c.created_at, c.status, c.avg_cpc
+               d.domain_name, c.created_at, c.status, c.avg_cpc, c.name
         FROM   Campaigns c
         INNER JOIN Domains d ON d.domain_id = c.domain_id
         ORDER BY d.domain_name, c.slot_number
