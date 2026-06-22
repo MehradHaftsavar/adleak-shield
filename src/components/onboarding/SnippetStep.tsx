@@ -1,7 +1,24 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Code, Copy, CheckCircle, ExternalLink, AlertCircle, Loader2 } from 'lucide-react';
+import { Code, Copy, CheckCircle, ExternalLink, AlertCircle, Loader2, ChevronDown, ChevronUp } from 'lucide-react';
+
+function Accordion({ title, children, defaultOpen = false }: { title: React.ReactNode; children: React.ReactNode; defaultOpen?: boolean }) {
+  const [open, setOpen] = useState(defaultOpen);
+  return (
+    <div className="border border-gray-200 rounded-lg overflow-hidden">
+      <button
+        type="button"
+        onClick={() => setOpen(o => !o)}
+        className="w-full flex items-center justify-between px-4 py-3 bg-gray-50 hover:bg-gray-100 transition-colors text-left"
+      >
+        <span className="text-sm font-medium text-gray-700">{title}</span>
+        {open ? <ChevronUp className="w-4 h-4 text-gray-500 flex-shrink-0" /> : <ChevronDown className="w-4 h-4 text-gray-500 flex-shrink-0" />}
+      </button>
+      {open && <div className="px-4 py-4 bg-white border-t border-gray-200">{children}</div>}
+    </div>
+  );
+}
 
 interface SnippetStepProps {
   domain: string;
@@ -155,27 +172,27 @@ export function SnippetStep({ domain, onComplete, onBack }: SnippetStepProps) {
         </div>
       </div>
 
-      {/* Merchant privacy obligations notice */}
-      <div className="mb-6 flex gap-3 rounded-lg border border-amber-200 bg-amber-50 p-4">
-        <span className="text-lg leading-none flex-shrink-0">⚖️</span>
-        <div className="text-sm text-amber-900 space-y-1">
-          <p className="font-semibold">Your privacy obligations as a data controller</p>
-          <p>
-            By installing this snippet, you become a <strong>data controller</strong> for your visitors' data under UK/EU GDPR.
-            Before going live you must:
-          </p>
-          <ul className="list-disc list-inside ml-1 space-y-0.5 text-amber-800">
-            <li>Add AdLeak Shield to your website's <strong>Privacy Policy</strong></li>
-            <li>Ensure you have a lawful basis for collecting visitor analytics (legitimate interest is common)</li>
-            <li>If you use a consent/cookie banner, configure it to load this snippet only for consenting visitors</li>
-          </ul>
-          <p className="text-xs text-amber-700 pt-1">
-            Full details in our{' '}
-            <a href="/terms#merchant" target="_blank" rel="noopener noreferrer" className="underline font-medium">Terms of Service (Section 6)</a>
-            {' '}and{' '}
-            <a href="/privacy#merchant" target="_blank" rel="noopener noreferrer" className="underline font-medium">Privacy Policy (Section 8)</a>.
-          </p>
-        </div>
+      {/* Merchant privacy obligations notice — collapsible */}
+      <div className="mb-6">
+        <Accordion title={<span className="flex items-center gap-2"><span>⚖️</span> Privacy obligations — read before going live</span>}>
+          <div className="text-sm text-amber-900 space-y-2">
+            <p>
+              By installing this snippet, you become a <strong>data controller</strong> for your visitors' data under UK/EU GDPR.
+              Before going live you must:
+            </p>
+            <ul className="list-disc list-inside ml-1 space-y-0.5 text-amber-800">
+              <li>Add AdLeak Shield to your website's <strong>Privacy Policy</strong></li>
+              <li>Ensure you have a lawful basis for collecting visitor analytics (legitimate interest is common)</li>
+              <li>If you use a consent/cookie banner, configure it to load this snippet only for consenting visitors</li>
+            </ul>
+            <p className="text-xs text-amber-700">
+              Full details in our{' '}
+              <a href="/terms#merchant" target="_blank" rel="noopener noreferrer" className="underline font-medium">Terms of Service (Section 6)</a>
+              {' '}and{' '}
+              <a href="/privacy#merchant" target="_blank" rel="noopener noreferrer" className="underline font-medium">Privacy Policy (Section 8)</a>.
+            </p>
+          </div>
+        </Accordion>
       </div>
 
       {isLoading ? (
@@ -194,10 +211,10 @@ export function SnippetStep({ domain, onComplete, onBack }: SnippetStepProps) {
               Install Tracking Snippet on Your Website
             </h3>
             
-            <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
-              <div className="flex items-center justify-between mb-2">
+            <div className="bg-gray-50 border border-gray-200 rounded-lg p-4 space-y-3">
+              <div className="flex items-center justify-between">
                 <p className="text-sm font-medium text-gray-700">
-                  Add this code to your website's &lt;head&gt; section:
+                  Paste into the <code className="bg-gray-200 px-1 rounded">&lt;head&gt;</code> of every page on <strong>{domain}</strong>:
                 </p>
                 <button
                   onClick={() => copyToClipboard(snippet, 'snippet')}
@@ -216,48 +233,44 @@ export function SnippetStep({ domain, onComplete, onBack }: SnippetStepProps) {
                   )}
                 </button>
               </div>
-              
+
               <pre className="bg-gray-900 text-gray-100 p-4 rounded overflow-x-auto text-xs">
                 <code>{snippet}</code>
               </pre>
+
+              {/* Platform-specific links */}
+              <div className="flex items-center gap-2 flex-wrap pt-1">
+                <span className="text-xs text-gray-500 font-medium">Platform guides:</span>
+                {[
+                  { label: 'WordPress',  hash: 'wordpress' },
+                  { label: 'Shopify',    hash: 'shopify' },
+                  { label: 'Wix',        hash: 'wix' },
+                  { label: 'Hand-coded', hash: 'html' },
+                ].map(({ label, hash }) => (
+                  <a
+                    key={hash}
+                    href={`/setup-guide#${hash}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-medium text-purple-700 bg-purple-50 border border-purple-200 rounded-full hover:bg-purple-100 transition-colors"
+                  >
+                    {label}
+                    <ExternalLink className="w-3 h-3" />
+                  </a>
+                ))}
+              </div>
             </div>
 
-            <div className="mt-3 bg-blue-50 border border-blue-200 rounded-lg p-3">
-              <p className="text-sm text-blue-900">
-                <strong>Where to paste:</strong> Add this to the &lt;head&gt; section of every page on {domain}.
-              </p>
-            </div>
-
-            {/* Extra instructions — platform-specific */}
-            <div className="mt-3 flex items-center gap-2 flex-wrap">
-              <span className="text-xs text-gray-500 font-medium">Extra instructions for:</span>
-              {[
-                { label: 'WordPress',  hash: 'wordpress' },
-                { label: 'Shopify',    hash: 'shopify' },
-                { label: 'Wix',        hash: 'wix' },
-                { label: 'Hand-coded', hash: 'html' },
-              ].map(({ label, hash }) => (
-                <a
-                  key={hash}
-                  href={`/setup-guide#${hash}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-medium text-purple-700 bg-purple-50 border border-purple-200 rounded-full hover:bg-purple-100 transition-colors"
-                >
-                  {label}
-                  <ExternalLink className="w-3 h-3" />
-                </a>
-              ))}
-            </div>
-
-            <div className="mt-3 bg-gray-50 border border-gray-200 rounded-lg p-3">
-              <p className="text-sm text-gray-700 font-medium mb-1">🔒 Using a Content Security Policy (CSP)?</p>
-              <p className="text-sm text-gray-600 mb-2">
-                Most websites don't use CSP — if you're not sure, you can skip this. If you do have one configured, add these two lines to allow the tracking script to load and send data:
-              </p>
-              <pre className="bg-gray-900 text-gray-100 p-3 rounded text-xs overflow-x-auto">
-                <code>{`script-src 'self' https://adleakshield.com;\nconnect-src 'self' https://adleak-functions-ajbraxdhf4hwgudf.westeurope-01.azurewebsites.net;`}</code>
-              </pre>
+            {/* CSP — collapsible, closed by default */}
+            <div className="mt-3">
+              <Accordion title="🔒 Using a Content Security Policy (CSP)? — click to expand">
+                <div className="text-sm text-gray-600 space-y-2">
+                  <p>Most websites don't use CSP — if you're not sure, skip this. If you do, add these two lines:</p>
+                  <pre className="bg-gray-900 text-gray-100 p-3 rounded text-xs overflow-x-auto">
+                    <code>{`script-src 'self' https://adleakshield.com;\nconnect-src 'self' https://adleak-functions-ajbraxdhf4hwgudf.westeurope-01.azurewebsites.net;`}</code>
+                  </pre>
+                </div>
+              </Accordion>
             </div>
           </div>
 
@@ -270,10 +283,10 @@ export function SnippetStep({ domain, onComplete, onBack }: SnippetStepProps) {
               Add ValueTrack Template to Google Ads
             </h3>
 
-            <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
-              <div className="flex items-center justify-between mb-2">
+            <div className="bg-gray-50 border border-gray-200 rounded-lg p-4 space-y-3">
+              <div className="flex items-center justify-between">
                 <p className="text-sm font-medium text-gray-700">
-                  Tracking template (add to each campaign):
+                  Add to each campaign's tracking template in Google Ads:
                 </p>
                 <button
                   onClick={() => copyToClipboard(template, 'template')}
@@ -292,53 +305,43 @@ export function SnippetStep({ domain, onComplete, onBack }: SnippetStepProps) {
                   )}
                 </button>
               </div>
-              
+
               <pre className="bg-gray-900 text-gray-100 p-4 rounded overflow-x-auto text-xs">
                 <code>{template}</code>
               </pre>
             </div>
 
-            <div className="mt-3 bg-blue-50 border border-blue-200 rounded-lg p-4">
-              <p className="text-sm text-blue-900 font-semibold mb-3">
-                How to add the template to Google Ads:
-              </p>
-              <ol className="text-sm text-blue-800 space-y-2 list-decimal list-inside ml-2">
-                <li>Sign in to your Google Ads account</li>
-                <li>Click <strong>Campaigns</strong> in the left menu</li>
-                <li>Select your campaign (the one you registered above)</li>
-                <li>Click the <strong>Settings</strong> tab</li>
-                <li>Scroll down to <strong>Other settings</strong></li>
-                <li>Click <strong>Campaign URL options</strong></li>
-                <li>In the <strong>Tracking template</strong> field, paste the template above</li>
-                <li>Click <strong>Save</strong></li>
-              </ol>
-              
-              <div className="mt-4 bg-yellow-100 border border-yellow-300 rounded p-3">
-                <p className="text-sm text-yellow-900">
-                  <strong>⚠️ Critical:</strong> The template must be added at the <strong>campaign level</strong> (steps above), 
-                  not at the account level or ad level. Add it separately to each campaign you registered.
-                </p>
-              </div>
-
-              <div className="mt-3 bg-white border border-blue-300 rounded p-3">
-                <p className="text-sm text-blue-900 mb-2">
-                  <strong>📌 Multiple ads in the same campaign?</strong>
-                </p>
-                <p className="text-sm text-blue-800">
-                  No problem! All ads within a campaign automatically use the same template. 
-                  You only need to add the template once per campaign, not per ad.
-                </p>
-              </div>
-
-              <a 
-                href="https://support.google.com/google-ads/answer/6305348"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-flex items-center gap-1 text-sm text-blue-700 hover:text-blue-800 mt-3 font-medium"
-              >
-                Google Ads official help article
-                <ExternalLink className="w-3 h-3" />
-              </a>
+            {/* Step-by-step Google Ads instructions — collapsible */}
+            <div className="mt-3">
+              <Accordion title="How to add this template in Google Ads — step by step">
+                <div className="space-y-3">
+                  <ol className="text-sm text-gray-700 space-y-2 list-decimal list-inside ml-1">
+                    <li>Sign in to your Google Ads account</li>
+                    <li>Click <strong>Campaigns</strong> in the left menu</li>
+                    <li>Select your campaign (the one you registered above)</li>
+                    <li>Click the <strong>Settings</strong> tab</li>
+                    <li>Scroll down to <strong>Other settings</strong></li>
+                    <li>Click <strong>Campaign URL options</strong></li>
+                    <li>In the <strong>Tracking template</strong> field, paste the template above</li>
+                    <li>Click <strong>Save</strong></li>
+                  </ol>
+                  <div className="bg-yellow-50 border border-yellow-200 rounded p-3 text-sm text-yellow-900">
+                    <strong>⚠️ Important:</strong> Add the template at the <strong>campaign level</strong>, not account or ad level. Repeat for each campaign you registered.
+                  </div>
+                  <p className="text-sm text-gray-600">
+                    <strong>📌 Multiple ads in the same campaign?</strong> No problem — all ads in a campaign share the same template. Add it once per campaign, not per ad.
+                  </p>
+                  <a
+                    href="https://support.google.com/google-ads/answer/6305348"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1 text-sm text-blue-700 hover:text-blue-800 font-medium"
+                  >
+                    Google Ads official help article
+                    <ExternalLink className="w-3 h-3" />
+                  </a>
+                </div>
+              </Accordion>
             </div>
           </div>
 
@@ -500,51 +503,40 @@ export function SnippetStep({ domain, onComplete, onBack }: SnippetStepProps) {
             </ul>
           </div>
 
-          {/* Important notes */}
-          <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
-            <p className="text-sm text-yellow-900">
-              <strong>⚠️ Important:</strong> Data will only appear in your dashboard once both steps are complete
-              and a visitor clicks one of your ads. The "Live" status indicator will turn green once we receive
-              the first data.
-            </p>
-          </div>
-
-          {/* What happens next */}
-          <div className="rounded-lg border border-gray-200 bg-gray-50 p-5">
-            <h4 className="text-sm font-semibold text-gray-900 mb-3 flex items-center gap-2">
-              <span className="text-base">🚀</span> What happens after you click "Go to Dashboard"
-            </h4>
-            <ol className="space-y-3">
-              <li className="flex gap-3 text-sm text-gray-700">
-                <span className="flex-shrink-0 w-5 h-5 rounded-full bg-purple-100 text-purple-700 flex items-center justify-center text-xs font-bold">1</span>
-                <div>
-                  <span className="font-medium">You'll land on your dashboard.</span>
-                  {' '}Everything will look empty — that's normal. Sessions and leak data only appear once real Google Ads clicks come through with the ValueTrack parameters active.
-                </div>
-              </li>
-              <li className="flex gap-3 text-sm text-gray-700">
-                <span className="flex-shrink-0 w-5 h-5 rounded-full bg-purple-100 text-purple-700 flex items-center justify-center text-xs font-bold">2</span>
-                <div>
-                  <span className="font-medium">The Live indicator turns green</span>
-                  {' '}(top of dashboard) the moment we receive your first tracked session — usually within seconds of a real ad click.
-                </div>
-              </li>
-              <li className="flex gap-3 text-sm text-gray-700">
-                <span className="flex-shrink-0 w-5 h-5 rounded-full bg-purple-100 text-purple-700 flex items-center justify-center text-xs font-bold">3</span>
-                <div>
-                  <span className="font-medium">Leak Table fills up over time.</span>
-                  {' '}Keywords only appear there if they have a high bounce rate — if your campaigns are performing well, it may stay empty (that's a good thing!).
-                </div>
-              </li>
-              <li className="flex gap-3 text-sm text-gray-700">
-                <span className="flex-shrink-0 w-5 h-5 rounded-full bg-purple-100 text-purple-700 flex items-center justify-center text-xs font-bold">4</span>
-                <div>
-                  <span className="font-medium">Nothing showing after 24 hours?</span>
-                  {' '}Check the All Sessions tab first — if sessions appear there but not in the Leak Table, your keywords are performing well. If sessions are also empty, recheck your snippet installation and ValueTrack template.
-                </div>
-              </li>
-            </ol>
-          </div>
+          {/* What happens next — collapsible, merges the "Important" warning */}
+          <Accordion title="🚀 What to expect on the dashboard — click to expand">
+            <div className="space-y-4">
+              <div className="bg-yellow-50 border border-yellow-200 rounded p-3 text-sm text-yellow-900">
+                <strong>⚠️ Heads up:</strong> The dashboard will look empty at first — that's normal. Data only appears once both steps above are complete and a real visitor clicks one of your ads.
+              </div>
+              <ol className="space-y-3">
+                <li className="flex gap-3 text-sm text-gray-700">
+                  <span className="flex-shrink-0 w-5 h-5 rounded-full bg-purple-100 text-purple-700 flex items-center justify-center text-xs font-bold">1</span>
+                  <div>
+                    <span className="font-medium">Dashboard starts empty</span> — sessions and leak data only appear once real Google Ads clicks come through with the ValueTrack parameters active.
+                  </div>
+                </li>
+                <li className="flex gap-3 text-sm text-gray-700">
+                  <span className="flex-shrink-0 w-5 h-5 rounded-full bg-purple-100 text-purple-700 flex items-center justify-center text-xs font-bold">2</span>
+                  <div>
+                    <span className="font-medium">The Live indicator turns green</span> the moment we receive your first tracked session — usually within seconds of a real ad click.
+                  </div>
+                </li>
+                <li className="flex gap-3 text-sm text-gray-700">
+                  <span className="flex-shrink-0 w-5 h-5 rounded-full bg-purple-100 text-purple-700 flex items-center justify-center text-xs font-bold">3</span>
+                  <div>
+                    <span className="font-medium">Leak Table fills up over time.</span> Keywords only appear if they have a high bounce rate — if it stays empty, your campaigns are performing well (that's a good thing!).
+                  </div>
+                </li>
+                <li className="flex gap-3 text-sm text-gray-700">
+                  <span className="flex-shrink-0 w-5 h-5 rounded-full bg-purple-100 text-purple-700 flex items-center justify-center text-xs font-bold">4</span>
+                  <div>
+                    <span className="font-medium">Nothing after 24 hours?</span> Check the All Sessions tab — if sessions appear there but not in Leak Table, your keywords are performing well. If sessions are also empty, recheck your snippet and ValueTrack template.
+                  </div>
+                </li>
+              </ol>
+            </div>
+          </Accordion>
 
           {/* Navigation */}
           <div className="flex gap-4 pt-4">
