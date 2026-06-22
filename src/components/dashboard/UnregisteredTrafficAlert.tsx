@@ -15,9 +15,10 @@ interface UnregisteredTraffic {
 interface UnregisteredTrafficAlertProps {
   traffic: UnregisteredTraffic[];
   registeredCount: number;
+  isViewer?: boolean;
 }
 
-export function UnregisteredTrafficAlert({ traffic: initialTraffic, registeredCount }: UnregisteredTrafficAlertProps) {
+export function UnregisteredTrafficAlert({ traffic: initialTraffic, registeredCount, isViewer = false }: UnregisteredTrafficAlertProps) {
   const [traffic, setTraffic] = useState(initialTraffic);
   const [confirmId, setConfirmId] = useState<string | null>(null);
   const [deleting, setDeleting] = useState(false);
@@ -95,13 +96,15 @@ export function UnregisteredTrafficAlert({ traffic: initialTraffic, registeredCo
               </ul>
             </div>
 
-            <Link
-              href="/settings"
-              className="inline-flex items-center gap-2 px-4 py-2 bg-red-600 hover:bg-red-700 text-white text-sm font-semibold rounded-lg transition-colors"
-            >
-              {atLimit ? 'Manage Campaigns' : 'Register These Campaigns'}
-              <ArrowRight className="w-4 h-4" />
-            </Link>
+            {!isViewer && (
+              <Link
+                href="/settings"
+                className="inline-flex items-center gap-2 px-4 py-2 bg-red-600 hover:bg-red-700 text-white text-sm font-semibold rounded-lg transition-colors"
+              >
+                {atLimit ? 'Manage Campaigns' : 'Register These Campaigns'}
+                <ArrowRight className="w-4 h-4" />
+              </Link>
+            )}
           </div>
         </div>
       </div>

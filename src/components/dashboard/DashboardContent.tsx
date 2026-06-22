@@ -28,7 +28,21 @@ interface DashboardStatus {
 export function DashboardContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
-  const { update: updateSession } = useSession();
+  const { data: session, update: updateSession } = useSession();
+
+  // Derive the role for the currently active workspace
+  const isViewer = (() => {
+    const ownTenantId = session?.user?.tenantId;
+    const activeTenantId = session?.user?.activeTenantId;
+    if (!activeTenantId || activeTenantId === ownTenantId) return false; // owner of own workspace
+    const all = session?.user?.allAccessibleDomains ?? [];
+    const activeDomainId = session?.user?.activeDomainId;
+    if (activeDomainId) {
+      return all.find(d => d.domainId === activeDomainId)?.role === 'visitor';
+    }
+    const ws = all.filter(d => d.tenantId === activeTenantId);
+    return ws.length > 0 && ws.every(d => d.role === 'visitor');
+  })();
 
   const [status, setStatus] = useState<DashboardStatus | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -230,6 +244,7 @@ export function DashboardContent() {
         <UnregisteredTrafficAlert
           traffic={status.unregisteredTraffic}
           registeredCount={status.campaigns.length}
+          isViewer={isViewer}
         />
       )}
 
@@ -244,13 +259,15 @@ export function DashboardContent() {
             <p className="text-gray-600 mb-4">
               No campaigns registered yet
             </p>
-            <Link
-              href="/settings"
-              className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg transition-colors"
-            >
-              <Plus className="w-5 h-5" />
-              Add Your First Campaign
-            </Link>
+            {!isViewer && (
+              <Link
+                href="/settings"
+                className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg transition-colors"
+              >
+                <Plus className="w-5 h-5" />
+                Add Your First Campaign
+              </Link>
+            )}
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
