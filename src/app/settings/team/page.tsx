@@ -208,8 +208,8 @@ export default function TeamPage() {
               </button>
             </div>
 
-            {/* Domain access picker — only shown when owner has 2+ domains */}
-            {ownerDomains.length > 1 && (
+            {/* Domain access picker */}
+            {ownerDomains.length > 0 && (
               <div className="border border-gray-200 rounded-lg p-3 bg-gray-50">
                 <p className="text-xs font-medium text-gray-700 mb-2">
                   Domain access

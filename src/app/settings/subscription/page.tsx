@@ -185,16 +185,10 @@ export default function SubscriptionPage() {
 
       {/* Current status banner */}
       {isSubscribed && (
-        <div className="mb-6 p-4 bg-green-50 border border-green-200 rounded-lg flex items-center justify-between flex-wrap gap-3">
+        <div className="mb-6 p-4 bg-green-50 border border-green-200 rounded-lg">
           <p className="text-sm text-green-800 font-medium">
             Active subscription — {PLAN_LIMITS[currentPlan].label}
           </p>
-          <button
-            onClick={handleManagePortal}
-            className="text-sm text-green-700 underline hover:no-underline"
-          >
-            Manage billing / cancel
-          </button>
         </div>
       )}
 
@@ -223,6 +217,22 @@ export default function SubscriptionPage() {
       {message && (
         <div className="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
           <p className="text-sm text-blue-800">{message}</p>
+        </div>
+      )}
+
+      {/* Billing management */}
+      {isSubscribed && (
+        <div className="mb-8 p-5 bg-white border border-gray-200 rounded-xl">
+          <h2 className="text-sm font-semibold text-gray-900 mb-1">Manage billing or cancel</h2>
+          <p className="text-sm text-gray-500 mb-4">
+            Update your payment method, download invoices, or cancel your subscription at any time via the Stripe billing portal. Cancellations take effect at the end of your current billing period — you keep full access until then.
+          </p>
+          <button
+            onClick={handleManagePortal}
+            className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+          >
+            Open billing portal ↗
+          </button>
         </div>
       )}
 

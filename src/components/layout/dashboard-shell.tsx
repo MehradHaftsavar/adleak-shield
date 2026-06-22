@@ -287,8 +287,8 @@ export function DashboardShell({ email, tenantId, children }: DashboardShellProp
                 AdLeak Shield
               </span>
 
-              {/* Domain dropdown (shows when user has multiple domains) */}
-              {allDomains.length > 1 && (
+              {/* Domain dropdown — always visible when at least one domain exists */}
+              {allDomains.length > 0 && (
                 <DomainDropdown
                   domains={allDomains}
                   activeTenantId={activeTenantId}
@@ -304,7 +304,7 @@ export function DashboardShell({ email, tenantId, children }: DashboardShellProp
                 <Link href="/settings" className="text-sm text-gray-600 hover:text-gray-900 transition-colors">
                   Setup
                 </Link>
-                {isOwner && (
+                {isOwner && isViewingOwnTenant && (
                   <Link href="/settings/team" className="text-sm text-gray-600 hover:text-gray-900 transition-colors">
                     Team
                   </Link>
@@ -320,17 +320,6 @@ export function DashboardShell({ email, tenantId, children }: DashboardShellProp
             {/* ── Right: desktop extras + hamburger ── */}
             <div className="flex items-center gap-3">
               <div className="hidden md:flex items-center gap-3">
-                {showSubscriptionControls && !isActive && (
-                  <button
-                    onClick={handleSubscribe}
-                    disabled={checkoutLoading}
-                    className="flex items-center gap-1.5 px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-60 text-white text-sm font-semibold rounded-lg transition-colors whitespace-nowrap"
-                  >
-                    {checkoutLoading ? <span className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" /> : null}
-                    {isCancelled ? "Resubscribe" : "Subscribe — £12.99/mo"}
-                  </button>
-                )}
-                {showSubscriptionControls && isActive && <ManageSubscriptionButton />}
                 <span className="text-xs text-gray-400 max-w-[160px] truncate">{email}</span>
                 <button
                   onClick={() => signOut({ callbackUrl: "/auth/login" })}
@@ -374,7 +363,7 @@ export function DashboardShell({ email, tenantId, children }: DashboardShellProp
                 className="block px-2 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-50 rounded-lg transition-colors">
                 Setup
               </Link>
-              {isOwner && (
+              {isOwner && isViewingOwnTenant && (
                 <Link href="/settings/team" onClick={() => setMenuOpen(false)}
                   className="block px-2 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-50 rounded-lg transition-colors">
                   Team
@@ -386,24 +375,6 @@ export function DashboardShell({ email, tenantId, children }: DashboardShellProp
                   Subscription
                 </Link>
               )}
-
-              <div className="pt-2 border-t border-gray-100">
-                {showSubscriptionControls && !isActive && (
-                  <button
-                    onClick={() => { setMenuOpen(false); handleSubscribe(); }}
-                    disabled={checkoutLoading}
-                    className="w-full flex items-center justify-center gap-2 px-3 py-2.5 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-60 text-white text-sm font-semibold rounded-lg transition-colors"
-                  >
-                    {checkoutLoading ? <span className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" /> : null}
-                    {isCancelled ? "Resubscribe" : "Subscribe — £12.99/mo"}
-                  </button>
-                )}
-                {showSubscriptionControls && isActive && (
-                  <div onClick={() => setMenuOpen(false)}>
-                    <ManageSubscriptionButton />
-                  </div>
-                )}
-              </div>
 
               <div className="pt-2 border-t border-gray-100">
                 <button
