@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import crypto from 'crypto';
 import { auth } from '@/lib/auth';
-import { withAdminDb, getAdminPool } from '@/lib/db/client';
+import { withAdminDb, withTenantDb, getAdminPool } from '@/lib/db/client';
 import * as mssql from 'mssql';
 import { Resend } from 'resend';
 import { buildTeamInvitationEmail } from '@/lib/email/teamInvitation';
@@ -81,11 +81,9 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'A pending invite already exists for this email' }, { status: 409 });
     }
 
-    // Load tenant's current domains, then narrow to selected ones if specified
-    const allDomains = await withAdminDb(async (req) => {
-      const r = await req
-        .input('tid', mssql.UniqueIdentifier, tenantId)
-        .query(`SELECT domain_id FROM Domains WHERE tenant_id = @tid`);
+    // Load tenant's current domains via withTenantDb — Domains has RLS, withAdminDb returns nothing
+    const allDomains = await withTenantDb(tenantId, async (req) => {
+      const r = await req.query(`SELECT domain_id FROM Domains`);
       return r.recordset.map((d: any) => d.domain_id as string);
     });
     const domains = domainIds && domainIds.length > 0

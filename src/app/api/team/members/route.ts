@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@/lib/auth';
-import { withAdminDb } from '@/lib/db/client';
+import { withAdminDb, withTenantDb } from '@/lib/db/client';
 import * as mssql from 'mssql';
 
 export const dynamic = 'force-dynamic';
@@ -15,19 +15,18 @@ export async function GET(_request: NextRequest) {
     const tenantId = session.user.tenantId as string;
 
     const [members, invitations] = await Promise.all([
-      withAdminDb(async (req) => {
-        const r = await req
-          .input('tenantId', mssql.UniqueIdentifier, tenantId)
-          .query(`
-            SELECT tm.member_id, tm.email, tm.role, tm.created_at, tm.accepted_at,
-                   (SELECT STRING_AGG(d.domain_name, ', ')
-                    FROM MemberDomainAccess mda
-                    INNER JOIN Domains d ON d.domain_id = mda.domain_id
-                    WHERE mda.member_id = tm.member_id) AS domains
-            FROM   TeamMembers tm
-            WHERE  tm.tenant_id = @tenantId
-            ORDER  BY tm.created_at DESC
-          `);
+      // Domains has RLS — must use withTenantDb so the STRING_AGG subquery can see domain names
+      withTenantDb(tenantId, async (req) => {
+        const r = await req.query(`
+          SELECT tm.member_id, tm.email, tm.role, tm.created_at, tm.accepted_at,
+                 (SELECT STRING_AGG(d.domain_name, ', ')
+                  FROM MemberDomainAccess mda
+                  INNER JOIN Domains d ON d.domain_id = mda.domain_id
+                  WHERE mda.member_id = tm.member_id) AS domains
+          FROM   TeamMembers tm
+          WHERE  tm.tenant_id = CAST(SESSION_CONTEXT(N'TenantId') AS UNIQUEIDENTIFIER)
+          ORDER  BY tm.created_at DESC
+        `);
         return r.recordset;
       }),
       withAdminDb(async (req) => {

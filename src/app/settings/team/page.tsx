@@ -369,7 +369,7 @@ export default function TeamPage() {
                   </div>
                   <div className="min-w-0">
                     <p className="text-sm font-medium text-gray-900 truncate">{m.email}</p>
-                    <p className="text-xs text-gray-500 truncate">{m.domains || 'All domains'}</p>
+                    <p className="text-xs text-gray-500 truncate">{m.domains || 'No domain access'}</p>
                   </div>
                 </div>
                 <div className="flex items-center gap-2 flex-shrink-0">
