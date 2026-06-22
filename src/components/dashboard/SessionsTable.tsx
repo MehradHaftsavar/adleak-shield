@@ -196,6 +196,15 @@ export function SessionsTable({ campaigns, dateRange, refreshTrigger }: Sessions
     setCsvLoading(true);
     try {
       const params = new URLSearchParams({ start: dateRange.start, end: dateRange.end });
+      if (keyword)    params.set('keyword',    keyword);
+      if (campaignId) params.set('campaignId', campaignId);
+      if (matchType)  params.set('matchType',  matchType);
+      if (device)     params.set('device',     device);
+      if (outcome)    params.set('outcome',    outcome);
+      if (adGroupId)  params.set('adGroupId',  adGroupId);
+      if (adId)       params.set('adId',       adId);
+      if (adPosition) params.set('adPosition', adPosition);
+      if (country)    params.set('country',    country);
       const res  = await fetch(`/api/export/sessions?${params}`);
       if (!res.ok) throw new Error('Export failed');
       const blob = await res.blob();
