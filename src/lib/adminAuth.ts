@@ -133,14 +133,24 @@ export async function getEffectiveTenantId(
 //   memberDomainIds []   → member but no domains granted → AND 1=0 (empty result)
 //   memberDomainIds [...] → restrict to IN list
 // ---------------------------------------------------------------------------
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+function assertUuid(id: string) {
+  if (!UUID_RE.test(id)) throw new Error(`Invalid domain ID format: ${id}`);
+}
+
 export function buildDomainFilter(
   activeDomainId: string | null,
   memberDomainIds: string[] | null,
   column: string,
 ): string {
-  if (activeDomainId) return `AND ${column} = '${activeDomainId}'`;
+  if (activeDomainId) {
+    assertUuid(activeDomainId);
+    return `AND ${column} = '${activeDomainId}'`;
+  }
   if (memberDomainIds === null) return '';
   if (memberDomainIds.length === 0) return 'AND 1=0';
+  memberDomainIds.forEach(assertUuid);
   return `AND ${column} IN (${memberDomainIds.map(id => `'${id}'`).join(', ')})`;
 }
 

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@/lib/auth';
-import { withAdminDb, withTenantDb } from '@/lib/db/client';
+import { withAdminDb } from '@/lib/db/client';
 import * as mssql from 'mssql';
 
 export async function PATCH(
