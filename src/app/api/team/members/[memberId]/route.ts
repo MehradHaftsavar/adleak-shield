@@ -40,21 +40,13 @@ export async function PATCH(
       }
 
       if (domainIds !== undefined) {
-        // Atomic swap: delete old access rows then insert the new set
-        await req.query(`BEGIN TRANSACTION`);
-        try {
-          await req.query(`DELETE FROM MemberDomainAccess WHERE member_id = @memberId`);
-          for (let i = 0; i < domainIds.length; i++) {
-            req.input(`did${i}`, mssql.UniqueIdentifier, domainIds[i]);
-            await req.query(`
-              INSERT INTO MemberDomainAccess (member_id, domain_id)
-              VALUES (@memberId, @did${i})
-            `);
-          }
-          await req.query(`COMMIT`);
-        } catch (err) {
-          await req.query(`ROLLBACK`);
-          throw err;
+        await req.query(`DELETE FROM MemberDomainAccess WHERE member_id = @memberId`);
+        for (let i = 0; i < domainIds.length; i++) {
+          req.input(`did${i}`, mssql.UniqueIdentifier, domainIds[i]);
+          await req.query(`
+            INSERT INTO MemberDomainAccess (member_id, domain_id)
+            VALUES (@memberId, @did${i})
+          `);
         }
       }
     });
