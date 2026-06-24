@@ -5,6 +5,12 @@ import { Metadata } from 'next';
 export const metadata: Metadata = {
   title: 'Blog — Google Ads Tips & Insights | AdLeak Shield',
   description: 'Practical guides and insights for small businesses running Google Ads. Learn how to stop wasting budget, improve conversions, and get more calls from your campaigns.',
+  alternates: {
+    canonical: 'https://www.adleakshield.com/blog',
+  },
+  openGraph: {
+    url: 'https://www.adleakshield.com/blog',
+  },
 };
 
 const posts = [

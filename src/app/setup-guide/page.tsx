@@ -8,6 +8,9 @@
 export const metadata = {
   title: 'Setup Guide — AdLeak Shield',
   description: 'Step-by-step instructions for installing AdLeak Shield on WordPress, Shopify, Wix, and hand-coded websites.',
+  alternates: {
+    canonical: 'https://www.adleakshield.com/setup-guide',
+  },
 };
 
 const CSP_SCRIPT  = 'https://adleakshield.com';

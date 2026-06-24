@@ -1,6 +1,6 @@
 import { MetadataRoute } from 'next';
 
-const BASE_URL = 'https://adleakshield.com';
+const BASE_URL = 'https://www.adleakshield.com';
 
 export default function sitemap(): MetadataRoute.Sitemap {
   return [

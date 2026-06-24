@@ -5,9 +5,13 @@ import { Metadata } from 'next';
 export const metadata: Metadata = {
   title: 'Why Your Google Ads Are Getting Clicks But No Calls | AdLeak Shield',
   description: "Spending on Google Ads but the phone isn't ringing? Discover the six most common reasons your campaign is leaking budget,and how to fix each one.",
+  alternates: {
+    canonical: 'https://www.adleakshield.com/blog/google-ads-clicks-but-no-calls',
+  },
   openGraph: {
     title: 'Why Your Google Ads Are Getting Clicks But No Calls',
     description: "Spending on Google Ads but the phone isn't ringing? Discover the six most common reasons your campaign is leaking budget,and how to fix each one.",
+    url: 'https://www.adleakshield.com/blog/google-ads-clicks-but-no-calls',
     type: 'article',
     publishedTime: '2026-06-16',
     authors: ['Mehrad Haftsavar'],
@@ -67,10 +71,10 @@ const articleSchema = {
   '@type': 'Article',
   headline: "Why Your Google Ads Are Getting Clicks But No Calls,And What's Really Draining Your Budget",
   description: "Spending on Google Ads but the phone isn't ringing? Discover the six most common reasons your campaign is leaking budget,and how to fix each one.",
-  publisher: { '@type': 'Organization', name: 'AdLeak Shield', url: 'https://adleakshield.com' },
+  publisher: { '@type': 'Organization', name: 'AdLeak Shield', url: 'https://www.adleakshield.com' },
   datePublished: '2026-06-16',
   dateModified: '2026-06-16',
-  url: 'https://adleakshield.com/blog/google-ads-clicks-but-no-calls',
+  url: 'https://www.adleakshield.com/blog/google-ads-clicks-but-no-calls',
 };
 
 const tocItems = [

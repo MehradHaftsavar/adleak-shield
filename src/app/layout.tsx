@@ -39,7 +39,7 @@ export const metadata: Metadata = {
     title: "AdLeak Shield — Stop Paying for Google Ads Clicks That Never Convert",
     description:
       "Find out exactly which keywords are eating your Google Ads budget without generating calls, leads, or sales. Cookieless tracking. GDPR compliant. Free 7-day trial.",
-    url: "https://adleakshield.com",
+    url: "https://www.adleakshield.com",
     siteName: "AdLeak Shield",
     type: "website",
   },
@@ -50,8 +50,9 @@ export const metadata: Metadata = {
       "AdLeak Shield shows you which Google Ads keywords are wasting your budget. Cut them, get your money back. Free 7-day trial.",
   },
   alternates: {
-    canonical: "https://adleakshield.com",
+    canonical: "https://www.adleakshield.com",
   },
+  metadataBase: new URL("https://www.adleakshield.com"),
 };
 
 export default async function RootLayout({

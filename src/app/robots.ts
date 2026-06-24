@@ -39,7 +39,7 @@ export default function robots(): MetadataRoute.Robots {
       { userAgent: 'Meta-ExternalAgent', allow: ['/', '/blog', '/blog/'] },
       { userAgent: 'Bytespider',         disallow: ['/'] },  // ByteDance / TikTok — block
     ],
-    sitemap: 'https://adleakshield.com/sitemap.xml',
-    host: 'https://adleakshield.com',
+    sitemap: 'https://www.adleakshield.com/sitemap.xml',
+    host: 'https://www.adleakshield.com',
   };
 }
