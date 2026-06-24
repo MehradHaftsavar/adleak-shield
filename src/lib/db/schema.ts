@@ -196,10 +196,10 @@ export interface MemberDomainAccess {
   access_id: string;
   member_id: string;
   domain_id: string;
-  granted_at: Date;
+  created_at: Date;
 }
 
-export type NewMemberDomainAccess = Omit<MemberDomainAccess, "access_id" | "granted_at"> & {
+export type NewMemberDomainAccess = Omit<MemberDomainAccess, "access_id" | "created_at"> & {
   access_id?: string;
 };
 

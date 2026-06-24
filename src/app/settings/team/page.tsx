@@ -448,8 +448,8 @@ export default function TeamPage() {
 
                 {/* Inline edit panel */}
                 {editingId === m.memberId && (
-                  <div className="px-6 pb-5 pt-1 bg-indigo-50 border-t border-indigo-100">
-                    <p className="text-xs font-semibold text-indigo-700 mb-3 uppercase tracking-wide">Edit access for {m.email}</p>
+                  <div className="px-6 pb-5 pt-4 bg-indigo-50 border-t border-indigo-100">
+                    <p className="text-xs font-semibold text-indigo-700 mb-4 uppercase tracking-wide">Edit access for {m.email}</p>
 
                     {/* Role */}
                     <div className="mb-3">
