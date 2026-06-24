@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useSession } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
-import { Users, UserPlus, Trash2, Mail, Clock } from 'lucide-react';
+import { Users, UserPlus, Trash2, Clock, Pencil, Check, X } from 'lucide-react';
 import { PLAN_LIMITS } from '@/lib/planLimits';
 import type { PlanType } from '@/types/auth';
 
@@ -15,6 +15,7 @@ interface Member {
   acceptedAt: string | null;
   status:     'active' | 'pending';
   domains:    string;
+  domainIds:  string[];
 }
 
 interface PendingInvite {
@@ -44,6 +45,13 @@ export default function TeamPage() {
   const [actionError,     setActionError]     = useState('');
   const [confirmRemove,   setConfirmRemove]   = useState<{ memberId: string; email: string } | null>(null);
   const [confirmCancel,   setConfirmCancel]   = useState<{ invitationId: string; email: string } | null>(null);
+
+  // Inline edit state for active members
+  const [editingId,       setEditingId]       = useState<string | null>(null);
+  const [editRole,        setEditRole]        = useState<'editor' | 'visitor'>('editor');
+  const [editDomainIds,   setEditDomainIds]   = useState<string[]>([]);
+  const [editSaving,      setEditSaving]      = useState(false);
+  const [editError,       setEditError]       = useState('');
 
   // Owner's domains (for invite domain picker)
   const [ownerDomains, setOwnerDomains] = useState<{ domainId: string; domainName: string }[]>([]);
@@ -143,6 +151,36 @@ export default function TeamPage() {
       loadTeam();
     } catch {
       setActionError('Network error. Please try again.');
+    }
+  }
+
+  function startEditing(m: Member) {
+    setEditingId(m.memberId);
+    setEditRole(m.role as 'editor' | 'visitor');
+    setEditDomainIds(m.domainIds);
+    setEditError('');
+  }
+
+  async function saveEdit(memberId: string) {
+    setEditSaving(true);
+    setEditError('');
+    try {
+      const res = await fetch(`/api/team/members/${memberId}`, {
+        method:  'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body:    JSON.stringify({ role: editRole, domainIds: editDomainIds }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setEditError(data.error || 'Failed to update member');
+        return;
+      }
+      setEditingId(null);
+      loadTeam();
+    } catch {
+      setEditError('Network error. Please try again.');
+    } finally {
+      setEditSaving(false);
     }
   }
 
@@ -371,32 +409,132 @@ export default function TeamPage() {
 
             {/* Active members */}
             {members.filter(m => m.status === 'active').map(m => (
-              <li key={m.memberId} className="px-6 py-4 flex items-center justify-between gap-4">
-                <div className="flex items-center gap-3 min-w-0">
-                  <div className="w-8 h-8 bg-gray-100 rounded-full flex items-center justify-center flex-shrink-0">
-                    <span className="text-xs font-bold text-gray-500">
-                      {m.email[0].toUpperCase()}
+              <li key={m.memberId} className="border-b border-gray-100 last:border-b-0">
+                {/* Member row */}
+                <div className="px-6 py-4 flex items-center justify-between gap-4">
+                  <div className="flex items-center gap-3 min-w-0">
+                    <div className="w-8 h-8 bg-gray-100 rounded-full flex items-center justify-center flex-shrink-0">
+                      <span className="text-xs font-bold text-gray-500">
+                        {m.email[0].toUpperCase()}
+                      </span>
+                    </div>
+                    <div className="min-w-0">
+                      <p className="text-sm font-medium text-gray-900 truncate">{m.email}</p>
+                      <p className="text-xs text-gray-500 truncate">{m.domains || 'All domains'}</p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2 flex-shrink-0">
+                    <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
+                      m.role === 'editor' ? 'bg-blue-100 text-blue-800' : 'bg-gray-100 text-gray-700'
+                    }`}>
+                      {m.role === 'editor' ? 'Editor' : 'Viewer'}
                     </span>
-                  </div>
-                  <div className="min-w-0">
-                    <p className="text-sm font-medium text-gray-900 truncate">{m.email}</p>
-                    <p className="text-xs text-gray-500 truncate">{m.domains || 'No domain access'}</p>
+                    <button
+                      onClick={() => editingId === m.memberId ? setEditingId(null) : startEditing(m)}
+                      className={`p-1.5 transition-colors rounded ${editingId === m.memberId ? 'text-indigo-600 bg-indigo-50' : 'text-gray-400 hover:text-indigo-600'}`}
+                      title="Edit access"
+                    >
+                      <Pencil className="w-4 h-4" />
+                    </button>
+                    <button
+                      onClick={() => handleRemoveMember(m.memberId, m.email)}
+                      className="p-1.5 text-gray-400 hover:text-red-600 transition-colors rounded"
+                      title="Remove member"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
                   </div>
                 </div>
-                <div className="flex items-center gap-2 flex-shrink-0">
-                  <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
-                    m.role === 'editor' ? 'bg-blue-100 text-blue-800' : 'bg-gray-100 text-gray-700'
-                  }`}>
-                    {m.role === 'editor' ? 'Editor' : 'Viewer'}
-                  </span>
-                  <button
-                    onClick={() => handleRemoveMember(m.memberId, m.email)}
-                    className="p-1.5 text-gray-400 hover:text-red-600 transition-colors rounded"
-                    title="Remove member"
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </button>
-                </div>
+
+                {/* Inline edit panel */}
+                {editingId === m.memberId && (
+                  <div className="px-6 pb-5 pt-1 bg-indigo-50 border-t border-indigo-100">
+                    <p className="text-xs font-semibold text-indigo-700 mb-3 uppercase tracking-wide">Edit access for {m.email}</p>
+
+                    {/* Role */}
+                    <div className="mb-3">
+                      <label className="block text-xs font-medium text-gray-700 mb-1">Role</label>
+                      <div className="flex gap-2">
+                        {(['editor', 'visitor'] as const).map(r => (
+                          <button
+                            key={r}
+                            type="button"
+                            onClick={() => setEditRole(r)}
+                            className={`px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors ${
+                              editRole === r
+                                ? 'bg-indigo-600 text-white border-indigo-600'
+                                : 'bg-white text-gray-700 border-gray-300 hover:border-indigo-400'
+                            }`}
+                          >
+                            {r === 'editor' ? 'Editor' : 'Viewer'}
+                          </button>
+                        ))}
+                      </div>
+                      <p className="mt-1 text-xs text-gray-500">
+                        {editRole === 'editor' ? 'Can view data and manage campaigns' : 'Read-only access to data'}
+                      </p>
+                    </div>
+
+                    {/* Domain access */}
+                    {ownerDomains.length > 0 && (
+                      <div className="mb-4">
+                        <label className="block text-xs font-medium text-gray-700 mb-1">
+                          Domain access
+                          <span className="ml-1 font-normal text-gray-400">
+                            {editDomainIds.length === 0 ? '(all domains)' : `(${editDomainIds.length} selected)`}
+                          </span>
+                        </label>
+                        <div className="flex flex-wrap gap-2">
+                          {ownerDomains.map(d => {
+                            const checked = editDomainIds.length === 0 || editDomainIds.includes(d.domainId);
+                            return (
+                              <label key={d.domainId} className="flex items-center gap-1.5 cursor-pointer">
+                                <input
+                                  type="checkbox"
+                                  checked={checked}
+                                  onChange={() => {
+                                    if (editDomainIds.length === 0) {
+                                      setEditDomainIds(ownerDomains.map(x => x.domainId).filter(id => id !== d.domainId));
+                                    } else if (editDomainIds.includes(d.domainId)) {
+                                      const next = editDomainIds.filter(id => id !== d.domainId);
+                                      setEditDomainIds(next.length > 0 ? next : []);
+                                    } else {
+                                      const next = [...editDomainIds, d.domainId];
+                                      setEditDomainIds(next.length === ownerDomains.length ? [] : next);
+                                    }
+                                  }}
+                                  className="w-3.5 h-3.5 rounded accent-indigo-600"
+                                />
+                                <span className="text-xs text-gray-700">{d.domainName}</span>
+                              </label>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    )}
+
+                    {editError && <p className="mb-2 text-xs text-red-600">{editError}</p>}
+
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => saveEdit(m.memberId)}
+                        disabled={editSaving}
+                        className="flex items-center gap-1.5 px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-60 text-white text-xs font-semibold rounded-lg transition-colors"
+                      >
+                        <Check className="w-3.5 h-3.5" />
+                        {editSaving ? 'Saving…' : 'Save changes'}
+                      </button>
+                      <button
+                        onClick={() => setEditingId(null)}
+                        disabled={editSaving}
+                        className="flex items-center gap-1.5 px-3 py-1.5 bg-white hover:bg-gray-50 text-gray-600 text-xs font-medium rounded-lg border border-gray-300 transition-colors"
+                      >
+                        <X className="w-3.5 h-3.5" />
+                        Cancel
+                      </button>
+                    </div>
+                  </div>
+                )}
               </li>
             ))}
 

@@ -22,7 +22,10 @@ export async function GET(_request: NextRequest) {
                  (SELECT STRING_AGG(d.domain_name, ', ')
                   FROM MemberDomainAccess mda
                   INNER JOIN Domains d ON d.domain_id = mda.domain_id
-                  WHERE mda.member_id = tm.member_id) AS domains
+                  WHERE mda.member_id = tm.member_id) AS domains,
+                 (SELECT STRING_AGG(CAST(mda.domain_id AS NVARCHAR(36)), ',')
+                  FROM MemberDomainAccess mda
+                  WHERE mda.member_id = tm.member_id) AS domain_ids
           FROM   TeamMembers tm
           WHERE  tm.tenant_id = CAST(SESSION_CONTEXT(N'TenantId') AS UNIQUEIDENTIFIER)
           ORDER  BY tm.created_at DESC
@@ -53,6 +56,7 @@ export async function GET(_request: NextRequest) {
         addedAt:     m.created_at,
         acceptedAt:  m.accepted_at,
         domains:     m.domains ?? '',
+        domainIds:   m.domain_ids ? m.domain_ids.split(',') : [],
         status:      m.accepted_at ? 'active' : 'pending',
       })),
       pendingInvitations: invitations.map((i: any) => ({
