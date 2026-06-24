@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { useSession } from 'next-auth/react';
 import { Code, Copy, CheckCircle, ExternalLink, AlertCircle, Loader2, ChevronDown, ChevronUp } from 'lucide-react';
 
 function Accordion({ title, children, defaultOpen = false }: { title: React.ReactNode; children: React.ReactNode; defaultOpen?: boolean }) {
@@ -28,13 +29,16 @@ interface SnippetStepProps {
 }
 
 export function SnippetStep({ domain, onComplete, onBack }: SnippetStepProps) {
+  const { data: session } = useSession();
   const [snippet, setSnippet] = useState('');
   const [template, setTemplate] = useState('');
   const [campaigns, setCampaigns] = useState<any[]>([]);
+  // Maps domainId → workspaceTenantId (null = own workspace)
+  const [domainWorkspaceMap, setDomainWorkspaceMap] = useState<Record<string, string | null>>({});
   const [snippetCopied, setSnippetCopied] = useState(false);
   const [templateCopied, setTemplateCopied] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
-  
+
   // Test My Setup state
   const [isTesting, setIsTesting] = useState(false);
   const [testResult, setTestResult] = useState<'idle' | 'testing' | 'success' | 'failed'>('idle');
@@ -49,24 +53,58 @@ export function SnippetStep({ domain, onComplete, onBack }: SnippetStepProps) {
 
   const loadSnippet = async () => {
     try {
-      const [snippetRes, campaignsRes] = await Promise.all([
-        fetch('/api/snippet'),
-        fetch('/api/campaigns'),
-      ]);
+      // Snippet code — may fail if user has no own domains; that's fine, snippet is generic
+      const snippetRes = await fetch('/api/snippet');
       if (snippetRes.ok) {
         const data = await snippetRes.json();
         setSnippet(data.snippet);
         setTemplate(data.template);
-        setCampaigns(data.campaigns || []);
+      } else {
+        // No own domain — still show the generic snippet code
+        setSnippet('<!-- AdLeak Shield -->\n<script src="https://www.adleakshield.com/tracker.js" defer></script>');
+        setTemplate('{lpurl}?keyword={keyword}&campaignid={campaignid}&matchtype={matchtype}&adgroupid={adgroupid}&adid={creative}&adposition={adposition}&gclid={gclid}');
       }
-      if (campaignsRes.ok) {
-        const data = await campaignsRes.json();
-        const list = data.campaigns ?? [];
-        setCampaigns(list);
-        if (list.length > 0) {
-          setTestDomainId(list[0].domainId);
-          setTestCampaignDbId(list[0].googleCampaignId);
+
+      // Own campaigns
+      const allCampaigns: any[] = [];
+      const workspaceMap: Record<string, string | null> = {};
+
+      const ownRes = await fetch('/api/campaigns');
+      if (ownRes.ok) {
+        const data = await ownRes.json();
+        for (const c of (data.campaigns ?? [])) {
+          allCampaigns.push(c);
+          workspaceMap[c.domainId] = null;
         }
+      }
+
+      // Invited workspace campaigns
+      const allAccessible = (session?.user?.allAccessibleDomains ?? []) as Array<{
+        tenantId: string; domainId: string; role: string; tenantOwnerEmail: string;
+      }>;
+      const ownTenantId = session?.user?.tenantId;
+      const invitedTenantIds = [...new Set(
+        allAccessible.filter(d => d.tenantId !== ownTenantId).map(d => d.tenantId)
+      )];
+
+      await Promise.all(invitedTenantIds.map(async (tenantId) => {
+        try {
+          const res = await fetch(`/api/campaigns?workspace=${tenantId}`);
+          if (res.ok) {
+            const data = await res.json();
+            for (const c of (data.campaigns ?? [])) {
+              allCampaigns.push(c);
+              workspaceMap[c.domainId] = tenantId;
+            }
+          }
+        } catch { /* non-fatal */ }
+      }));
+
+      setCampaigns(allCampaigns);
+      setDomainWorkspaceMap(workspaceMap);
+      if (allCampaigns.length > 0) {
+        setTestDomainId(allCampaigns[0].domainId);
+        setTestCampaignDbId(allCampaigns[0].googleCampaignId);
       }
     } catch (err) {
       console.error('Failed to load snippet:', err);
@@ -120,14 +158,19 @@ export function SnippetStep({ domain, onComplete, onBack }: SnippetStepProps) {
     setTestMessage('Test page opened. Waiting for tracking data...');
 
     // Poll for verification (check every 2 seconds for 30 seconds)
+    const testWorkspace = domainWorkspaceMap[testDomainId] ?? null;
+    const verifyUrl = testWorkspace
+      ? `/api/verification/status?workspace=${testWorkspace}`
+      : '/api/verification/status';
+
     let attempts = 0;
     const maxAttempts = 15; // 30 seconds
-    
+
     const pollInterval = setInterval(async () => {
       attempts++;
 
       try {
-        const res = await fetch('/api/verification/status');
+        const res = await fetch(verifyUrl);
         if (res.ok) {
           const data = await res.json();
           

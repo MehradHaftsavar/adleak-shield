@@ -9,6 +9,27 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
+    const { searchParams } = new URL(request.url);
+    const workspaceParam = searchParams.get('workspace');
+
+    // Invited workspace branch — check that workspace's Sessions table
+    if (workspaceParam && workspaceParam !== session.user.tenantId) {
+      const allAccessible = (session.user.allAccessibleDomains ?? []) as Array<{ tenantId: string }>;
+      const hasAccess = allAccessible.some(d => d.tenantId === workspaceParam);
+      if (!hasAccess) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+
+      const result = await withTenantDb(workspaceParam, async (req) => {
+        const testResult = await req.query(`
+          SELECT TOP 1 started_at FROM Sessions
+          WHERE keyword = 'adleak_test'
+            AND started_at >= DATEADD(second, -90, GETUTCDATE())
+          ORDER BY started_at DESC
+        `);
+        return { snippetInstalled: testResult.recordset.length > 0 };
+      });
+      return NextResponse.json(result);
+    }
+
     const result = await withTenantDb(session.user.tenantId, async (req) => {
       // Get registered campaigns count
       const campaignsResult = await req.query(`
