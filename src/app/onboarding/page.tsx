@@ -191,7 +191,6 @@ export default function OnboardingPage() {
 
           {currentStep === 2 && (
             <CampaignStep
-              domain={domain}
               onComplete={handleCampaignsComplete}
               onBack={() => setCurrentStep(1)}
             />
