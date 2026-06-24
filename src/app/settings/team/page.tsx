@@ -481,26 +481,22 @@ export default function TeamPage() {
                         <label className="block text-xs font-medium text-gray-700 mb-1">
                           Domain access
                           <span className="ml-1 font-normal text-gray-400">
-                            {editDomainIds.length === 0 ? '(all domains)' : `(${editDomainIds.length} selected)`}
+                            {editDomainIds.length === ownerDomains.length ? '(all domains)' : editDomainIds.length === 0 ? '(none)' : `(${editDomainIds.length} selected)`}
                           </span>
                         </label>
                         <div className="flex flex-wrap gap-2">
                           {ownerDomains.map(d => {
-                            const checked = editDomainIds.length === 0 || editDomainIds.includes(d.domainId);
+                            const checked = editDomainIds.includes(d.domainId);
                             return (
                               <label key={d.domainId} className="flex items-center gap-1.5 cursor-pointer">
                                 <input
                                   type="checkbox"
                                   checked={checked}
                                   onChange={() => {
-                                    if (editDomainIds.length === 0) {
-                                      setEditDomainIds(ownerDomains.map(x => x.domainId).filter(id => id !== d.domainId));
-                                    } else if (editDomainIds.includes(d.domainId)) {
-                                      const next = editDomainIds.filter(id => id !== d.domainId);
-                                      setEditDomainIds(next.length > 0 ? next : []);
+                                    if (checked) {
+                                      setEditDomainIds(editDomainIds.filter(id => id !== d.domainId));
                                     } else {
-                                      const next = [...editDomainIds, d.domainId];
-                                      setEditDomainIds(next.length === ownerDomains.length ? [] : next);
+                                      setEditDomainIds([...editDomainIds, d.domainId]);
                                     }
                                   }}
                                   className="w-3.5 h-3.5 rounded accent-indigo-600"
