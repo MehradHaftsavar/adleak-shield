@@ -225,13 +225,13 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(result);
     }
 
-    // ── Own / active workspace branch ────────────────────────────────────────
-    const { tenantId, isImpersonating, role } = await getEffectiveTenantId(
+    // ── Own tenant branch — workspace dropdown only affects dashboard, not settings ──
+    const { isImpersonating } = await getEffectiveTenantId(
       session.user.tenantId as string,
       session.user.isOwner as boolean
     );
     if (isImpersonating) return blockedInImpersonation();
-    if (role === 'visitor') return forbidden('Visitors cannot register campaigns');
+    const tenantId = session.user.tenantId as string;
 
     if (!avgCpc || isNaN(parseFloat(avgCpc))) {
       return NextResponse.json({ error: 'Average CPC is required' }, { status: 400 });
@@ -389,15 +389,13 @@ export async function PATCH(request: NextRequest) {
       return NextResponse.json(result);
     }
 
-    // ── Own / active workspace branch ────────────────────────────────────────
-    const { tenantId, isImpersonating, role, activeDomainId, memberDomainIds } = await getEffectiveTenantId(
+    // ── Own tenant branch — workspace dropdown only affects dashboard, not settings ──
+    const { isImpersonating: isImp2 } = await getEffectiveTenantId(
       session.user.tenantId as string,
       session.user.isOwner as boolean
     );
-    if (isImpersonating) return blockedInImpersonation();
-    if (role === 'visitor') return forbidden('Visitors cannot update campaigns');
-
-    const domainFilter = buildDomainFilter(activeDomainId, memberDomainIds, 'domain_id');
+    if (isImp2) return blockedInImpersonation();
+    const tenantId = session.user.tenantId as string;
 
     const result = await withTenantDb(tenantId, async (req) => {
       req.input('campaignId', mssql.UniqueIdentifier, campaignId);
@@ -414,7 +412,7 @@ export async function PATCH(request: NextRequest) {
       }
       if (sets.length === 0) throw new Error('NO_FIELDS');
 
-      const updateResult = await req.query(`UPDATE Campaigns SET ${sets.join(', ')} WHERE campaign_id = @campaignId ${domainFilter}`);
+      const updateResult = await req.query(`UPDATE Campaigns SET ${sets.join(', ')} WHERE campaign_id = @campaignId`);
       if (updateResult.rowsAffected[0] === 0) throw new Error('NOT_FOUND');
       return { success: true, avgCpc: avgCpc !== undefined ? parseFloat(avgCpc) : undefined, name: name ?? undefined };
     });
@@ -473,19 +471,17 @@ export async function DELETE(request: NextRequest) {
       return NextResponse.json(result);
     }
 
-    // ── Own / active workspace branch ────────────────────────────────────────
-    const { tenantId, isImpersonating, role, activeDomainId, memberDomainIds } = await getEffectiveTenantId(
+    // ── Own tenant branch — workspace dropdown only affects dashboard, not settings ──
+    const { isImpersonating: isImp3 } = await getEffectiveTenantId(
       session.user.tenantId as string,
       session.user.isOwner as boolean
     );
-    if (isImpersonating) return blockedInImpersonation();
-    if (role === 'visitor') return forbidden('Visitors cannot delete campaigns');
-
-    const domainFilter = buildDomainFilter(activeDomainId, memberDomainIds, 'domain_id');
+    if (isImp3) return blockedInImpersonation();
+    const tenantId = session.user.tenantId as string;
 
     const result = await withTenantDb(tenantId, async (req) => {
       req.input('campaignId', mssql.UniqueIdentifier, campaignDbId);
-      const check = await req.query(`SELECT campaign_id FROM Campaigns WHERE campaign_id = @campaignId ${domainFilter}`);
+      const check = await req.query(`SELECT campaign_id FROM Campaigns WHERE campaign_id = @campaignId`);
       if (check.recordset.length === 0) throw new Error('NOT_FOUND');
       await req.query(`DELETE FROM JourneyEvents WHERE session_id IN (SELECT session_id FROM Sessions WHERE campaign_id = @campaignId)`);
       await req.query(`DELETE FROM ClickLogs WHERE campaign_id = @campaignId`);
