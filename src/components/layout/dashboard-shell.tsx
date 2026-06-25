@@ -149,6 +149,7 @@ export function DashboardShell({ email, tenantId, children }: DashboardShellProp
   const [checkoutLoading, setCheckoutLoading] = useState(false);
   const [menuOpen,        setMenuOpen]        = useState(false);
   const [switching,       setSwitching]       = useState(false);
+  const didRefreshDomains = useRef(false);
   const [justSubscribed,  setJustSubscribed]  = useState<boolean>(() => {
     if (typeof window === "undefined") return false;
     if (new URLSearchParams(window.location.search).get("payment") === "success") {
@@ -183,9 +184,12 @@ export function DashboardShell({ email, tenantId, children }: DashboardShellProp
     if (status === "unauthenticated") router.push("/auth/login");
   }, [status, router]);
 
-  // If domains failed to load at sign-in (silent catch in auth config), re-fetch them now
+  // If domains failed to load at sign-in (silent catch in auth config), re-fetch them now.
+  // Guard with a ref so this only fires once — without it, accounts with no domains loop
+  // forever: update() cycles status → effect re-fires → update() again.
   useEffect(() => {
-    if (status === "authenticated" && allDomains.length === 0) {
+    if (status === "authenticated" && allDomains.length === 0 && !didRefreshDomains.current) {
+      didRefreshDomains.current = true;
       update({ refreshAccessibleDomains: true });
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
