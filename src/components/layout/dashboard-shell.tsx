@@ -149,7 +149,6 @@ export function DashboardShell({ email, tenantId, children }: DashboardShellProp
   const [checkoutLoading, setCheckoutLoading] = useState(false);
   const [menuOpen,        setMenuOpen]        = useState(false);
   const [switching,       setSwitching]       = useState(false);
-  const didRefreshDomains = useRef(false);
   const [justSubscribed,  setJustSubscribed]  = useState<boolean>(() => {
     if (typeof window === "undefined") return false;
     if (new URLSearchParams(window.location.search).get("payment") === "success") {
@@ -185,13 +184,14 @@ export function DashboardShell({ email, tenantId, children }: DashboardShellProp
   }, [status, router]);
 
   // If domains failed to load at sign-in (silent catch in auth config), re-fetch them now.
-  // Guard with a ref so this only fires once — without it, accounts with no domains loop
-  // forever: update() cycles status → effect re-fires → update() again.
+  // Use sessionStorage so the flag survives page navigations (a ref resets on every remount).
+  // Without this guard, accounts with genuinely no domains loop forever: update() fires on
+  // every mount → JWT callback queries DB → still empty → unmount/remount → repeat.
   useEffect(() => {
-    if (status === "authenticated" && allDomains.length === 0 && !didRefreshDomains.current) {
-      didRefreshDomains.current = true;
-      update({ refreshAccessibleDomains: true });
-    }
+    if (status !== "authenticated" || allDomains.length !== 0) return;
+    if (sessionStorage.getItem('als_domains_refreshed')) return;
+    sessionStorage.setItem('als_domains_refreshed', '1');
+    update({ refreshAccessibleDomains: true });
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [status]);
 
