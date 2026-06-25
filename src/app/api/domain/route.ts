@@ -231,6 +231,15 @@ export async function DELETE(request: NextRequest) {
         // Clean up MemberDomainAccess rows (FK constraint)
         await req.query(`DELETE FROM MemberDomainAccess WHERE domain_id = @${dParam}`);
 
+        // Remove team members who now have zero domain access (dangling after this deletion)
+        await req.query(`
+          DELETE FROM TeamMembers
+          WHERE tenant_id = CAST(SESSION_CONTEXT(N'TenantId') AS UNIQUEIDENTIFIER)
+            AND NOT EXISTS (
+              SELECT 1 FROM MemberDomainAccess WHERE member_id = TeamMembers.member_id
+            )
+        `);
+
         const deleteResult = await req.query(`DELETE FROM Domains WHERE domain_id = @${dParam}`);
         if (deleteResult.rowsAffected[0] === 0) throw new Error('NOT_FOUND');
       }
