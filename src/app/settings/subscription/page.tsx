@@ -191,7 +191,7 @@ export default function SubscriptionPage() {
         <div className="mb-8 grid grid-cols-3 gap-4">
           {[
             { label: 'Domains',   used: usage.domainCount,   max: PLAN_LIMITS[currentPlan].domains },
-            { label: 'Campaigns', used: usage.campaignCount, max: PLAN_LIMITS[currentPlan].campaignsPerDomain },
+            { label: 'Campaigns', used: usage.campaignCount, max: PLAN_LIMITS[currentPlan].campaignsPerDomain * PLAN_LIMITS[currentPlan].domains },
             { label: 'Seats',     used: usage.memberCount,   max: PLAN_LIMITS[currentPlan].seats },
           ].map(({ label, used, max }) => (
             <div key={label} className="bg-white border border-gray-200 rounded-lg p-4 text-center">
