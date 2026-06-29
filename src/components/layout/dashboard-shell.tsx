@@ -176,7 +176,7 @@ export function DashboardShell({ email, tenantId, children }: DashboardShellProp
   async function handleDomainSwitch(newTenantId: string, newDomainId: string) {
     setSwitching(true);
     await update({ activeTenantId: newTenantId, activeDomainId: newDomainId });
-    window.location.reload();
+    setSwitching(false);
   }
 
   useEffect(() => {

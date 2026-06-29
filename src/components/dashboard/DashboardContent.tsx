@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useRef, useState, useCallback } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { useSession } from 'next-auth/react';
 import { PLAN_LIMITS } from '@/lib/planLimits';
@@ -134,6 +134,22 @@ export function DashboardContent() {
   useEffect(() => {
     loadStatus();
   }, []);
+
+  // Re-fetch when the user switches domains via the dropdown (no page reload needed)
+  const activeDomainId = session?.user?.activeDomainId;
+  const prevDomainRef = useRef<string | null | undefined>(undefined);
+  useEffect(() => {
+    if (prevDomainRef.current === undefined) {
+      prevDomainRef.current = activeDomainId ?? null;
+      return;
+    }
+    if (prevDomainRef.current !== (activeDomainId ?? null)) {
+      prevDomainRef.current = activeDomainId ?? null;
+      loadStatus();
+      setRefreshTrigger(t => t + 1);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeDomainId]);
 
   const loadStatus = async (): Promise<DashboardStatus | null> => {
     setError('');
