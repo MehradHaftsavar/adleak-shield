@@ -533,10 +533,7 @@ export function SnippetStep({ domain, onComplete, onBack }: SnippetStepProps) {
           </div>
 
           {/* Campaign summary */}
-          <div className="bg-green-50 border border-green-200 rounded-lg p-4">
-            <h4 className="text-sm font-semibold text-green-900 mb-2">
-              ✓ Your Registered Campaigns:
-            </h4>
+          <Accordion title={`✓ Your Registered Campaigns (${campaigns.length})`}>
             <ul className="text-sm text-green-800 space-y-1">
               {campaigns.map((campaign: any, idx: number) => (
                 <li key={idx}>
@@ -544,7 +541,7 @@ export function SnippetStep({ domain, onComplete, onBack }: SnippetStepProps) {
                 </li>
               ))}
             </ul>
-          </div>
+          </Accordion>
 
           {/* What happens next — collapsible, merges the "Important" warning */}
           <Accordion title="🚀 What to expect on the dashboard — click to expand">

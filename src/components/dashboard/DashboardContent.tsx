@@ -6,7 +6,7 @@ import { useSearchParams, useRouter } from 'next/navigation';
 import { useSession } from 'next-auth/react';
 import { PLAN_LIMITS } from '@/lib/planLimits';
 import type { PlanType } from '@/types/auth';
-import { Activity, Plus, RefreshCw, CheckCircle } from 'lucide-react';
+import { Activity, Plus, RefreshCw, CheckCircle, ChevronDown } from 'lucide-react';
 import { StatusIndicator } from '@/components/dashboard/StatusIndicator';
 import { CampaignStatusCard } from '@/components/dashboard/CampaignStatusCard';
 import { UnregisteredTrafficAlert } from '@/components/dashboard/UnregisteredTrafficAlert';
@@ -84,6 +84,7 @@ export function DashboardContent() {
     return false;
   });
   const [upgrading, setUpgrading] = useState(false);
+  const [campaignsOpen, setCampaignsOpen] = useState(true);
 
   // Date range state for Leak Table
   const [leakDateRange, setLeakDateRange] = useState({
@@ -270,40 +271,49 @@ export function DashboardContent() {
 
       {/* Campaign Status Cards */}
       <div>
-        <h2 className="text-xl font-semibold text-gray-900 mb-4">
-          Campaign Status
-        </h2>
-        
-        {status.campaigns.length === 0 ? (
-          <div className="bg-white rounded-lg border-2 border-dashed border-gray-300 p-8 text-center">
-            <p className="text-gray-600 mb-4">
-              No campaigns registered yet
-            </p>
-            {!isViewer && (
-              <Link
-                href="/settings"
-                className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg transition-colors"
-              >
-                <Plus className="w-5 h-5" />
-                Add Your First Campaign
-              </Link>
+        <button
+          onClick={() => setCampaignsOpen(o => !o)}
+          className="flex items-center justify-between w-full text-left mb-4 group"
+        >
+          <h2 className="text-xl font-semibold text-gray-900">
+            Campaign Status
+            {status.campaigns.length > 0 && (
+              <span className="ml-2 text-sm font-normal text-gray-400">({status.campaigns.length})</span>
             )}
-          </div>
-        ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {status.campaigns.map((campaign) => {
-              const hasUnregistered = status.unregisteredTraffic.some(
-                t => t.googleCampaignId === campaign.googleCampaignId
-              );
-              return (
-                <CampaignStatusCard
-                  key={campaign.id}
-                  campaign={campaign}
-                  hasUnregisteredTraffic={hasUnregistered}
-                />
-              );
-            })}
-          </div>
+          </h2>
+          <ChevronDown className={`w-5 h-5 text-gray-400 group-hover:text-gray-600 transition-transform duration-200 ${campaignsOpen ? '' : '-rotate-90'}`} />
+        </button>
+
+        {campaignsOpen && (
+          status.campaigns.length === 0 ? (
+            <div className="bg-white rounded-lg border-2 border-dashed border-gray-300 p-8 text-center">
+              <p className="text-gray-600 mb-4">No campaigns registered yet</p>
+              {!isViewer && (
+                <Link
+                  href="/settings"
+                  className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg transition-colors"
+                >
+                  <Plus className="w-5 h-5" />
+                  Add Your First Campaign
+                </Link>
+              )}
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
+              {status.campaigns.map((campaign) => {
+                const hasUnregistered = status.unregisteredTraffic.some(
+                  t => t.googleCampaignId === campaign.googleCampaignId
+                );
+                return (
+                  <CampaignStatusCard
+                    key={campaign.id}
+                    campaign={campaign}
+                    hasUnregisteredTraffic={hasUnregistered}
+                  />
+                );
+              })}
+            </div>
+          )
         )}
       </div>
 
