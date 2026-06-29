@@ -4,6 +4,8 @@ import Link from 'next/link';
 import { useEffect, useState, useCallback } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { useSession } from 'next-auth/react';
+import { PLAN_LIMITS } from '@/lib/planLimits';
+import type { PlanType } from '@/types/auth';
 import { Activity, Plus, RefreshCw, CheckCircle } from 'lucide-react';
 import { StatusIndicator } from '@/components/dashboard/StatusIndicator';
 import { CampaignStatusCard } from '@/components/dashboard/CampaignStatusCard';
@@ -16,8 +18,14 @@ import { DashboardSkeleton } from '@/components/ui/skeletons';
 
 interface DashboardStatus {
   isLive: boolean;
-  campaigns: any[];
-  unregisteredTraffic: any[];
+  campaigns: Array<{ id: string; domainId: string; [key: string]: any }>;
+  unregisteredTraffic: Array<{
+    googleCampaignId: string;
+    domainId:         string | null;
+    domainName:       string | null;
+    hitCount:         number;
+    lastDetected:     Date;
+  }>;
   hasUnregisteredTraffic: boolean;
   subscriptionStatus: string | null;
   trialEndsAt: string | null;
@@ -243,7 +251,8 @@ export function DashboardContent() {
       {status.hasUnregisteredTraffic && (
         <UnregisteredTrafficAlert
           traffic={status.unregisteredTraffic}
-          registeredCount={status.campaigns.length}
+          campaigns={status.campaigns}
+          maxPerDomain={PLAN_LIMITS[(session?.user?.planType ?? 'starter') as PlanType].campaignsPerDomain}
           isViewer={isViewer}
         />
       )}

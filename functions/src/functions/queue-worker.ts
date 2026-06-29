@@ -106,38 +106,52 @@ async function isTenantEligible(tenantId: string): Promise<boolean> {
   });
 }
 
+// Look up domain_id (and tenant_id for case where campaign isn't registered)
+// by domain name — withAdminDb bypasses RLS so it sees all tenants' domains.
+async function lookupDomainInfo(
+  domainName: string
+): Promise<{ domainId: string; tenantId: string } | null> {
+  return withAdminDb(async (request) => {
+    const result = await request
+      .input("domainName", mssql.NVarChar, domainName.substring(0, 253))
+      .query(
+        `SELECT TOP 1 domain_id, tenant_id FROM Domains WHERE domain_name = @domainName`
+      );
+    const row = result.recordset[0];
+    return row ? { domainId: row.domain_id, tenantId: row.tenant_id } : null;
+  });
+}
+
 async function logUnregistered(
   unrecognisedCampaignId: string,
   referringDomain: string,
-  tenantId: string | null
+  tenantId: string | null,
+  domainId: string | null
 ): Promise<void> {
   await withAdminDb(async (request) => {
-    request.input(
-      "campaignId",
-      mssql.NVarChar,
-      unrecognisedCampaignId.substring(0, 20)
+    request.input("campaignId",      mssql.NVarChar,        unrecognisedCampaignId.substring(0, 20));
+    request.input("referringDomain", mssql.NVarChar,        referringDomain.substring(0, 253));
+    const hasTenant = !!tenantId;
+    const hasDomain = !!domainId;
+    if (hasTenant)  request.input("tenantId",  mssql.UniqueIdentifier, tenantId!);
+    if (hasDomain)  request.input("domainId",  mssql.UniqueIdentifier, domainId!);
+
+    const cols = [
+      "unrecognised_campaign_id",
+      "referring_domain",
+      ...(hasTenant ? ["tenant_id"] : []),
+      ...(hasDomain ? ["domain_id"] : []),
+    ].join(", ");
+    const vals = [
+      "@campaignId",
+      "@referringDomain",
+      ...(hasTenant ? ["@tenantId"] : []),
+      ...(hasDomain ? ["@domainId"] : []),
+    ].join(", ");
+
+    await request.query(
+      `INSERT INTO UnregisteredTrafficLog (${cols}) VALUES (${vals})`
     );
-    request.input(
-      "referringDomain",
-      mssql.NVarChar,
-      referringDomain.substring(0, 253)
-    );
-    if (tenantId) {
-      request.input("tenantId", mssql.UniqueIdentifier, tenantId);
-      await request.query(
-        `INSERT INTO UnregisteredTrafficLog
-            (tenant_id, unrecognised_campaign_id, referring_domain)
-         VALUES
-            (@tenantId, @campaignId, @referringDomain)`
-      );
-    } else {
-      await request.query(
-        `INSERT INTO UnregisteredTrafficLog
-            (unrecognised_campaign_id, referring_domain)
-         VALUES
-            (@campaignId, @referringDomain)`
-      );
-    }
   });
 }
 
@@ -336,7 +350,8 @@ export async function queueWorkerHandler(
         domain: env.domain,
       });
       try {
-        await logUnregistered(googleCampaignId, env.domain, null);
+        const domainInfo = await lookupDomainInfo(env.domain);
+        await logUnregistered(googleCampaignId, env.domain, domainInfo?.tenantId ?? null, domainInfo?.domainId ?? null);
       } catch (err) {
         context.error("[Worker] Failed to log unregistered traffic", {
           err: err instanceof Error ? err.message : String(err),
@@ -353,7 +368,8 @@ export async function queueWorkerHandler(
         registeredDomain: campaign.domainName,
       });
       try {
-        await logUnregistered(googleCampaignId, env.domain, campaign.tenantId);
+        const domainInfo = await lookupDomainInfo(env.domain);
+        await logUnregistered(googleCampaignId, env.domain, campaign.tenantId, domainInfo?.domainId ?? null);
       } catch (err) {
         context.error("[Worker] Failed to log domain mismatch", {
           err: err instanceof Error ? err.message : String(err),

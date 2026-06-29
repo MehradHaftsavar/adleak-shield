@@ -3,6 +3,8 @@
 import { useState, useEffect } from 'react';
 import { Target, Trash2, Plus, Pencil, Check, X, ChevronDown, ChevronUp, Users } from 'lucide-react';
 import { useSession } from 'next-auth/react';
+import { PLAN_LIMITS } from '@/lib/planLimits';
+import type { PlanType } from '@/types/auth';
 
 interface DomainEntry {
   domainId: string;
@@ -97,7 +99,7 @@ export function CampaignStep({ onComplete, onBack }: CampaignStepProps) {
       if (campaignsRes.ok) {
         const c = await campaignsRes.json();
         setOwnCampaigns(c.campaigns ?? []);
-        setOwnMaxCampaigns(c.maxAllowed ?? 3);
+        setOwnMaxCampaigns(c.maxAllowed ?? PLAN_LIMITS[((session?.user?.planType ?? 'starter') as PlanType)].campaignsPerDomain);
       }
 
       // Build invited workspace list from session
@@ -135,7 +137,7 @@ export function CampaignStep({ onComplete, onBack }: CampaignStepProps) {
             const data = await res.json();
             setInvitedWorkspaces(prev => prev.map(w =>
               w.tenantId === ws.tenantId
-                ? { ...w, campaigns: data.campaigns ?? [], maxCampaigns: data.maxAllowed ?? 3, loading: false }
+                ? { ...w, campaigns: data.campaigns ?? [], maxCampaigns: data.maxAllowed ?? PLAN_LIMITS['starter'].campaignsPerDomain, loading: false }
                 : w
             ));
           } else {

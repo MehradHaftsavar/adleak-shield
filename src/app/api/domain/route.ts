@@ -13,7 +13,7 @@ const domainSchema = z.object({
     .max(253, 'Domain must be less than 253 characters')
     .regex(
       /^(localhost:\d+|([a-z0-9]+(-[a-z0-9]+)*\.)+[a-z]{2,})$/i,
-      'Invalid domain format (e.g., example.co.uk or localhost:8000)'
+      'Invalid domain format (e.g., example.com or example.co.uk)'
     )
     .transform(val => val.toLowerCase().trim()),
 });

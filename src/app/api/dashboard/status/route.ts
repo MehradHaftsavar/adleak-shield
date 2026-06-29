@@ -51,6 +51,7 @@ export async function GET(request: NextRequest) {
       const campaignsResult = await req.query(`
         SELECT
           c.campaign_id,
+          c.domain_id,
           c.google_campaign_id,
           c.slot_number,
           c.name,
@@ -66,6 +67,7 @@ export async function GET(request: NextRequest) {
 
       const campaigns = campaignsResult.recordset.map(c => ({
         id: c.campaign_id,
+        domainId: c.domain_id,
         googleCampaignId: c.google_campaign_id,
         slotNumber: c.slot_number,
         name: c.name ?? null,
@@ -75,22 +77,27 @@ export async function GET(request: NextRequest) {
         lastSession: c.last_session,
       }));
 
-      // 3. Check for unregistered traffic (last 7 days)
+      // 3. Check for unregistered traffic (last 7 days), grouped per campaign+domain
       const unregisteredResult = await req.query(`
-        SELECT 
-          unrecognised_campaign_id,
-          COUNT(*) as hit_count,
-          MAX(logged_at) as last_detected
-        FROM UnregisteredTrafficLog
-        WHERE logged_at >= DATEADD(day, -7, GETUTCDATE())
-        GROUP BY unrecognised_campaign_id
-        ORDER BY MAX(logged_at) DESC
+        SELECT
+          u.unrecognised_campaign_id,
+          u.domain_id,
+          d.domain_name,
+          COUNT(*) AS hit_count,
+          MAX(u.logged_at) AS last_detected
+        FROM UnregisteredTrafficLog u
+        LEFT JOIN Domains d ON d.domain_id = u.domain_id
+        WHERE u.logged_at >= DATEADD(day, -7, GETUTCDATE())
+        GROUP BY u.unrecognised_campaign_id, u.domain_id, d.domain_name
+        ORDER BY MAX(u.logged_at) DESC
       `);
 
       const unregisteredTraffic = unregisteredResult.recordset.map(u => ({
         googleCampaignId: u.unrecognised_campaign_id,
-        hitCount: u.hit_count,
-        lastDetected: u.last_detected,
+        domainId:         u.domain_id ?? null,
+        domainName:       u.domain_name ?? null,
+        hitCount:         u.hit_count,
+        lastDetected:     u.last_detected,
       }));
 
       return {
