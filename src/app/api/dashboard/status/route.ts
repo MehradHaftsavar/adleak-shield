@@ -92,12 +92,15 @@ export async function GET(request: NextRequest) {
         ORDER BY MAX(u.logged_at) DESC
       `);
 
+      const registeredGoogleIds = new Set(campaigns.map(c => c.googleCampaignId));
+
       const unregisteredTraffic = unregisteredResult.recordset.map(u => ({
         googleCampaignId: u.unrecognised_campaign_id,
         domainId:         u.domain_id ?? null,
         domainName:       u.domain_name ?? null,
         hitCount:         u.hit_count,
         lastDetected:     u.last_detected,
+        isMismatch:       registeredGoogleIds.has(u.unrecognised_campaign_id),
       }));
 
       return {

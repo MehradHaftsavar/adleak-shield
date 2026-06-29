@@ -10,6 +10,7 @@ interface UnregisteredTraffic {
   domainName:       string | null;
   hitCount:         number;
   lastDetected:     Date;
+  isMismatch:       boolean;
 }
 
 interface Campaign {
@@ -78,7 +79,7 @@ export function UnregisteredTrafficAlert({
 
             <div className="bg-white rounded border border-red-200 p-3 mb-3 space-y-2">
               {traffic.map((t) => {
-                const full = isDomainFull(t.domainId);
+                const full = !t.isMismatch && isDomainFull(t.domainId);
                 return (
                   <div key={t.googleCampaignId} className="flex items-start justify-between gap-2">
                     <div className="min-w-0">
@@ -89,17 +90,26 @@ export function UnregisteredTrafficAlert({
                       {t.domainName && (
                         <div className="text-xs text-gray-500 mt-0.5">
                           Domain: <span className="font-medium">{t.domainName}</span>
-                          {full && (
-                            <span className="ml-2 text-red-600 font-medium">
-                              — this domain is full ({maxPerDomain}/{maxPerDomain} campaigns).
-                              Remove one before registering this.
-                            </span>
-                          )}
                         </div>
                       )}
-                      {!t.domainName && (
-                        <div className="text-xs text-gray-400 mt-0.5">Domain not yet identified</div>
-                      )}
+                      <div className="text-xs mt-1">
+                        {t.isMismatch ? (
+                          <span className="text-amber-700">
+                            This campaign ID is already registered to a different domain.
+                            To track it here: remove it from its current domain in Setup, then add it to this one.
+                            Or remove the AdLeak script from this domain if it was added by mistake.
+                          </span>
+                        ) : full ? (
+                          <span className="text-red-600 font-medium">
+                            This domain is at its campaign limit ({maxPerDomain}/{maxPerDomain}).
+                            Remove an existing campaign before registering this one.
+                          </span>
+                        ) : (
+                          <span className="text-gray-400">
+                            Not registered — go to Setup to start tracking it.
+                          </span>
+                        )}
+                      </div>
                     </div>
                     <button
                       onClick={() => setConfirmId(t.googleCampaignId)}

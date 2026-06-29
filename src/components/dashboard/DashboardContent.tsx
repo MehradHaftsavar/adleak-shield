@@ -35,6 +35,7 @@ interface DashboardStatus {
     domainName:       string | null;
     hitCount:         number;
     lastDetected:     Date;
+    isMismatch:       boolean;
   }>;
   hasUnregisteredTraffic: boolean;
   subscriptionStatus: string | null;
