@@ -24,7 +24,7 @@ interface DomainStepProps {
 }
 
 export function DomainStep({ onComplete, existingDomain }: DomainStepProps) {
-  const { data: session } = useSession();
+  const { data: session, update } = useSession();
   const planType = (session?.user?.planType ?? 'starter') as PlanType;
   const limits = PLAN_LIMITS[planType];
 
@@ -91,6 +91,7 @@ export function DomainStep({ onComplete, existingDomain }: DomainStepProps) {
 
       setNewDomain('');
       await fetchDomains();
+      update({ refreshAccessibleDomains: true });
       setIsLoading(false);
     } catch {
       setError('Network error. Please try again.');
@@ -118,6 +119,7 @@ export function DomainStep({ onComplete, existingDomain }: DomainStepProps) {
       }
 
       await fetchDomains();
+      update({ refreshAccessibleDomains: true });
       setIsLoading(false);
     } catch {
       setError('Network error. Please try again.');
