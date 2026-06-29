@@ -18,7 +18,17 @@ import { DashboardSkeleton } from '@/components/ui/skeletons';
 
 interface DashboardStatus {
   isLive: boolean;
-  campaigns: Array<{ id: string; domainId: string; [key: string]: any }>;
+  campaigns: Array<{
+    id: string;
+    domainId: string;
+    googleCampaignId: string;
+    slotNumber: number;
+    name: string | null;
+    domain: string;
+    status: string;
+    sessionCount: number;
+    lastSession: Date | null;
+  }>;
   unregisteredTraffic: Array<{
     googleCampaignId: string;
     domainId:         string | null;
