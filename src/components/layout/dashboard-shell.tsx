@@ -145,6 +145,7 @@ export function DashboardShell({ email, tenantId, children }: DashboardShellProp
   const [thawVisible,     setThawVisible]     = useState(false);
   const [thawProgress,    setThawProgress]    = useState(0);
   const [impLabel,        setImpLabel]        = useState<string | null>(null);
+  const [impDomains,      setImpDomains]      = useState<AccessibleDomain[] | null>(null);
   const [stoppingImp,     setStoppingImp]     = useState(false);
   const [checkoutLoading, setCheckoutLoading] = useState(false);
   const [menuOpen,        setMenuOpen]        = useState(false);
@@ -166,11 +167,17 @@ export function DashboardShell({ email, tenantId, children }: DashboardShellProp
   const isCancelled = subscriptionStatus === "canceled";
 
   // Domain switching state
-  const allDomains     = (session?.user?.allAccessibleDomains ?? []) as AccessibleDomain[];
-  const activeTenantId = (session?.user?.activeTenantId ?? tenantId) as string;
-  const activeDomainId = (session?.user?.activeDomainId ?? null) as string | null;
-  const ownTenantId    = (session?.user?.tenantId ?? tenantId) as string;
-  const isViewingOwnTenant = activeTenantId === ownTenantId;
+  // During impersonation, use the fetched impersonated-user domains; otherwise use the JWT list.
+  const isImpersonating = !!impLabel;
+  const allDomains      = isImpersonating
+    ? (impDomains ?? [])
+    : (session?.user?.allAccessibleDomains ?? []) as AccessibleDomain[];
+  const activeTenantId  = isImpersonating
+    ? (impDomains?.[0]?.tenantId ?? tenantId)
+    : (session?.user?.activeTenantId ?? tenantId) as string;
+  const activeDomainId  = (session?.user?.activeDomainId ?? null) as string | null;
+  const ownTenantId     = (session?.user?.tenantId ?? tenantId) as string;
+  const isViewingOwnTenant = !isImpersonating && activeTenantId === ownTenantId;
   const isOwner        = session?.user?.isOwner as boolean | undefined;
 
   async function handleDomainSwitch(newTenantId: string, newDomainId: string) {
@@ -219,8 +226,17 @@ export function DashboardShell({ email, tenantId, children }: DashboardShellProp
   }
 
   useEffect(() => {
-    setImpLabel(getImpLabel());
-  }, []);
+    const label = getImpLabel();
+    setImpLabel(label);
+    if (!label) return;
+    // Fetch the impersonated user's domains for the dropdown, and clear any
+    // stale activeDomainId the admin had set on their own account.
+    update({ activeDomainId: null });
+    fetch('/api/admin/impersonate/domains')
+      .then(r => r.ok ? r.json() : null)
+      .then(d => { if (d?.domains) setImpDomains(d.domains); })
+      .catch(() => {});
+  }, []); // eslint-disable-line
 
   async function stopImpersonation() {
     setStoppingImp(true);
