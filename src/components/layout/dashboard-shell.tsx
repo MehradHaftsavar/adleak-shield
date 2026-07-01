@@ -232,9 +232,7 @@ export function DashboardShell({ email, tenantId, children }: DashboardShellProp
     const label = getImpLabel();
     setImpLabel(label);
     if (!label) return;
-    // Fetch the impersonated user's domains for the dropdown, and clear any
-    // stale activeDomainId the admin had set on their own account.
-    update({ activeDomainId: null });
+    // Fetch the impersonated user's domains for the nav dropdown.
     fetch('/api/admin/impersonate/domains')
       .then(r => r.ok ? r.json() : null)
       .then(d => { if (d?.domains) setImpDomains(d.domains); })

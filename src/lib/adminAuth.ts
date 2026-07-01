@@ -64,17 +64,9 @@ export async function getEffectiveTenantId(
     const impCookie   = cookieStore.get(IMP_COOKIE);
     if (impCookie?.value) {
       const labelCookie = cookieStore.get(IMP_LABEL_COOKIE);
-      // Read activeDomainId from the JWT so domain switching works inside impersonation
-      let activeDomainId: string | null = null;
-      if (!opts) {
-        try {
-          const s    = await auth();
-          activeDomainId = s?.user?.activeDomainId ?? null;
-        } catch { /* non-fatal */ }
-      }
       return {
         tenantId:          impCookie.value,
-        activeDomainId,
+        activeDomainId:    null,
         memberDomainIds:   null, // impersonation sees all domains
         isImpersonating:   true,
         impersonatedEmail: labelCookie?.value ?? null,
