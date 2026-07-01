@@ -111,7 +111,24 @@ export default function SubscriptionPage() {
     setMessage('');
 
     try {
-      // Try upgrade route first (updates existing subscription with proration)
+      if (!isSubscribed) {
+        // Not an active paid subscriber — just update plan_type in DB, no Stripe involved
+        const res  = await fetch('/api/user/plan', {
+          method:  'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body:    JSON.stringify({ plan }),
+        });
+        const data = await res.json();
+        if (res.ok && data.success) {
+          await update({ planType: plan });
+          setMessage(`Plan updated to ${PLAN_LIMITS[plan].label}. Changes take effect immediately.`);
+        } else {
+          setMessage(data.error || 'Something went wrong. Please try again.');
+        }
+        return;
+      }
+
+      // Active paid subscriber — try proration upgrade first
       const upgradeRes  = await fetch('/api/stripe/upgrade', {
         method:  'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -120,13 +137,12 @@ export default function SubscriptionPage() {
       const upgradeData = await upgradeRes.json();
 
       if (upgradeRes.ok && upgradeData.success) {
-        // Stamp the new planType into the JWT immediately so limits update without re-login
         await update({ planType: plan });
         setMessage(`Plan updated to ${PLAN_LIMITS[plan].label}. Changes take effect immediately.`);
         return;
       }
 
-      // redirect:checkout means no active subscription — go to Stripe checkout
+      // Fallback: no live Stripe subscription found — go to checkout
       if (upgradeData.redirect === 'checkout') {
         const checkoutRes  = await fetch('/api/stripe/checkout', {
           method:  'POST',

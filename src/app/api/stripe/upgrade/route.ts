@@ -48,7 +48,13 @@ export async function POST(request: NextRequest) {
     }
 
     if (!tenantRow?.stripe_customer_id) {
-      // No existing customer and not trialing — go to checkout
+      // No Stripe customer yet — update plan_type in DB and send to checkout to subscribe
+      await withAdminDb(async (req) => {
+        await req
+          .input('plan',     mssql.NVarChar(20),    plan)
+          .input('tenantId', mssql.UniqueIdentifier, tenantId)
+          .query(`UPDATE Tenants SET plan_type = @plan WHERE tenant_id = @tenantId`);
+      });
       return NextResponse.json({ redirect: 'checkout' }, { status: 200 });
     }
 
