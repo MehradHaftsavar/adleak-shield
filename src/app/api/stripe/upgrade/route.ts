@@ -66,7 +66,14 @@ export async function POST(request: NextRequest) {
 
     const subscription = subscriptions.data[0];
     if (!subscription) {
-      return NextResponse.json({ redirect: 'checkout' }, { status: 200 });
+      // DB says active but no live Stripe subscription — update plan_type only
+      await withAdminDb(async (req) => {
+        await req
+          .input('plan',     mssql.NVarChar(20),    plan)
+          .input('tenantId', mssql.UniqueIdentifier, tenantId)
+          .query(`UPDATE Tenants SET plan_type = @plan WHERE tenant_id = @tenantId`);
+      });
+      return NextResponse.json({ success: true, plan });
     }
 
     const currentItemId = subscription.items.data[0]?.id;
