@@ -167,13 +167,16 @@ export function DashboardShell({ email, tenantId, children }: DashboardShellProp
   const isCancelled = subscriptionStatus === "canceled";
 
   // Domain switching state
-  // During impersonation, use the fetched impersonated-user domains; otherwise use the JWT list.
+  // During impersonation, use the fetched impersonated-user domains once loaded.
+  // While still loading (impDomains === null), fall back to session domains so the
+  // dropdown never disappears mid-load.
   const isImpersonating = !!impLabel;
+  const sessionDomains  = (session?.user?.allAccessibleDomains ?? []) as AccessibleDomain[];
   const allDomains      = isImpersonating
-    ? (impDomains ?? [])
-    : (session?.user?.allAccessibleDomains ?? []) as AccessibleDomain[];
-  const activeTenantId  = isImpersonating
-    ? (impDomains?.[0]?.tenantId ?? tenantId)
+    ? (impDomains ?? sessionDomains)
+    : sessionDomains;
+  const activeTenantId  = isImpersonating && impDomains !== null
+    ? (impDomains[0]?.tenantId ?? tenantId)
     : (session?.user?.activeTenantId ?? tenantId) as string;
   const activeDomainId  = (session?.user?.activeDomainId ?? null) as string | null;
   const ownTenantId     = (session?.user?.tenantId ?? tenantId) as string;
