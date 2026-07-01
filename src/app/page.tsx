@@ -50,12 +50,12 @@ function Hero() {
         </div>
 
         <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
-          <Link
-            href="/auth/signup"
-            className="w-full sm:w-auto px-8 py-3.5 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg transition-colors text-base"
+          <a
+            href="#pricing"
+            className="w-full sm:w-auto px-8 py-3.5 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg transition-colors text-base text-center"
           >
             Start your free 7-day trial
-          </Link>
+          </a>
           {/* Anchor link — smooth scroll handled by CSS scroll-behavior in globals.css */}
           <a
             href="#features"
@@ -195,6 +195,7 @@ function Features() {
 const PLANS = [
   {
     name:     'Starter',
+    slug:     'starter',
     price:    '£12.99',
     desc:     'Perfect for a single business running Google Ads on one website.',
     features: [
@@ -214,6 +215,7 @@ const PLANS = [
   },
   {
     name:     'Freelancer',
+    slug:     'freelancer',
     price:    '£29.99',
     desc:     'For freelancers and consultants managing multiple client accounts.',
     features: [
@@ -233,6 +235,7 @@ const PLANS = [
   },
   {
     name:     'Agency',
+    slug:     'agency',
     price:    '£59.99',
     desc:     'For agencies managing many clients with large teams.',
     features: [
@@ -309,7 +312,7 @@ function Pricing() {
               </ul>
 
               <Link
-                href="/auth/signup"
+                href={`/auth/signup?plan=${plan.slug}`}
                 className={`block w-full text-center px-6 py-3 font-semibold rounded-lg transition-colors text-sm ${
                   plan.highlight
                     ? 'bg-white text-blue-600 hover:bg-blue-50'
