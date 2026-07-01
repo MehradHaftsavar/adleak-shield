@@ -144,7 +144,9 @@ interface DashboardShellProps {
 export function DashboardShell({ email, tenantId, children }: DashboardShellProps) {
   const [thawVisible,     setThawVisible]     = useState(false);
   const [thawProgress,    setThawProgress]    = useState(0);
-  const [impLabel,        setImpLabel]        = useState<string | null>(null);
+  const [impLabel,        setImpLabel]        = useState<string | null>(() =>
+    typeof window !== 'undefined' ? getImpLabel() : null
+  );
   const [impDomains,      setImpDomains]      = useState<AccessibleDomain[] | null>(null);
   const [stoppingImp,     setStoppingImp]     = useState(false);
   const [checkoutLoading, setCheckoutLoading] = useState(false);
@@ -229,15 +231,12 @@ export function DashboardShell({ email, tenantId, children }: DashboardShellProp
   }
 
   useEffect(() => {
-    const label = getImpLabel();
-    setImpLabel(label);
-    if (!label) return;
-    // Fetch the impersonated user's domains for the nav dropdown.
+    if (!impLabel) return;
     fetch('/api/admin/impersonate/domains')
       .then(r => r.ok ? r.json() : null)
       .then(d => { if (d?.domains) setImpDomains(d.domains); })
       .catch(() => {});
-  }, []); // eslint-disable-line
+  }, [impLabel]); // eslint-disable-line
 
   async function stopImpersonation() {
     setStoppingImp(true);

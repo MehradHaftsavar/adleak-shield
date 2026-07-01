@@ -96,22 +96,16 @@ export async function GET(request: NextRequest) {
         const Stripe = (await import('stripe')).default;
         const stripe = new Stripe(process.env.STRIPE_SECRET_KEY, { apiVersion: '2024-06-20' as never });
 
-        const subs = await stripe.subscriptions.list({
-          status: 'active',
-          limit: 100,
-          expand: ['data.plan'],
-        });
-
-        for (const sub of subs.data) {
-          const item = sub.items.data[0];
-          if (!item?.price) continue;
-          const amount        = item.price.unit_amount ?? 0;
-          const interval      = item.price.recurring?.interval;
-          const intervalCount = item.price.recurring?.interval_count ?? 1;
-
-          if (interval === 'month')      mrr += (amount / 100) / intervalCount;
-          else if (interval === 'year')  mrr += (amount / 100) / (12 * intervalCount);
-        }
+        await stripe.subscriptions.list({ status: 'active', limit: 100 })
+          .autoPagingEach(sub => {
+            const item = sub.items.data[0];
+            if (!item?.price) return;
+            const amount        = item.price.unit_amount ?? 0;
+            const interval      = item.price.recurring?.interval;
+            const intervalCount = item.price.recurring?.interval_count ?? 1;
+            if (interval === 'month')     mrr += (amount / 100) / intervalCount;
+            else if (interval === 'year') mrr += (amount / 100) / (12 * intervalCount);
+          });
         mrr = Math.round(mrr * 100) / 100;
       } catch (stripeErr) {
         console.warn('[Admin Metrics] Stripe MRR fetch failed:', stripeErr);
