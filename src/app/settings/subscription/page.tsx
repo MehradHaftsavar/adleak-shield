@@ -137,8 +137,12 @@ export default function SubscriptionPage() {
       const upgradeData = await upgradeRes.json();
 
       if (upgradeRes.ok && upgradeData.success) {
-        await update({ planType: plan });
-        setMessage(`Plan updated to ${PLAN_LIMITS[plan].label}. Changes take effect immediately.`);
+        if (upgradeData.scheduledDowngrade) {
+          setMessage(`Plan will switch to ${PLAN_LIMITS[plan].label} at the end of your current billing period. No refund is issued.`);
+        } else {
+          await update({ planType: plan });
+          setMessage(`Plan updated to ${PLAN_LIMITS[plan].label}. Changes take effect immediately.`);
+        }
         return;
       }
 

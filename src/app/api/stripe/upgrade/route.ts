@@ -7,6 +7,8 @@ import type { PlanType } from '@/types/auth';
 
 export const dynamic = 'force-dynamic';
 
+const PLAN_ORDER: Record<string, number> = { starter: 0, freelancer: 1, agency: 2 };
+
 function priceIdForPlan(plan: PlanType): string {
   if (plan === 'freelancer') return process.env.STRIPE_PRICE_FREELANCER!;
   if (plan === 'agency')     return process.env.STRIPE_PRICE_AGENCY!;
@@ -31,12 +33,11 @@ export async function POST(request: NextRequest) {
     const tenantRow = await withAdminDb(async (req) => {
       const result = await req
         .input('tenantId', mssql.UniqueIdentifier, tenantId)
-        .query(`SELECT stripe_customer_id, subscription_status FROM Tenants WHERE tenant_id = @tenantId`);
+        .query(`SELECT stripe_customer_id, subscription_status, plan_type FROM Tenants WHERE tenant_id = @tenantId`);
       return result.recordset[0] ?? null;
     });
 
-    // Trialing users (with or without stripe_customer_id) just get their plan_type updated —
-    // no payment needed until trial ends and they subscribe
+    // Trialing users just get plan_type updated — no payment until trial ends
     if (tenantRow?.subscription_status === 'trialing') {
       await withAdminDb(async (req) => {
         await req
@@ -48,20 +49,15 @@ export async function POST(request: NextRequest) {
     }
 
     if (!tenantRow?.stripe_customer_id) {
-      // No Stripe customer yet — update plan_type in DB and send to checkout to subscribe
-      await withAdminDb(async (req) => {
-        await req
-          .input('plan',     mssql.NVarChar(20),    plan)
-          .input('tenantId', mssql.UniqueIdentifier, tenantId)
-          .query(`UPDATE Tenants SET plan_type = @plan WHERE tenant_id = @tenantId`);
-      });
       return NextResponse.json({ redirect: 'checkout' }, { status: 200 });
     }
 
     if (tenantRow.subscription_status !== 'active') {
-      // Cancelled or past-due — use checkout to resubscribe
       return NextResponse.json({ redirect: 'checkout' }, { status: 200 });
     }
+
+    const currentPlan = (tenantRow.plan_type ?? 'starter') as string;
+    const isUpgrade = (PLAN_ORDER[plan] ?? 0) > (PLAN_ORDER[currentPlan] ?? 0);
 
     // Find the active subscription for this customer
     const subscriptions = await stripe.subscriptions.list({
@@ -87,17 +83,43 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'No subscription item found' }, { status: 400 });
     }
 
-    // Update the subscription to the new price (pro-rated).
-    // automatic_tax inherits the customer's stored billing address from checkout,
-    // so no address re-collection is needed here.
-    await stripe.subscriptions.update(subscription.id, {
-      proration_behavior: 'create_prorations',
-      automatic_tax:      { enabled: true },
-      items: [{ id: currentItemId, price: priceIdForPlan(plan as PlanType) }],
-      metadata: { tenantId, plan },
-    });
-
-    return NextResponse.json({ success: true, plan });
+    if (isUpgrade) {
+      // Upgrade: charge prorated difference immediately, update DB now
+      await stripe.subscriptions.update(subscription.id, {
+        proration_behavior: 'create_prorations',
+        automatic_tax:      { enabled: true },
+        items: [{ id: currentItemId, price: priceIdForPlan(plan as PlanType) }],
+        metadata: { tenantId, plan },
+      });
+      await withAdminDb(async (req) => {
+        await req
+          .input('plan',     mssql.NVarChar(20),    plan)
+          .input('tenantId', mssql.UniqueIdentifier, tenantId)
+          .query(`UPDATE Tenants SET plan_type = @plan WHERE tenant_id = @tenantId`);
+      });
+      return NextResponse.json({ success: true, plan });
+    } else {
+      // Downgrade: schedule the plan change for end of current billing period.
+      // Using a subscription schedule so Stripe only fires subscription.updated
+      // when the new phase actually executes at renewal — DB stays on old plan until then.
+      const schedule = await stripe.subscriptionSchedules.create({
+        from_subscription: subscription.id,
+      });
+      await stripe.subscriptionSchedules.update(schedule.id, {
+        end_behavior: 'release',
+        phases: [
+          {
+            items: [{ price: subscription.items.data[0].price.id as string, quantity: 1 }],
+            end_date: subscription.current_period_end,
+          },
+          {
+            items: [{ price: priceIdForPlan(plan as PlanType), quantity: 1 }],
+          },
+        ],
+        metadata: { tenantId, plan },
+      });
+      return NextResponse.json({ success: true, plan, scheduledDowngrade: true });
+    }
   } catch (error) {
     console.error('[stripe/upgrade] Error:', error);
     return NextResponse.json({ error: 'Failed to update subscription' }, { status: 500 });
