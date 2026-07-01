@@ -107,14 +107,19 @@ export function DashboardContent() {
   const handleUpgrade = useCallback(async () => {
     setUpgrading(true);
     try {
-      const res = await fetch('/api/stripe/checkout', { method: 'POST' });
+      const plan = session?.user?.planType ?? 'starter';
+      const res = await fetch('/api/stripe/checkout', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ plan }),
+      });
       const data = await res.json();
       if (data.url) window.location.href = data.url;
     } catch (err) {
       console.error('Checkout error:', err);
       setUpgrading(false);
     }
-  }, []);
+  }, [session?.user?.planType]);
 
 
   useEffect(() => {

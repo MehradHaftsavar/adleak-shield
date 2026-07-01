@@ -1,12 +1,20 @@
 "use client";
+export const dynamic = 'force-dynamic';
 import React, { useState, useEffect } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import Script from "next/script";
 import { signUpSchema } from "@/lib/validators/auth";
+import { PLAN_LIMITS } from "@/lib/planLimits";
+import type { PlanType } from "@/types/auth";
 
 export default function SignupPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const rawPlan = searchParams.get('plan');
+  const plan: PlanType = (rawPlan === 'freelancer' || rawPlan === 'agency') ? rawPlan : 'starter';
+  const planLimits = PLAN_LIMITS[plan];
+
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
@@ -41,7 +49,7 @@ export default function SignupPage() {
       const res = await fetch("/api/user/signup", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(parsed.data),
+        body: JSON.stringify({ ...parsed.data, plan }),
       });
 
       const data = await res.json();
@@ -75,7 +83,13 @@ export default function SignupPage() {
         </div>
         <div className="mt-8 bg-white py-8 px-4 shadow-sm border border-gray-200 rounded-lg sm:px-10">
           <h2 className="text-xl font-semibold text-gray-900 mb-1">Start your free trial</h2>
-          <p className="text-sm text-gray-500 mb-6">7 days free · No credit card required</p>
+          <p className="text-sm text-gray-500 mb-1">7 days free · No credit card required</p>
+          {plan !== 'starter' && (
+            <p className="text-sm font-medium text-indigo-700 mb-6">
+              {planLimits.label} plan — {planLimits.domains} domains, {planLimits.campaignsPerDomain} campaigns/domain
+            </p>
+          )}
+          {plan === 'starter' && <div className="mb-6" />}
           <form onSubmit={handleSubmit} className="space-y-5">
             {error && (
               <div className="rounded-md bg-red-50 border border-red-200 p-3">

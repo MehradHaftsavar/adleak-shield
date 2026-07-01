@@ -20,6 +20,8 @@ export async function POST(req: NextRequest) {
     }
 
     const { email, password } = parsed.data;
+    const rawPlan = body?.plan;
+    const planType: string = (rawPlan === 'freelancer' || rawPlan === 'agency') ? rawPlan : 'starter';
     console.log("[Signup] Attempting signup for:", email);
 
     const passwordHash = await bcrypt.hash(password, 10);
@@ -78,12 +80,13 @@ export async function POST(req: NextRequest) {
           .input("passwordHash", mssql.NVarChar(60), passwordHash)
           .input("trialEndsAt", mssql.DateTimeOffset, trialEndsAt)
           .input("isOwner", mssql.Bit, isOwner)
+          .input("planType", mssql.NVarChar(20), planType)
           .query(
             `INSERT INTO Tenants
-              (email, password_hash, trial_ends_at, is_owner, subscription_status, email_verified)
+              (email, password_hash, trial_ends_at, is_owner, subscription_status, email_verified, plan_type)
              OUTPUT INSERTED.tenant_id
              VALUES
-              (@emailNew, @passwordHash, @trialEndsAt, @isOwner, 'trialing', 0)`
+              (@emailNew, @passwordHash, @trialEndsAt, @isOwner, 'trialing', 0, @planType)`
           );
 
         console.log("[Signup] Tenant inserted, recordset:", newTenant.recordset);
