@@ -35,17 +35,19 @@ export async function POST(request: NextRequest) {
       return result.recordset[0] ?? null;
     });
 
+    // Trialing users (with or without stripe_customer_id) just get their plan_type updated —
+    // no payment needed until trial ends and they subscribe
+    if (tenantRow?.subscription_status === 'trialing') {
+      await withAdminDb(async (req) => {
+        await req
+          .input('plan',     mssql.NVarChar(20),    plan)
+          .input('tenantId', mssql.UniqueIdentifier, tenantId)
+          .query(`UPDATE Tenants SET plan_type = @plan WHERE tenant_id = @tenantId`);
+      });
+      return NextResponse.json({ success: true, plan });
+    }
+
     if (!tenantRow?.stripe_customer_id) {
-      if (tenantRow?.subscription_status === 'trialing') {
-        // Still on free trial — just update plan_type in DB, no payment needed yet
-        await withAdminDb(async (req) => {
-          await req
-            .input('plan',     mssql.NVarChar(20),    plan)
-            .input('tenantId', mssql.UniqueIdentifier, tenantId)
-            .query(`UPDATE Tenants SET plan_type = @plan WHERE tenant_id = @tenantId`);
-        });
-        return NextResponse.json({ success: true, plan });
-      }
       // No existing customer and not trialing — go to checkout
       return NextResponse.json({ redirect: 'checkout' }, { status: 200 });
     }
