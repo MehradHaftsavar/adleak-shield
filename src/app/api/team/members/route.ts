@@ -27,7 +27,9 @@ export async function GET(_request: NextRequest) {
                   FROM MemberDomainAccess mda
                   WHERE mda.member_id = tm.member_id) AS domain_ids
           FROM   TeamMembers tm
+          LEFT JOIN Tenants t ON t.email = tm.email
           WHERE  tm.tenant_id = CAST(SESSION_CONTEXT(N'TenantId') AS UNIQUEIDENTIFIER)
+            AND  (t.deleted_at IS NULL OR t.tenant_id IS NULL)
           ORDER  BY tm.created_at DESC
         `);
         return r.recordset;
