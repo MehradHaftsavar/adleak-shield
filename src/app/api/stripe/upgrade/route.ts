@@ -113,21 +113,20 @@ export async function POST(request: NextRequest) {
       // Downgrade: check the user isn't over the target plan's limits before scheduling.
       const limits = PLAN_LIMITS[plan as PlanType];
       // Domains + Campaigns have RLS (SESSION_CONTEXT filter applied automatically).
-      // TeamMembers has no RLS predicate — filter explicitly by tenant_id.
+      // TeamMembers has no RLS predicate — filter explicitly using @currentTenantId
+      // which withTenantDb already adds to the request before the callback runs.
       const usage = await withTenantDb(tenantId, async (req) => {
-        const r = await req
-          .input('_tenantId', mssql.UniqueIdentifier, tenantId)
-          .query(`
-            SELECT
-              (SELECT COUNT(*) FROM Domains) AS domainCount,
-              (SELECT COUNT(*)
-               FROM   TeamMembers
-               WHERE  tenant_id    = @_tenantId
-                 AND  accepted_at IS NOT NULL) AS memberCount,
-              (SELECT MAX(cnt) FROM (
-                SELECT COUNT(*) AS cnt FROM Campaigns GROUP BY domain_id
-              ) AS perDomain) AS maxCampaignsOnOneDomain
-          `);
+        const r = await req.query(`
+          SELECT
+            (SELECT COUNT(*) FROM Domains) AS domainCount,
+            (SELECT COUNT(*)
+             FROM   TeamMembers
+             WHERE  tenant_id    = @currentTenantId
+               AND  accepted_at IS NOT NULL) AS memberCount,
+            (SELECT ISNULL(MAX(cnt), 0) FROM (
+              SELECT COUNT(*) AS cnt FROM Campaigns GROUP BY domain_id
+            ) AS perDomain) AS maxCampaignsOnOneDomain
+        `);
         return r.recordset[0] ?? { domainCount: 0, memberCount: 0, maxCampaignsOnOneDomain: 0 };
       });
 
