@@ -128,7 +128,7 @@ export async function POST(request: NextRequest) {
         withAdminDb(async (req) => {
           const r = await req
             .input('tenantId', mssql.UniqueIdentifier, tenantId)
-            .query(`SELECT COUNT(*) AS cnt FROM TeamMembers WHERE tenant_id = @tenantId AND accepted_at IS NOT NULL`);
+            .query(`SELECT COUNT(*) AS cnt FROM TeamMembers WHERE tenant_id = @tenantId`);
           return (r.recordset[0]?.cnt ?? 0) as number;
         }),
       ]);
