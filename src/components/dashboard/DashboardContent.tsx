@@ -66,23 +66,25 @@ export function DashboardContent() {
   const [status, setStatus] = useState<DashboardStatus | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState('');
-  // Initialise synchronously from the URL so the banner is visible on the very
-  // first render — before any loading state — regardless of subscribe or resubscribe.
-  // We also write to sessionStorage so the flag survives the router.replace('/dashboard')
-  // call that strips ?payment=success from the URL (which can remount this component
-  // with empty searchParams, causing a plain lazy initialiser to return false).
-  const [paymentSuccess, setPaymentSuccess] = useState<boolean>(() => {
+  // Set immediately from the URL param so the banner shows before router.replace
+  // strips ?payment=success. Persisted to sessionStorage under a tenant-scoped key
+  // so a new account with a different tenantId never inherits a previous payment flag.
+  const [paymentSuccess, setPaymentSuccess] = useState<boolean>(
+    () => searchParams.get('payment') === 'success'
+  );
+
+  // Once session is available, persist/restore the flag under the tenant-scoped key.
+  const tenantId = session?.user?.tenantId as string | undefined;
+  useEffect(() => {
+    if (!tenantId) return;
+    const key = `als_payment_success_${tenantId}`;
     if (searchParams.get('payment') === 'success') {
-      if (typeof window !== 'undefined') {
-        sessionStorage.setItem('als_payment_success', 'true');
-      }
-      return true;
+      sessionStorage.setItem(key, 'true');
+    } else if (!paymentSuccess) {
+      // Restore across router.replace (URL param gone but same tab/tenant)
+      if (sessionStorage.getItem(key) === 'true') setPaymentSuccess(true);
     }
-    if (typeof window !== 'undefined') {
-      return sessionStorage.getItem('als_payment_success') === 'true';
-    }
-    return false;
-  });
+  }, [tenantId]); // eslint-disable-line
   const [upgrading, setUpgrading] = useState(false);
   const [campaignsOpen, setCampaignsOpen] = useState(true);
 
@@ -223,7 +225,7 @@ export function DashboardContent() {
             Subscription activated — full access unlocked.
           </p>
           <button
-            onClick={() => { setPaymentSuccess(false); sessionStorage.removeItem('als_payment_success'); }}
+            onClick={() => { setPaymentSuccess(false); if (tenantId) sessionStorage.removeItem(`als_payment_success_${tenantId}`); }}
             className="ml-auto text-green-600 hover:text-green-800 text-lg leading-none"
           >
             ×
