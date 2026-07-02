@@ -163,9 +163,26 @@ export async function DELETE() {
         .input('tenantId', mssql.UniqueIdentifier, tenantId)
         .query(`DELETE FROM Campaigns WHERE tenant_id = @tenantId`);
 
+      // MemberDomainAccess references Domains.domain_id — must be deleted first
+      await new mssql.Request(transaction)
+        .input('tenantId', mssql.UniqueIdentifier, tenantId)
+        .query(`
+          DELETE FROM MemberDomainAccess
+          WHERE domain_id IN (SELECT domain_id FROM Domains WHERE tenant_id = @tenantId)
+        `);
+
       await new mssql.Request(transaction)
         .input('tenantId', mssql.UniqueIdentifier, tenantId)
         .query(`DELETE FROM Domains WHERE tenant_id = @tenantId`);
+
+      // Team rows reference the tenant
+      await new mssql.Request(transaction)
+        .input('tenantId', mssql.UniqueIdentifier, tenantId)
+        .query(`DELETE FROM TeamMembers WHERE tenant_id = @tenantId`);
+
+      await new mssql.Request(transaction)
+        .input('tenantId', mssql.UniqueIdentifier, tenantId)
+        .query(`DELETE FROM TeamInvitations WHERE tenant_id = @tenantId`);
 
       await new mssql.Request(transaction)
         .input('tenantId', mssql.UniqueIdentifier, tenantId)
