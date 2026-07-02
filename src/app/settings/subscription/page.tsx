@@ -70,8 +70,9 @@ function PlanCard({
         <button
           onClick={() => onSelect(plan)}
           disabled={loading}
-          className="w-full px-4 py-2.5 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-60 text-white font-semibold rounded-lg text-sm transition-colors"
+          className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-60 text-white font-semibold rounded-lg text-sm transition-colors"
         >
+          {loading && <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />}
           {loading ? 'Processing…' : isSubscribed ? 'Switch to this plan' : 'Subscribe'}
         </button>
       )}
