@@ -88,6 +88,7 @@ export default function SubscriptionPage() {
   const [usage,   setUsage]   = useState<UsageData | null>(null);
   const [loading, setLoading] = useState<PlanType | null>(null);
   const [message, setMessage] = useState('');
+  const [isError, setIsError] = useState(false);
 
   // When Stripe redirects back after a confirmed upgrade, refresh the session
   // so the JWT picks up the new plan_type written by the webhook.
@@ -135,6 +136,7 @@ export default function SubscriptionPage() {
   async function handlePlanSelect(plan: PlanType) {
     setLoading(plan);
     setMessage('');
+    setIsError(false);
 
     try {
       if (subscriptionStatus === 'trialing') {
@@ -199,8 +201,10 @@ export default function SubscriptionPage() {
         return;
       }
 
+      setIsError(true);
       setMessage(upgradeData.error || 'Something went wrong. Please try again.');
     } catch {
+      setIsError(true);
       setMessage('Network error. Please try again.');
     } finally {
       setLoading(null);
@@ -271,8 +275,8 @@ export default function SubscriptionPage() {
       )}
 
       {message && (
-        <div className="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
-          <p className="text-sm text-blue-800">{message}</p>
+        <div className={`mb-6 p-4 rounded-lg border ${isError ? 'bg-red-50 border-red-200' : 'bg-blue-50 border-blue-200'}`}>
+          <p className={`text-sm ${isError ? 'text-red-800' : 'text-blue-800'}`}>{message}</p>
         </div>
       )}
 

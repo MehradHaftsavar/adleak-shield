@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@/lib/auth';
 import { stripe } from '@/lib/stripe';
 import { withAdminDb } from '@/lib/db/client';
+import { PLAN_LIMITS } from '@/lib/planLimits';
 import * as mssql from 'mssql';
 import type { PlanType } from '@/types/auth';
 
@@ -109,7 +110,47 @@ export async function POST(request: NextRequest) {
       });
       return NextResponse.json({ url: portalSession.url });
     } else {
-      // Downgrade: schedule the plan change for end of current billing period.
+      // Downgrade: check the user isn't over the target plan's limits before scheduling.
+      const limits = PLAN_LIMITS[plan as PlanType];
+      const usage = await withAdminDb(async (req) => {
+        const r = await req
+          .input('tenantId', mssql.UniqueIdentifier, tenantId)
+          .query(`
+            SELECT
+              (SELECT COUNT(*) FROM Domains WHERE tenant_id = @tenantId) AS domainCount,
+              (SELECT COUNT(*) FROM Campaigns WHERE tenant_id = @tenantId) AS campaignCount,
+              (SELECT COUNT(*) FROM TeamMembers WHERE tenant_id = @tenantId AND accepted_at IS NOT NULL) AS memberCount
+          `);
+        return r.recordset[0] ?? { domainCount: 0, campaignCount: 0, memberCount: 0 };
+      });
+
+      const totalSeats    = (usage.memberCount ?? 0) + 1; // +1 for owner
+      const maxCampaigns  = limits.domains * limits.campaignsPerDomain;
+      const violations: string[] = [];
+
+      if ((usage.domainCount ?? 0) > limits.domains) {
+        const n = usage.domainCount - limits.domains;
+        violations.push(`${n} domain${n > 1 ? 's' : ''} (you have ${usage.domainCount}, limit is ${limits.domains})`);
+      }
+      if ((usage.campaignCount ?? 0) > maxCampaigns) {
+        const n = usage.campaignCount - maxCampaigns;
+        violations.push(`${n} campaign${n > 1 ? 's' : ''} (you have ${usage.campaignCount}, limit is ${maxCampaigns})`);
+      }
+      if (totalSeats > limits.seats) {
+        const n = totalSeats - limits.seats;
+        violations.push(`${n} team member${n > 1 ? 's' : ''} (you have ${totalSeats}, limit is ${limits.seats})`);
+      }
+
+      if (violations.length > 0) {
+        const list = violations.length === 1
+          ? violations[0]
+          : violations.slice(0, -1).join(', ') + ' and ' + violations[violations.length - 1];
+        return NextResponse.json({
+          error: `To downgrade to ${limits.label}, please first remove: ${list}.`,
+        }, { status: 400 });
+      }
+
+      // Schedule the plan change for end of current billing period.
       // If the subscription already has a schedule (e.g. user clicked twice), update
       // it in place rather than trying to create another one.
       const scheduleId = existingScheduleId
@@ -120,6 +161,7 @@ export async function POST(request: NextRequest) {
         end_behavior: 'release',
         phases: [
           {
+            start_date: 'now',
             items: [{ price: subscription.items.data[0].price.id as string, quantity: 1 }],
             end_date: subscription.current_period_end,
           },
