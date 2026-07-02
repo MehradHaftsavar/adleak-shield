@@ -42,7 +42,7 @@ export default function SettingsPage() {
       }
       // signOut with callbackUrl lets NextAuth clear the cookie and handle
       // the redirect atomically — no React re-render race, no stale JWT cookie.
-      await signOut({ callbackUrl: '/auth/login' });
+      await signOut({ callbackUrl: 'https://www.adleakshield.com' });
     } catch {
       setDeleteError('Network error. Please try again.');
       setDeleting(false);

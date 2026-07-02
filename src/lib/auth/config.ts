@@ -240,6 +240,14 @@ export const authConfig: NextAuthConfig = {
       return session;
     },
 
+    async redirect({ url, baseUrl }) {
+      // Allow redirect to the marketing site after account deletion sign-out
+      if (url === 'https://www.adleakshield.com') return url;
+      if (url.startsWith('/')) return `${baseUrl}${url}`;
+      if (url.startsWith(baseUrl)) return url;
+      return baseUrl;
+    },
+
     authorized({ auth, request: { nextUrl } }) {
       const isLoggedIn     = !!auth?.user;
       const isOnDashboard  = nextUrl.pathname.startsWith("/dashboard");
