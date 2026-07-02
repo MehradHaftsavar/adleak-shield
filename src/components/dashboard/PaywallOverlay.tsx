@@ -5,9 +5,10 @@ import { Lock, PauseCircle } from 'lucide-react';
 
 interface PaywallOverlayProps {
   onUpgrade: () => Promise<void>;
+  priceGbp:  string;
 }
 
-export default function PaywallOverlay({ onUpgrade }: PaywallOverlayProps) {
+export default function PaywallOverlay({ onUpgrade, priceGbp }: PaywallOverlayProps) {
   const [loading, setLoading] = useState(false);
 
   const handleClick = async () => {
@@ -42,7 +43,7 @@ export default function PaywallOverlay({ onUpgrade }: PaywallOverlayProps) {
         </div>
 
         <div className="mb-1">
-          <span className="text-3xl font-bold text-gray-900">£12.99</span>
+          <span className="text-3xl font-bold text-gray-900">£{priceGbp}</span>
           <span className="text-gray-500 text-sm ml-1">/ month</span>
         </div>
         <p className="text-xs text-gray-400 mb-6">Cancel anytime</p>

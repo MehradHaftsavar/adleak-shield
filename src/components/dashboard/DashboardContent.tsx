@@ -86,6 +86,9 @@ export function DashboardContent() {
   const [upgrading, setUpgrading] = useState(false);
   const [campaignsOpen, setCampaignsOpen] = useState(true);
 
+  const planType  = (session?.user?.planType ?? 'starter') as PlanType;
+  const planPrice = PLAN_LIMITS[planType].priceGbp.toFixed(2);
+
   // Date range state for Leak Table
   const [leakDateRange, setLeakDateRange] = useState({
     start: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString(),
@@ -257,7 +260,7 @@ export function DashboardContent() {
               className="inline-flex items-center gap-1 font-semibold underline underline-offset-2 hover:text-red-900 disabled:opacity-60"
             >
               {upgrading && <span className="inline-block w-3 h-3 border-2 border-red-800 border-t-transparent rounded-full animate-spin" />}
-              subscribe for £12.99/mo to unlock your dashboard →
+              subscribe for £{planPrice}/mo to unlock your dashboard →
             </button>
           </p>
         </div>
@@ -341,7 +344,7 @@ export function DashboardContent() {
       {/* Leak Table + Visitor Journeys — single paywall wraps both */}
       <div className="relative space-y-6">
         {status.isPaywalled && (
-          <PaywallOverlay onUpgrade={handleUpgrade} />
+          <PaywallOverlay onUpgrade={handleUpgrade} priceGbp={planPrice} />
         )}
 
         <div className={status.isPaywalled ? 'select-none pointer-events-none' : ''}>
