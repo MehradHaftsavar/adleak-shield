@@ -92,10 +92,23 @@ export default function SubscriptionPage() {
   // so the JWT picks up the new plan_type written by the webhook.
   useEffect(() => {
     if (searchParams.get('upgrade') === 'success') {
-      update().then(() => {
-        router.replace('/settings/subscription');
-        setMessage('Plan upgraded successfully. Your new plan is now active.');
-      });
+      // Sync plan from Stripe immediately (don't wait for webhook) then stamp JWT
+      fetch('/api/stripe/sync-plan', { method: 'POST' })
+        .then(r => r.ok ? r.json() : null)
+        .then(async (data) => {
+          if (data?.plan) {
+            await update({ planType: data.plan, subscriptionStatus: data.subscriptionStatus });
+          } else {
+            await update();
+          }
+          router.replace('/settings/subscription');
+          setMessage('Plan upgraded successfully. Your new plan is now active.');
+        })
+        .catch(async () => {
+          await update();
+          router.replace('/settings/subscription');
+          setMessage('Plan upgraded successfully. Your new plan is now active.');
+        });
     }
   }, []); // eslint-disable-line
 
