@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useSession } from 'next-auth/react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { CreditCard, Check } from 'lucide-react';
 import { PLAN_LIMITS } from '@/lib/planLimits';
 import type { PlanType } from '@/types/auth';
@@ -81,11 +81,23 @@ function PlanCard({
 
 export default function SubscriptionPage() {
   const { data: session, status, update } = useSession();
-  const router = useRouter();
+  const router       = useRouter();
+  const searchParams = useSearchParams();
 
   const [usage,   setUsage]   = useState<UsageData | null>(null);
   const [loading, setLoading] = useState<PlanType | null>(null);
   const [message, setMessage] = useState('');
+
+  // When Stripe redirects back after a confirmed upgrade, refresh the session
+  // so the JWT picks up the new plan_type written by the webhook.
+  useEffect(() => {
+    if (searchParams.get('upgrade') === 'success') {
+      update().then(() => {
+        router.replace('/settings/subscription');
+        setMessage('Plan upgraded successfully. Your new plan is now active.');
+      });
+    }
+  }, []); // eslint-disable-line
 
   useEffect(() => {
     // Fetch current usage to show alongside plan limits
@@ -149,13 +161,15 @@ export default function SubscriptionPage() {
       });
       const upgradeData = await upgradeRes.json();
 
-      if (upgradeRes.ok && upgradeData.success) {
-        if (upgradeData.scheduledDowngrade) {
-          setMessage(`Plan will switch to ${PLAN_LIMITS[plan].label} at the end of your current billing period. No refund is issued.`);
-        } else {
-          await update({ planType: plan });
-          setMessage(`Plan updated to ${PLAN_LIMITS[plan].label}. Changes take effect immediately.`);
-        }
+      // Upgrade: Stripe returns a hosted confirmation URL — redirect the user there.
+      if (upgradeRes.ok && upgradeData.url) {
+        window.location.href = upgradeData.url;
+        return;
+      }
+
+      // Downgrade: scheduled for end of billing period.
+      if (upgradeRes.ok && upgradeData.scheduledDowngrade) {
+        setMessage(`Plan will switch to ${PLAN_LIMITS[plan].label} at the end of your current billing period. No refund is issued.`);
         return;
       }
 

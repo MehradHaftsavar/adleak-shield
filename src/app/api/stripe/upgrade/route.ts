@@ -83,29 +83,40 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'No subscription item found' }, { status: 400 });
     }
 
+    // If the subscription already has a schedule attached we must handle it first.
+    const existingScheduleId = subscription.schedule as string | null | undefined;
+
     if (isUpgrade) {
-      // Upgrade: charge prorated difference immediately, update DB now
-      await stripe.subscriptions.update(subscription.id, {
-        proration_behavior: 'create_prorations',
-        automatic_tax:      { enabled: true },
-        items: [{ id: currentItemId, price: priceIdForPlan(plan as PlanType) }],
-        metadata: { tenantId, plan },
+      // If there's a pending downgrade schedule, release it before upgrading.
+      if (existingScheduleId) {
+        await stripe.subscriptionSchedules.release(existingScheduleId);
+      }
+      // Upgrade: send user to Stripe's hosted confirmation page so they see
+      // the prorated charge and explicitly confirm before anything is billed.
+      // The subscription_update_confirm flow pre-computes the proration and
+      // shows it to the user. On confirm, Stripe fires customer.subscription.updated
+      // and the webhook updates plan_type in the DB.
+      const portalSession = await stripe.billingPortal.sessions.create({
+        customer:   tenantRow.stripe_customer_id as string,
+        return_url: `${process.env.NEXT_PUBLIC_APP_URL}/settings/subscription?upgrade=success`,
+        flow_data:  {
+          type: 'subscription_update_confirm',
+          subscription_update_confirm: {
+            subscription: subscription.id,
+            items: [{ id: currentItemId, price: priceIdForPlan(plan as PlanType), quantity: 1 }],
+          },
+        },
       });
-      await withAdminDb(async (req) => {
-        await req
-          .input('plan',     mssql.NVarChar(20),    plan)
-          .input('tenantId', mssql.UniqueIdentifier, tenantId)
-          .query(`UPDATE Tenants SET plan_type = @plan WHERE tenant_id = @tenantId`);
-      });
-      return NextResponse.json({ success: true, plan });
+      return NextResponse.json({ url: portalSession.url });
     } else {
       // Downgrade: schedule the plan change for end of current billing period.
-      // Using a subscription schedule so Stripe only fires subscription.updated
-      // when the new phase actually executes at renewal — DB stays on old plan until then.
-      const schedule = await stripe.subscriptionSchedules.create({
-        from_subscription: subscription.id,
-      });
-      await stripe.subscriptionSchedules.update(schedule.id, {
+      // If the subscription already has a schedule (e.g. user clicked twice), update
+      // it in place rather than trying to create another one.
+      const scheduleId = existingScheduleId
+        ? existingScheduleId
+        : (await stripe.subscriptionSchedules.create({ from_subscription: subscription.id })).id;
+
+      await stripe.subscriptionSchedules.update(scheduleId, {
         end_behavior: 'release',
         phases: [
           {
