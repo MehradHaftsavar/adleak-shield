@@ -40,8 +40,9 @@ export default function SettingsPage() {
         setDeleting(false);
         return;
       }
-      // Sign out and redirect to main site
-      await signOut({ redirect: false });
+      // Fire sign-out without awaiting — navigate away immediately so
+      // NextAuth's session-null state never triggers the middleware login redirect.
+      signOut({ redirect: false });
       window.location.href = 'https://www.adleakshield.com';
     } catch {
       setDeleteError('Network error. Please try again.');
