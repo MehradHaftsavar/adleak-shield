@@ -34,7 +34,7 @@ async function loadAccessibleDomains(
         FROM   TeamMembers tm
         INNER JOIN Tenants t              ON t.tenant_id  = tm.tenant_id
         INNER JOIN MemberDomainAccess mda ON mda.member_id = tm.member_id
-        WHERE  tm.email = @_email AND tm.accepted_at IS NOT NULL
+        WHERE  tm.email = @_email AND tm.accepted_at IS NOT NULL AND t.deleted_at IS NULL
       `);
     return r.recordset as { tenant_id: string; role: string; tenant_owner_email: string; domain_id: string }[];
   });
@@ -96,6 +96,7 @@ export const authConfig: NextAuthConfig = {
         const ownDomains = ((user.allAccessibleDomains ?? []) as AccessibleDomain[]).filter(d => d.tenantId === user.tenantId);
         token.activeDomainId    = ownDomains[0]?.domainId ?? null;
         token.planType          = (user.planType ?? 'starter') as PlanType;
+        token.domainsRefreshedAt = Date.now();
       }
 
       // ── Session updates ───────────────────────────────────────────────────────
@@ -180,6 +181,35 @@ export const authConfig: NextAuthConfig = {
                 ? new Date(fresh.trial_ends_at).toISOString()
                 : token.trialEndsAt;
               token.planType = (fresh.plan_type ?? 'starter') as PlanType;
+            }
+          } catch {
+            // Non-fatal — keep existing token values
+          }
+        }
+      } // end trigger === "update"
+
+      // ── Periodic member-domain refresh (non-update path) ─────────────────────
+      // Re-load allAccessibleDomains every 10 minutes so that when a workspace
+      // owner deletes their account the invitee's JWT clears the stale tenant
+      // within one refresh cycle rather than waiting for full token expiry.
+      if (trigger !== 'update' && !user) {
+        const DOMAIN_REFRESH_MS = 10 * 60 * 1000; // 10 minutes
+        const lastRefresh = (token.domainsRefreshedAt as number | undefined) ?? 0;
+        if (Date.now() - lastRefresh > DOMAIN_REFRESH_MS) {
+          try {
+            const refreshed = await loadAccessibleDomains(
+              token.email as string,
+              token.tenantId as string,
+              token.email as string,
+            );
+            token.allAccessibleDomains = refreshed;
+            token.domainsRefreshedAt   = Date.now();
+            // If the active tenant/domain is no longer accessible, reset to own
+            const stillValid = refreshed.some(d => d.domainId === token.activeDomainId);
+            if (!stillValid) {
+              token.activeTenantId = token.tenantId;
+              const ownDomains = refreshed.filter(d => d.tenantId === token.tenantId);
+              token.activeDomainId = ownDomains[0]?.domainId ?? null;
             }
           } catch {
             // Non-fatal — keep existing token values
