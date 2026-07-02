@@ -111,8 +111,8 @@ export default function SubscriptionPage() {
     setMessage('');
 
     try {
-      if (!isSubscribed) {
-        // Not an active paid subscriber — just update plan_type in DB, no Stripe involved
+      if (subscriptionStatus === 'trialing') {
+        // Trialing: update plan_type in DB only — no charge until trial ends
         const res  = await fetch('/api/user/plan', {
           method:  'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -121,10 +121,23 @@ export default function SubscriptionPage() {
         const data = await res.json();
         if (res.ok && data.success) {
           await update({ planType: plan });
-          setMessage(`Plan updated to ${PLAN_LIMITS[plan].label}. Changes take effect immediately.`);
+          setMessage(`Plan updated to ${PLAN_LIMITS[plan].label}. You'll be billed this amount when your trial ends.`);
         } else {
           setMessage(data.error || 'Something went wrong. Please try again.');
         }
+        return;
+      }
+
+      if (!isSubscribed) {
+        // Canceled / no subscription — go straight to checkout for the chosen plan
+        const res  = await fetch('/api/stripe/checkout', {
+          method:  'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body:    JSON.stringify({ plan }),
+        });
+        const data = await res.json();
+        if (data.url) window.location.href = data.url;
+        else setMessage(data.error || 'Something went wrong. Please try again.');
         return;
       }
 
@@ -182,8 +195,9 @@ export default function SubscriptionPage() {
     );
   }
 
-  const currentPlan = (session?.user?.planType ?? 'starter') as PlanType;
-  const isSubscribed = session?.user?.subscriptionStatus === 'active';
+  const currentPlan        = (session?.user?.planType ?? 'starter') as PlanType;
+  const subscriptionStatus = session?.user?.subscriptionStatus as string | undefined;
+  const isSubscribed       = subscriptionStatus === 'active';
 
   return (
     <div className="max-w-4xl mx-auto">
