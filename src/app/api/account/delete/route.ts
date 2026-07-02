@@ -175,7 +175,7 @@ export async function DELETE() {
         .input('tenantId', mssql.UniqueIdentifier, tenantId)
         .query(`DELETE FROM Domains WHERE tenant_id = @tenantId`);
 
-      // Team rows reference the tenant
+      // Team rows reference the tenant (members OF this workspace)
       await new mssql.Request(transaction)
         .input('tenantId', mssql.UniqueIdentifier, tenantId)
         .query(`DELETE FROM TeamMembers WHERE tenant_id = @tenantId`);
@@ -183,6 +183,30 @@ export async function DELETE() {
       await new mssql.Request(transaction)
         .input('tenantId', mssql.UniqueIdentifier, tenantId)
         .query(`DELETE FROM TeamInvitations WHERE tenant_id = @tenantId`);
+
+      // Remove this user's own membership rows in OTHER workspaces.
+      // Must delete MemberDomainAccess first (FK on member_id), then TeamMembers.
+      // tenantEmail was captured before the soft-delete overwrites the email column.
+      if (tenantEmail) {
+        await new mssql.Request(transaction)
+          .input('email', mssql.NVarChar(255), tenantEmail.toLowerCase().trim())
+          .input('tenantId', mssql.UniqueIdentifier, tenantId)
+          .query(`
+            DELETE FROM MemberDomainAccess
+            WHERE member_id IN (
+              SELECT member_id FROM TeamMembers
+              WHERE email = @email AND tenant_id != @tenantId
+            )
+          `);
+
+        await new mssql.Request(transaction)
+          .input('email', mssql.NVarChar(255), tenantEmail.toLowerCase().trim())
+          .input('tenantId', mssql.UniqueIdentifier, tenantId)
+          .query(`
+            DELETE FROM TeamMembers
+            WHERE email = @email AND tenant_id != @tenantId
+          `);
+      }
 
       await new mssql.Request(transaction)
         .input('tenantId', mssql.UniqueIdentifier, tenantId)

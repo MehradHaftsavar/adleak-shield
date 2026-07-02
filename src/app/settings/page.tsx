@@ -40,10 +40,9 @@ export default function SettingsPage() {
         setDeleting(false);
         return;
       }
-      // Fire sign-out without awaiting — navigate away immediately so
-      // NextAuth's session-null state never triggers the middleware login redirect.
-      signOut({ redirect: false });
-      window.location.href = 'https://www.adleakshield.com';
+      // signOut with callbackUrl lets NextAuth clear the cookie and handle
+      // the redirect atomically — no React re-render race, no stale JWT cookie.
+      await signOut({ callbackUrl: '/auth/login' });
     } catch {
       setDeleteError('Network error. Please try again.');
       setDeleting(false);
