@@ -112,23 +112,28 @@ export async function POST(request: NextRequest) {
     } else {
       // Downgrade: check the user isn't over the target plan's limits before scheduling.
       const limits = PLAN_LIMITS[plan as PlanType];
-      // Domains + Campaigns have RLS (SESSION_CONTEXT filter applied automatically).
-      // TeamMembers has no RLS predicate — filter explicitly using @currentTenantId
-      // which withTenantDb already adds to the request before the callback runs.
-      const usage = await withTenantDb(tenantId, async (req) => {
-        const r = await req.query(`
-          SELECT
-            (SELECT COUNT(*) FROM Domains) AS domainCount,
-            (SELECT COUNT(*)
-             FROM   TeamMembers
-             WHERE  tenant_id    = @currentTenantId
-               AND  accepted_at IS NOT NULL) AS memberCount,
-            (SELECT ISNULL(MAX(cnt), 0) FROM (
-              SELECT COUNT(*) AS cnt FROM Campaigns GROUP BY domain_id
-            ) AS perDomain) AS maxCampaignsOnOneDomain
-        `);
-        return r.recordset[0] ?? { domainCount: 0, memberCount: 0, maxCampaignsOnOneDomain: 0 };
-      });
+      // Domains + Campaigns have RLS — must use withTenantDb.
+      // TeamMembers has no RLS predicate — use withAdminDb with explicit tenant filter.
+      const [rlsUsage, memberCount] = await Promise.all([
+        withTenantDb(tenantId, async (req) => {
+          const r = await req.query(`
+            SELECT
+              (SELECT COUNT(*) FROM Domains) AS domainCount,
+              (SELECT ISNULL(MAX(cnt), 0) FROM (
+                SELECT COUNT(*) AS cnt FROM Campaigns GROUP BY domain_id
+              ) AS perDomain) AS maxCampaignsOnOneDomain
+          `);
+          return r.recordset[0] ?? { domainCount: 0, maxCampaignsOnOneDomain: 0 };
+        }),
+        withAdminDb(async (req) => {
+          const r = await req
+            .input('tenantId', mssql.UniqueIdentifier, tenantId)
+            .query(`SELECT COUNT(*) AS cnt FROM TeamMembers WHERE tenant_id = @tenantId AND accepted_at IS NOT NULL`);
+          return (r.recordset[0]?.cnt ?? 0) as number;
+        }),
+      ]);
+
+      const usage = { ...rlsUsage, memberCount };
 
       const totalSeats = (usage.memberCount ?? 0) + 1; // +1 for owner
       const violations: string[] = [];
