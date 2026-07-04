@@ -161,16 +161,19 @@ export async function POST(request: NextRequest) {
         ? existingScheduleId
         : (await stripe.subscriptionSchedules.create({ from_subscription: subscription.id })).id;
 
-      // Only set start_date on the first phase when creating a new schedule.
-      // Updating an existing schedule's current phase start_date is not allowed by Stripe.
-      const firstPhase = existingScheduleId
-        ? { items: [{ price: subscription.items.data[0].price.id as string, quantity: 1 }], end_date: subscription.current_period_end }
-        : { start_date: 'now' as const, items: [{ price: subscription.items.data[0].price.id as string, quantity: 1 }], end_date: subscription.current_period_end };
+      // Stripe requires start_date on the first phase to anchor the timeline.
+      // For existing schedules we must pass the phase's existing start_date (unchanged);
+      // for new schedules 'now' is correct.
+      let firstPhaseStartDate: number | 'now' = 'now';
+      if (existingScheduleId) {
+        const existing = await stripe.subscriptionSchedules.retrieve(existingScheduleId);
+        firstPhaseStartDate = existing.phases[0]?.start_date ?? 'now';
+      }
 
       await stripe.subscriptionSchedules.update(scheduleId, {
         end_behavior: 'release',
         phases: [
-          firstPhase,
+          { start_date: firstPhaseStartDate, items: [{ price: subscription.items.data[0].price.id as string, quantity: 1 }], end_date: subscription.current_period_end },
           { items: [{ price: priceIdForPlan(plan as PlanType), quantity: 1 }] },
         ],
         metadata: { tenantId, plan },
