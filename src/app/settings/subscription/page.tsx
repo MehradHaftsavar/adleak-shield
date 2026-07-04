@@ -183,9 +183,10 @@ export default function SubscriptionPage() {
         return;
       }
 
-      // Downgrade: scheduled for end of billing period.
-      if (upgradeRes.ok && upgradeData.scheduledDowngrade) {
-        setMessage(`Plan will switch to ${PLAN_LIMITS[plan].label} at the end of your current billing period. No refund is issued.`);
+      // Downgrade: immediate with prorated credit.
+      if (upgradeRes.ok && upgradeData.immediateDowngrade) {
+        await update({ planType: plan });
+        setMessage(`Plan switched to ${PLAN_LIMITS[plan].label}. A prorated credit for your unused time has been applied to your next invoice.`);
         return;
       }
 
@@ -285,7 +286,7 @@ export default function SubscriptionPage() {
         <div className="mb-8 p-5 bg-white border border-gray-200 rounded-xl">
           <h2 className="text-sm font-semibold text-gray-900 mb-1">Manage billing or cancel</h2>
           <p className="text-sm text-gray-500 mb-4">
-            Update your payment method, download invoices, or cancel your subscription at any time via the Stripe billing portal. Cancellations take effect at the end of your current billing period — you keep full access until then.
+            Update your payment method, download invoices, or cancel your subscription via the Stripe billing portal. Cancellations take effect at the end of your current billing period — you keep full access until then.
           </p>
           <button
             onClick={handleManagePortal}
@@ -311,7 +312,7 @@ export default function SubscriptionPage() {
       </div>
 
       <p className="text-xs text-gray-400 mt-6 text-center">
-        Upgrades are prorated — you only pay the difference. Downgrades take effect at the next billing cycle.
+        All plan changes take effect immediately. A prorated credit for any unused time is applied to your next invoice.
       </p>
     </div>
   );

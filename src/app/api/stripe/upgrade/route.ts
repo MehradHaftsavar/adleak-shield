@@ -154,31 +154,28 @@ export async function POST(request: NextRequest) {
         }, { status: 400 });
       }
 
-      // Schedule the plan change for end of current billing period.
-      // If the subscription already has a schedule (e.g. user clicked twice), update
-      // it in place rather than trying to create another one.
-      const scheduleId = existingScheduleId
-        ? existingScheduleId
-        : (await stripe.subscriptionSchedules.create({ from_subscription: subscription.id })).id;
-
-      // Stripe requires start_date on the first phase to anchor the timeline.
-      // For existing schedules we must pass the phase's existing start_date (unchanged);
-      // for new schedules 'now' is correct.
-      let firstPhaseStartDate: number | 'now' = 'now';
+      // Downgrade: immediate with Stripe proration.
+      // Any pending schedule must be released before the direct update.
       if (existingScheduleId) {
-        const existing = await stripe.subscriptionSchedules.retrieve(existingScheduleId);
-        firstPhaseStartDate = existing.phases[0]?.start_date ?? 'now';
+        await stripe.subscriptionSchedules.release(existingScheduleId);
       }
 
-      await stripe.subscriptionSchedules.update(scheduleId, {
-        end_behavior: 'release',
-        phases: [
-          { start_date: firstPhaseStartDate, items: [{ price: subscription.items.data[0].price.id as string, quantity: 1 }], end_date: subscription.current_period_end },
-          { items: [{ price: priceIdForPlan(plan as PlanType), quantity: 1 }] },
-        ],
-        metadata: { tenantId, plan },
+      // Direct subscription swap — Stripe creates a proration credit for the
+      // unused days on the current plan, applied to the customer's next invoice.
+      await stripe.subscriptions.update(subscription.id, {
+        items: [{ id: currentItemId, price: priceIdForPlan(plan as PlanType), quantity: 1 }],
+        proration_behavior: 'create_prorations',
       });
-      return NextResponse.json({ success: true, plan, scheduledDowngrade: true });
+
+      // Write to DB immediately — don't wait for the webhook
+      await withAdminDb(async (req) => {
+        await req
+          .input('plan',     mssql.NVarChar(20),    plan)
+          .input('tenantId', mssql.UniqueIdentifier, tenantId)
+          .query(`UPDATE Tenants SET plan_type = @plan WHERE tenant_id = @tenantId`);
+      });
+
+      return NextResponse.json({ success: true, plan, immediateDowngrade: true });
     }
   } catch (error) {
     console.error('[stripe/upgrade] Error:', error);
