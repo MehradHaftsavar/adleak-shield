@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useSession } from 'next-auth/react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { CreditCard, Check } from 'lucide-react';
 import { PLAN_LIMITS } from '@/lib/planLimits';
 import type { PlanType } from '@/types/auth';
@@ -81,12 +82,33 @@ function PlanCard({
 
 export default function SubscriptionPage() {
   const { data: session, status, update } = useSession();
+  const router       = useRouter();
+  const searchParams = useSearchParams();
 
   const [usage,   setUsage]   = useState<UsageData | null>(null);
   const [loading, setLoading] = useState<PlanType | null>(null);
   const [message, setMessage] = useState('');
   const [isError, setIsError] = useState(false);
   const [confirmChange, setConfirmChange] = useState<{ plan: PlanType; isUpgrade: boolean } | null>(null);
+
+  // When Stripe redirects back after a confirmed upgrade, sync plan immediately
+  useEffect(() => {
+    if (searchParams.get('upgrade') === 'success') {
+      fetch('/api/stripe/sync-plan', { method: 'POST' })
+        .then(r => r.ok ? r.json() : null)
+        .then(async (data) => {
+          if (data?.plan) await update({ planType: data.plan, subscriptionStatus: data.subscriptionStatus });
+          else await update();
+          router.replace('/settings/subscription');
+          setMessage('Plan upgraded successfully. Your new plan is now active.');
+        })
+        .catch(async () => {
+          await update();
+          router.replace('/settings/subscription');
+          setMessage('Plan upgraded successfully. Your new plan is now active.');
+        });
+    }
+  }, []); // eslint-disable-line
 
   useEffect(() => {
     // Fetch current usage to show alongside plan limits
@@ -166,15 +188,16 @@ export default function SubscriptionPage() {
       });
       const upgradeData = await upgradeRes.json();
 
-      // Immediate plan change (upgrade or downgrade) with prorated credit/charge
-      if (upgradeRes.ok && (upgradeData.immediateDowngrade || upgradeData.immediateUpgrade)) {
+      // Upgrade via Stripe portal confirmation — redirect user there
+      if (upgradeRes.ok && upgradeData.url) {
+        window.location.href = upgradeData.url;
+        return;
+      }
+
+      // Downgrade: immediate with prorated credit
+      if (upgradeRes.ok && upgradeData.immediateDowngrade) {
         await update({ planType: plan });
-        const isUp = upgradeData.immediateUpgrade;
-        setMessage(
-          isUp
-            ? `Plan upgraded to ${PLAN_LIMITS[plan].label}. The prorated difference has been charged to your payment method.`
-            : `Plan switched to ${PLAN_LIMITS[plan].label}. A prorated credit for your unused time has been applied to your next invoice.`
-        );
+        setMessage(`Plan switched to ${PLAN_LIMITS[plan].label}. A prorated credit for your unused time has been applied to your next invoice.`);
         return;
       }
 
