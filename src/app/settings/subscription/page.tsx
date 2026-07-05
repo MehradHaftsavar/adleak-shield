@@ -2,7 +2,6 @@
 
 import { useState, useEffect } from 'react';
 import { useSession } from 'next-auth/react';
-import { useRouter, useSearchParams } from 'next/navigation';
 import { CreditCard, Check } from 'lucide-react';
 import { PLAN_LIMITS } from '@/lib/planLimits';
 import type { PlanType } from '@/types/auth';
@@ -82,38 +81,12 @@ function PlanCard({
 
 export default function SubscriptionPage() {
   const { data: session, status, update } = useSession();
-  const router       = useRouter();
-  const searchParams = useSearchParams();
 
   const [usage,   setUsage]   = useState<UsageData | null>(null);
   const [loading, setLoading] = useState<PlanType | null>(null);
   const [message, setMessage] = useState('');
   const [isError, setIsError] = useState(false);
-  const [confirmDowngrade, setConfirmDowngrade] = useState<PlanType | null>(null);
-
-  // When Stripe redirects back after a confirmed upgrade, refresh the session
-  // so the JWT picks up the new plan_type written by the webhook.
-  useEffect(() => {
-    if (searchParams.get('upgrade') === 'success') {
-      // Sync plan from Stripe immediately (don't wait for webhook) then stamp JWT
-      fetch('/api/stripe/sync-plan', { method: 'POST' })
-        .then(r => r.ok ? r.json() : null)
-        .then(async (data) => {
-          if (data?.plan) {
-            await update({ planType: data.plan, subscriptionStatus: data.subscriptionStatus });
-          } else {
-            await update();
-          }
-          router.replace('/settings/subscription');
-          setMessage('Plan upgraded successfully. Your new plan is now active.');
-        })
-        .catch(async () => {
-          await update();
-          router.replace('/settings/subscription');
-          setMessage('Plan upgraded successfully. Your new plan is now active.');
-        });
-    }
-  }, []); // eslint-disable-line
+  const [confirmChange, setConfirmChange] = useState<{ plan: PlanType; isUpgrade: boolean } | null>(null);
 
   useEffect(() => {
     // Fetch current usage to show alongside plan limits
@@ -140,9 +113,9 @@ export default function SubscriptionPage() {
     setMessage('');
     setIsError(false);
 
-    // Active subscriber clicking a lower plan → show confirmation modal first
+    // Active subscriber downgrading → show confirmation modal first
     if (isSubscribed && PLAN_ORDER[plan] < PLAN_ORDER[currentPlan]) {
-      setConfirmDowngrade(plan);
+      setConfirmChange({ plan, isUpgrade: false });
       return;
     }
 
@@ -185,7 +158,7 @@ export default function SubscriptionPage() {
         return;
       }
 
-      // Active paid subscriber — upgrade or downgrade
+      // Active paid subscriber — upgrade or downgrade via direct Stripe API
       const upgradeRes  = await fetch('/api/stripe/upgrade', {
         method:  'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -193,16 +166,15 @@ export default function SubscriptionPage() {
       });
       const upgradeData = await upgradeRes.json();
 
-      // Upgrade: Stripe returns a hosted confirmation URL — redirect the user there.
-      if (upgradeRes.ok && upgradeData.url) {
-        window.location.href = upgradeData.url;
-        return;
-      }
-
-      // Downgrade: immediate with prorated credit.
-      if (upgradeRes.ok && upgradeData.immediateDowngrade) {
+      // Immediate plan change (upgrade or downgrade) with prorated credit/charge
+      if (upgradeRes.ok && (upgradeData.immediateDowngrade || upgradeData.immediateUpgrade)) {
         await update({ planType: plan });
-        setMessage(`Plan switched to ${PLAN_LIMITS[plan].label}. A prorated credit for your unused time has been applied to your next invoice.`);
+        const isUp = upgradeData.immediateUpgrade;
+        setMessage(
+          isUp
+            ? `Plan upgraded to ${PLAN_LIMITS[plan].label}. The prorated difference has been charged to your payment method.`
+            : `Plan switched to ${PLAN_LIMITS[plan].label}. A prorated credit for your unused time has been applied to your next invoice.`
+        );
         return;
       }
 
@@ -331,38 +303,44 @@ export default function SubscriptionPage() {
         All plan changes take effect immediately. A prorated credit for any unused time is applied to your next invoice.
       </p>
 
-      {/* Downgrade confirmation modal */}
-      {confirmDowngrade && (
+      {/* Plan change confirmation modal */}
+      {confirmChange && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
           <div className="bg-white rounded-xl shadow-xl max-w-md w-full p-6">
-            <h2 className="text-lg font-bold text-gray-900 mb-2">Confirm downgrade</h2>
+            <h2 className="text-lg font-bold text-gray-900 mb-2">
+              {confirmChange.isUpgrade ? 'Confirm upgrade' : 'Confirm downgrade'}
+            </h2>
             <p className="text-sm text-gray-600 mb-4">
               You&apos;re switching from <strong>{PLAN_LIMITS[currentPlan].label}</strong> to{' '}
-              <strong>{PLAN_LIMITS[confirmDowngrade].label}</strong>. This takes effect immediately.
+              <strong>{PLAN_LIMITS[confirmChange.plan].label}</strong>. This takes effect immediately.
             </p>
             <p className="text-sm text-gray-600 mb-6">
-              Any unused time on your current plan will be credited and automatically deducted from your next invoice — you won&apos;t be charged twice.
+              {confirmChange.isUpgrade
+                ? 'You\'ll be charged the prorated difference for the remaining days in your current billing period.'
+                : 'Any unused time on your current plan will be credited and automatically deducted from your next invoice — you won\'t be charged twice.'}
             </p>
             <div className="flex gap-3">
               <button
-                onClick={() => setConfirmDowngrade(null)}
+                onClick={() => setConfirmChange(null)}
                 className="flex-1 px-4 py-2.5 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
               >
                 Cancel
               </button>
               <button
                 onClick={() => {
-                  const plan = confirmDowngrade;
-                  setConfirmDowngrade(null);
+                  const { plan } = confirmChange;
+                  setConfirmChange(null);
                   void executeSwitch(plan);
                 }}
-                disabled={loading === confirmDowngrade}
-                className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 text-sm font-semibold text-white bg-red-600 hover:bg-red-700 disabled:opacity-60 rounded-lg transition-colors"
+                disabled={loading === confirmChange.plan}
+                className={`flex-1 flex items-center justify-center gap-2 px-4 py-2.5 text-sm font-semibold text-white rounded-lg transition-colors disabled:opacity-60 ${
+                  confirmChange.isUpgrade ? 'bg-indigo-600 hover:bg-indigo-700' : 'bg-red-600 hover:bg-red-700'
+                }`}
               >
-                {loading === confirmDowngrade && (
+                {loading === confirmChange.plan && (
                   <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
                 )}
-                Confirm downgrade
+                {confirmChange.isUpgrade ? 'Confirm upgrade' : 'Confirm downgrade'}
               </button>
             </div>
           </div>

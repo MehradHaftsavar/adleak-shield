@@ -88,27 +88,22 @@ export async function POST(request: NextRequest) {
     const existingScheduleId = subscription.schedule as string | null | undefined;
 
     if (isUpgrade) {
-      // If there's a pending downgrade schedule, release it before upgrading.
+      // Release any pending downgrade schedule before upgrading.
       if (existingScheduleId) {
         await stripe.subscriptionSchedules.release(existingScheduleId);
       }
-      // Upgrade: send user to Stripe's hosted confirmation page so they see
-      // the prorated charge and explicitly confirm before anything is billed.
-      // The subscription_update_confirm flow pre-computes the proration and
-      // shows it to the user. On confirm, Stripe fires customer.subscription.updated
-      // and the webhook updates plan_type in the DB.
-      const portalSession = await stripe.billingPortal.sessions.create({
-        customer:   tenantRow.stripe_customer_id as string,
-        return_url: `${process.env.NEXT_PUBLIC_APP_URL}/settings/subscription?upgrade=success`,
-        flow_data:  {
-          type: 'subscription_update_confirm',
-          subscription_update_confirm: {
-            subscription: subscription.id,
-            items: [{ id: currentItemId, price: priceIdForPlan(plan as PlanType), quantity: 1 }],
-          },
-        },
+      // Direct upgrade — Stripe charges the prorated difference immediately.
+      await stripe.subscriptions.update(subscription.id, {
+        items: [{ id: currentItemId, price: priceIdForPlan(plan as PlanType), quantity: 1 }],
+        proration_behavior: 'create_prorations',
       });
-      return NextResponse.json({ url: portalSession.url });
+      await withAdminDb(async (req) => {
+        await req
+          .input('plan',     mssql.NVarChar(20),    plan)
+          .input('tenantId', mssql.UniqueIdentifier, tenantId)
+          .query(`UPDATE Tenants SET plan_type = @plan WHERE tenant_id = @tenantId`);
+      });
+      return NextResponse.json({ success: true, plan, immediateUpgrade: true });
     } else {
       // Downgrade: check the user isn't over the target plan's limits before scheduling.
       const limits = PLAN_LIMITS[plan as PlanType];
