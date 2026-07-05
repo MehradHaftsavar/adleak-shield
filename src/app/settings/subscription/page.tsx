@@ -141,7 +141,7 @@ export default function SubscriptionPage() {
     setIsError(false);
 
     // Active subscriber clicking a lower plan → show confirmation modal first
-    if (isSubscribed && subscriptionStatus !== 'trialing' && PLAN_ORDER[plan] < PLAN_ORDER[currentPlan]) {
+    if (isSubscribed && PLAN_ORDER[plan] < PLAN_ORDER[currentPlan]) {
       setConfirmDowngrade(plan);
       return;
     }
