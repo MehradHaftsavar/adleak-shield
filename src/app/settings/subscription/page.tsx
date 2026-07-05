@@ -89,6 +89,7 @@ export default function SubscriptionPage() {
   const [loading, setLoading] = useState<PlanType | null>(null);
   const [message, setMessage] = useState('');
   const [isError, setIsError] = useState(false);
+  const [confirmDowngrade, setConfirmDowngrade] = useState<PlanType | null>(null);
 
   // When Stripe redirects back after a confirmed upgrade, refresh the session
   // so the JWT picks up the new plan_type written by the webhook.
@@ -133,7 +134,22 @@ export default function SubscriptionPage() {
     if (status === 'authenticated' && session?.user?.tenantId) load();
   }, [status, session]);
 
-  async function handlePlanSelect(plan: PlanType) {
+  const PLAN_ORDER: Record<PlanType, number> = { starter: 0, freelancer: 1, agency: 2 };
+
+  function handlePlanSelect(plan: PlanType) {
+    setMessage('');
+    setIsError(false);
+
+    // Active subscriber clicking a lower plan → show confirmation modal first
+    if (isSubscribed && subscriptionStatus !== 'trialing' && PLAN_ORDER[plan] < PLAN_ORDER[currentPlan]) {
+      setConfirmDowngrade(plan);
+      return;
+    }
+
+    void executeSwitch(plan);
+  }
+
+  async function executeSwitch(plan: PlanType) {
     setLoading(plan);
     setMessage('');
     setIsError(false);
@@ -169,7 +185,7 @@ export default function SubscriptionPage() {
         return;
       }
 
-      // Active paid subscriber — try proration upgrade first
+      // Active paid subscriber — upgrade or downgrade
       const upgradeRes  = await fetch('/api/stripe/upgrade', {
         method:  'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -314,6 +330,44 @@ export default function SubscriptionPage() {
       <p className="text-xs text-gray-400 mt-6 text-center">
         All plan changes take effect immediately. A prorated credit for any unused time is applied to your next invoice.
       </p>
+
+      {/* Downgrade confirmation modal */}
+      {confirmDowngrade && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
+          <div className="bg-white rounded-xl shadow-xl max-w-md w-full p-6">
+            <h2 className="text-lg font-bold text-gray-900 mb-2">Confirm downgrade</h2>
+            <p className="text-sm text-gray-600 mb-4">
+              You&apos;re switching from <strong>{PLAN_LIMITS[currentPlan].label}</strong> to{' '}
+              <strong>{PLAN_LIMITS[confirmDowngrade].label}</strong>. This takes effect immediately.
+            </p>
+            <p className="text-sm text-gray-600 mb-6">
+              Any unused time on your current plan will be credited and automatically deducted from your next invoice — you won&apos;t be charged twice.
+            </p>
+            <div className="flex gap-3">
+              <button
+                onClick={() => setConfirmDowngrade(null)}
+                className="flex-1 px-4 py-2.5 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => {
+                  const plan = confirmDowngrade;
+                  setConfirmDowngrade(null);
+                  void executeSwitch(plan);
+                }}
+                disabled={loading === confirmDowngrade}
+                className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 text-sm font-semibold text-white bg-red-600 hover:bg-red-700 disabled:opacity-60 rounded-lg transition-colors"
+              >
+                {loading === confirmDowngrade && (
+                  <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                )}
+                Confirm downgrade
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

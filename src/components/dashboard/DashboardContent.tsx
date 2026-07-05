@@ -74,15 +74,17 @@ export function DashboardContent() {
   );
 
   // Once session is available, persist/restore the flag under the tenant-scoped key.
+  // Store a timestamp so the banner only shows within a 10-minute window after payment —
+  // prevents re-login on the same tab from re-showing the banner.
   const tenantId = session?.user?.tenantId as string | undefined;
   useEffect(() => {
     if (!tenantId) return;
     const key = `als_payment_success_${tenantId}`;
     if (searchParams.get('payment') === 'success') {
-      sessionStorage.setItem(key, 'true');
+      sessionStorage.setItem(key, String(Date.now()));
     } else if (!paymentSuccess) {
-      // Restore across router.replace (URL param gone but same tab/tenant)
-      if (sessionStorage.getItem(key) === 'true') setPaymentSuccess(true);
+      const ts = Number(sessionStorage.getItem(key) ?? 0);
+      if (ts && Date.now() - ts < 10 * 60 * 1000) setPaymentSuccess(true);
     }
   }, [tenantId]); // eslint-disable-line
   const [upgrading, setUpgrading] = useState(false);
