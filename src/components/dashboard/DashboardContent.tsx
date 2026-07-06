@@ -49,11 +49,13 @@ export function DashboardContent() {
   const router = useRouter();
   const { data: session, update: updateSession } = useSession();
 
-  // Derive the role for the currently active workspace
+  // Derive the role and ownership for the currently active workspace
+  const ownTenantId    = session?.user?.tenantId;
+  const activeTenantId = session?.user?.activeTenantId;
+  const isOwnerView    = !activeTenantId || activeTenantId === ownTenantId;
+
   const isViewer = (() => {
-    const ownTenantId = session?.user?.tenantId;
-    const activeTenantId = session?.user?.activeTenantId;
-    if (!activeTenantId || activeTenantId === ownTenantId) return false; // owner of own workspace
+    if (isOwnerView) return false;
     const all = session?.user?.allAccessibleDomains ?? [];
     const activeDomainId = session?.user?.activeDomainId;
     if (activeDomainId) {
@@ -235,8 +237,8 @@ export function DashboardContent() {
         </div>
       )}
 
-      {/* Trial expiring soon banner (≤3 days left, not yet paywalled) */}
-      {!status.isPaywalled && status.daysLeftInTrial !== null && status.daysLeftInTrial <= 3 && status.subscriptionStatus !== 'active' && (
+      {/* Trial expiring soon banner — owner only, not yet paywalled */}
+      {isOwnerView && !status.isPaywalled && status.daysLeftInTrial !== null && status.daysLeftInTrial <= 3 && status.subscriptionStatus !== 'active' && (
         <div className="bg-amber-50 border border-amber-200 rounded-lg px-4 py-2 text-center">
           <p className="text-sm text-amber-800">
             Your free trial ends in{' '}
@@ -253,18 +255,20 @@ export function DashboardContent() {
         </div>
       )}
 
-      {/* Trial expired banner */}
-      {status.isPaywalled && (
+      {/* Paywalled top banner — owner only */}
+      {isOwnerView && status.isPaywalled && (
         <div className="bg-red-50 border border-red-200 rounded-lg px-4 py-3 text-center">
           <p className="text-sm text-red-800">
-            Your free trial has ended. Your data is safe —{' '}
+            {status.subscriptionStatus === 'canceled'
+              ? 'Your subscription has ended. Your data is preserved for 90 days — '
+              : 'Your free trial has ended. Your data is safe — '}
             <button
               onClick={handleUpgrade}
               disabled={upgrading}
               className="inline-flex items-center gap-1 font-semibold underline underline-offset-2 hover:text-red-900 disabled:opacity-60"
             >
               {upgrading && <span className="inline-block w-3 h-3 border-2 border-red-800 border-t-transparent rounded-full animate-spin" />}
-              subscribe for £{planPrice}/mo to unlock your dashboard →
+              {status.subscriptionStatus === 'canceled' ? 'resubscribe to unlock →' : `subscribe for £${planPrice}/mo to unlock your dashboard →`}
             </button>
           </p>
         </div>
@@ -348,7 +352,12 @@ export function DashboardContent() {
       {/* Leak Table + Visitor Journeys — single paywall wraps both */}
       <div className="relative space-y-6">
         {status.isPaywalled && (
-          <PaywallOverlay onUpgrade={handleUpgrade} priceGbp={planPrice} />
+          <PaywallOverlay
+            onUpgrade={handleUpgrade}
+            priceGbp={planPrice}
+            reason={status.subscriptionStatus === 'canceled' ? 'canceled' : 'trial_ended'}
+            isOwnerView={isOwnerView}
+          />
         )}
 
         <div className={status.isPaywalled ? 'select-none pointer-events-none' : ''}>
