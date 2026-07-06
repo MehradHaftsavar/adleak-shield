@@ -93,6 +93,7 @@ app.timer("janitor", {
             subscription_cancelled_at,
             data_deletion_warned_at
           FROM Tenants
+          WHERE deleted_at IS NULL
         `);
         return r.recordset as TenantRow[];
       });
