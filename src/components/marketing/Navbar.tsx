@@ -53,7 +53,7 @@ export function Navbar() {
             Log in
           </Link>
           <Link
-            href="/auth/signup"
+            href="/pricing"
             className="text-sm font-semibold bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg transition-colors"
           >
             Start free trial
@@ -91,7 +91,7 @@ export function Navbar() {
               Log in
             </Link>
             <Link
-              href="/auth/signup"
+              href="/pricing"
               className="text-sm font-semibold bg-blue-600 text-white px-4 py-2 rounded-lg text-center"
             >
               Start free trial

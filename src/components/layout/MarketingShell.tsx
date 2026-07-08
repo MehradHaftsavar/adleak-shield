@@ -70,7 +70,7 @@ function MarketingNav() {
             Log in
           </Link>
           <Link
-            href="/auth/signup"
+            href="/pricing"
             className="text-sm font-semibold bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg transition-colors"
           >
             Start free trial
@@ -107,7 +107,7 @@ function MarketingNav() {
               Log in
             </Link>
             <Link
-              href="/auth/signup"
+              href="/pricing"
               className="text-sm font-semibold bg-blue-600 text-white px-4 py-2 rounded-lg text-center"
             >
               Start free trial
@@ -139,7 +139,7 @@ function MarketingFooter() {
         <div className="flex items-center gap-4 text-sm">
           <Link href="/auth/login" className="hover:text-white transition-colors">Log in</Link>
           <Link
-            href="/auth/signup"
+            href="/pricing"
             className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-1.5 rounded-lg transition-colors font-medium"
           >
             Get started

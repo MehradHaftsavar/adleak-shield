@@ -76,6 +76,7 @@ async function loadAccessibleDomains(
 }
 
 export const authConfig: NextAuthConfig = {
+  trustHost: true,
   pages: {
     signIn: "/auth/login",
     error: "/auth/login",

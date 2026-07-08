@@ -12,10 +12,6 @@ export async function PATCH(
     if (!session?.user?.tenantId) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
-    if (!session.user.isOwner) {
-      return NextResponse.json({ error: 'Only owners can edit member access' }, { status: 403 });
-    }
-
     const tenantId  = session.user.tenantId as string;
     const { memberId } = params;
     const body      = await request.json();
