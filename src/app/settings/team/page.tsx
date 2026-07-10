@@ -48,10 +48,13 @@ export default function TeamPage() {
 
   // Inline edit state for active members
   const [editingId,       setEditingId]       = useState<string | null>(null);
+  const [editEmail,       setEditEmail]       = useState('');
   const [editRole,        setEditRole]        = useState<'editor' | 'visitor'>('editor');
   const [editDomainIds,   setEditDomainIds]   = useState<string[]>([]);
   const [editSaving,      setEditSaving]      = useState(false);
   const [editError,       setEditError]       = useState('');
+
+  const [sessionHint, setSessionHint] = useState<string | null>(null);
 
   // Owner's domains (for invite domain picker)
   const [ownerDomains, setOwnerDomains] = useState<{ domainId: string; domainName: string }[]>([]);
@@ -103,6 +106,7 @@ export default function TeamPage() {
         return;
       }
       setInviteMsg(`Invitation sent to ${inviteEmail}`);
+      setSessionHint(`${inviteEmail} will see your workspace immediately after accepting. If they're already logged in and don't see it, they'll need to log out and back in.`);
       setInviteEmail('');
       loadTeam();
     } catch {
@@ -156,6 +160,7 @@ export default function TeamPage() {
 
   function startEditing(m: Member) {
     setEditingId(m.memberId);
+    setEditEmail(m.email);
     setEditRole(m.role as 'editor' | 'visitor');
     setEditDomainIds(m.domainIds);
     setEditError('');
@@ -176,6 +181,7 @@ export default function TeamPage() {
         return;
       }
       setEditingId(null);
+      setSessionHint(`Access updated for ${editEmail}. Changes take effect the next time they log in, or automatically within 10 minutes if they're already logged in.`);
       loadTeam();
     } catch {
       setEditError('Network error. Please try again.');
@@ -226,6 +232,13 @@ export default function TeamPage() {
         <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg flex items-center justify-between">
           <p className="text-sm text-red-700">{actionError}</p>
           <button onClick={() => setActionError('')} className="text-red-400 hover:text-red-600 ml-4 text-xs">Dismiss</button>
+        </div>
+      )}
+
+      {sessionHint && (
+        <div className="mb-6 p-4 bg-amber-50 border border-amber-200 rounded-lg flex items-start justify-between gap-4">
+          <p className="text-sm text-amber-800">{sessionHint}</p>
+          <button onClick={() => setSessionHint(null)} className="flex-shrink-0 text-amber-400 hover:text-amber-600 text-xs">Dismiss</button>
         </div>
       )}
 

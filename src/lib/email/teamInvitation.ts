@@ -72,6 +72,10 @@ export function buildTeamInvitationEmail(opts: TeamInvitationEmailOptions): {
 
               <hr style="border:none;border-top:1px solid #e5e7eb;margin:0 0 24px;" />
 
+              <p style="margin:0 0 16px;font-size:13px;color:#6b7280;line-height:1.6;">
+                Already have an AdLeak Shield account? After accepting, the workspace will appear automatically. If you don't see it straight away, log out and back in.
+              </p>
+
               <p style="margin:0;font-size:13px;color:#9ca3af;line-height:1.6;">
                 This invitation expires in ${expiresInDays} days. If you weren't expecting this email
                 you can safely ignore it — no account will be created.

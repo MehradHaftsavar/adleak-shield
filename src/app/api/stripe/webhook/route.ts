@@ -121,7 +121,9 @@ export async function POST(request: NextRequest) {
           paused: 'canceled',
         };
 
-        const mappedStatus = statusMap[subscription.status] ?? 'canceled';
+        // cancel_at_period_end means the user chose to cancel — treat as canceled immediately
+        const effectiveStatus = subscription.cancel_at_period_end ? 'canceled' : subscription.status;
+        const mappedStatus = statusMap[effectiveStatus] ?? 'canceled';
         const isCanceled   = mappedStatus === 'canceled';
         const isActive     = mappedStatus === 'active';
 
