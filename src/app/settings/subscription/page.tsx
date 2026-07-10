@@ -227,7 +227,25 @@ export default function SubscriptionPage() {
     try {
       const res  = await fetch('/api/stripe/portal', { method: 'POST' });
       const data = await res.json();
-      if (data.url) window.open(data.url, '_blank', 'noopener,noreferrer');
+      if (data.url) {
+        window.open(data.url, '_blank', 'noopener,noreferrer');
+
+        // When the user closes the portal tab and returns here, sync the
+        // subscription status from the DB so the page reflects any cancellation
+        // or payment method change without requiring a logout.
+        const syncOnReturn = async () => {
+          if (document.visibilityState !== 'visible') return;
+          document.removeEventListener('visibilitychange', syncOnReturn);
+          try {
+            const syncRes  = await fetch('/api/stripe/sync-plan', { method: 'POST' });
+            const syncData = syncRes.ok ? await syncRes.json() : null;
+            if (syncData?.subscriptionStatus) {
+              await update({ planType: syncData.plan, subscriptionStatus: syncData.subscriptionStatus });
+            }
+          } catch { /* non-fatal */ }
+        };
+        document.addEventListener('visibilitychange', syncOnReturn);
+      }
     } catch { /* non-fatal */ }
   }
 
