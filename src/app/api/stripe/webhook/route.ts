@@ -144,7 +144,8 @@ export async function POST(request: NextRequest) {
             status:   'active',
             limit:    1,
           });
-          const other = otherActive.data.find(s => s.id !== subscription.id);
+          // Exclude cancel_at_period_end subs — they are effectively canceled too
+          const other = otherActive.data.find(s => s.id !== subscription.id && !s.cancel_at_period_end);
           if (other) {
             const otherPriceId = other.items.data[0]?.price?.id ?? '';
             const otherPlan    = getPlanFromPriceId(otherPriceId);
@@ -219,7 +220,8 @@ export async function POST(request: NextRequest) {
           status:   'active',
           limit:    1,
         });
-        const otherActive = otherActiveSubs.data.find(s => s.id !== subscription.id);
+        // Exclude cancel_at_period_end subs — they are effectively canceled too
+        const otherActive = otherActiveSubs.data.find(s => s.id !== subscription.id && !s.cancel_at_period_end);
         if (otherActive) {
           const otherPriceId = otherActive.items.data[0]?.price?.id ?? '';
           const otherPlan    = getPlanFromPriceId(otherPriceId);

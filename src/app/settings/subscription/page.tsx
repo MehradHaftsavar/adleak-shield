@@ -273,9 +273,9 @@ export default function SubscriptionPage() {
           const trySync = async (): Promise<string | null> => {
             try {
               const syncRes  = await fetch('/api/stripe/sync-plan', { method: 'POST' });
-              const syncData = syncRes.ok ? await syncRes.json() : null;
+              const syncData = await syncRes.json();
               if (syncData?.subscriptionStatus) {
-                await update({ planType: syncData.plan, subscriptionStatus: syncData.subscriptionStatus });
+                await update({ planType: syncData.plan ?? undefined, subscriptionStatus: syncData.subscriptionStatus });
                 return syncData.subscriptionStatus as string;
               }
             } catch { /* non-fatal */ }

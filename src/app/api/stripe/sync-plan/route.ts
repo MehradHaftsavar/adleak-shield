@@ -34,9 +34,21 @@ export async function POST() {
       limit: 1,
     });
 
-    const sub = subscriptions.data[0];
+    // Exclude cancel_at_period_end subs — treated as canceled same as webhook logic
+    const sub = subscriptions.data.find(s => !s.cancel_at_period_end) ?? null;
     if (!sub) {
-      return NextResponse.json({ error: 'No active subscription' }, { status: 400 });
+      // No truly active subscription — ensure DB reflects canceled state
+      await withAdminDb(async (req) => {
+        await req
+          .input('tenantId', mssql.UniqueIdentifier, tenantId)
+          .query(`
+            UPDATE Tenants
+            SET subscription_status       = 'canceled',
+                subscription_cancelled_at = ISNULL(subscription_cancelled_at, GETUTCDATE())
+            WHERE tenant_id = @tenantId
+          `);
+      });
+      return NextResponse.json({ subscriptionStatus: 'canceled', plan: null });
     }
 
     const priceId = sub.items.data[0]?.price?.id;
