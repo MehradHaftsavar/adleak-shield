@@ -68,9 +68,9 @@ export async function POST(request: NextRequest) {
       // Allows business customers to enter their VAT number — enables EU reverse charge
       // (B2B sales become zero-rated so no VAT is charged to registered businesses).
       tax_id_collection: { enabled: true },
-      // Required when tax_id_collection is enabled for an existing customer — allows
-      // Stripe to update the customer's name from the checkout form.
-      customer_update: { name: 'auto' },
+      // customer_update is only valid when passing an existing customer ID.
+      // New customers (customer_email path) do not support this param.
+      ...(tenantRow.stripe_customer_id ? { customer_update: { name: 'auto' } } : {}),
       consent_collection: { terms_of_service: 'required' },
       custom_text: {
         terms_of_service_acceptance: {
