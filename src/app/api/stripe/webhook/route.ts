@@ -179,6 +179,48 @@ export async function POST(request: NextRequest) {
         const subscription = event.data.object as Stripe.Subscription;
         const customerId = subscription.customer as string;
 
+        // Issue a prorated refund for unused time in the billing period.
+        // Only applies when cancelled immediately (canceledAt < periodEnd).
+        try {
+          const canceledAt    = subscription.canceled_at ?? Math.floor(Date.now() / 1000);
+          const periodStart   = subscription.current_period_start;
+          const periodEnd     = subscription.current_period_end;
+          const totalSeconds  = periodEnd - periodStart;
+          const unusedSeconds = periodEnd - canceledAt;
+
+          if (unusedSeconds > 0 && totalSeconds > 0) {
+            const invoiceId = typeof subscription.latest_invoice === 'string'
+              ? subscription.latest_invoice
+              : (subscription.latest_invoice as Stripe.Invoice | null)?.id;
+
+            if (invoiceId) {
+              const invoice = await stripe.invoices.retrieve(invoiceId, { expand: ['charge'] });
+              const charge  = invoice.charge as Stripe.Charge | null;
+
+              if (charge?.paid) {
+                const alreadyRefunded = charge.amount_refunded ?? 0;
+                const available       = charge.amount_captured - alreadyRefunded;
+                const refundAmount    = Math.min(
+                  Math.floor((unusedSeconds / totalSeconds) * charge.amount_captured),
+                  available,
+                );
+
+                if (refundAmount > 0) {
+                  await stripe.refunds.create({
+                    charge: charge.id,
+                    amount: refundAmount,
+                    reason: 'requested_by_customer',
+                  });
+                  console.log(`[stripe/webhook] Refunded ${refundAmount} pence to ${customerId} for unused subscription time`);
+                }
+              }
+            }
+          }
+        } catch (refundErr) {
+          // Log but don't fail the webhook — DB update must still proceed
+          console.error(`[stripe/webhook] Failed to issue cancellation refund for ${customerId}:`, refundErr);
+        }
+
         // Stamp cancellation timestamp (ISNULL = only set if not already set,
         // in case customer.subscription.updated fired first).
         // Clear data_deletion_warned_at so a fresh warning goes out in 85 days.
