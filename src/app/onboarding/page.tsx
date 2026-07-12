@@ -6,7 +6,6 @@ import { useSession } from 'next-auth/react';
 import { DomainStep } from '@/components/onboarding/DomainStep';
 import { CampaignStep } from '@/components/onboarding/CampaignStep';
 import { SnippetStep } from '@/components/onboarding/SnippetStep';
-
 export default function OnboardingPage() {
   const router = useRouter();
   const { update, status } = useSession();
@@ -22,6 +21,7 @@ export default function OnboardingPage() {
       router.push('/auth/login?callbackUrl=%2Fonboarding');
     }
   }, [status, router]);
+
 
   // Check if user already completed onboarding
   useEffect(() => {
@@ -146,6 +146,7 @@ export default function OnboardingPage() {
         </div>
       )}
       <div className="container mx-auto px-4 py-12">
+
         {/* Progress indicator */}
         <div className="max-w-3xl mx-auto mb-8">
           <div className="relative flex items-center justify-between">
@@ -203,6 +204,19 @@ export default function OnboardingPage() {
               onComplete={handleOnboardingComplete}
               onBack={() => setCurrentStep(2)}
             />
+          )}
+
+          {/* Skip — visible on steps 1 and 2 only (step 3 has its own complete button) */}
+          {currentStep !== 3 && (
+            <p className="mt-6 text-center text-sm text-gray-400">
+              Joining a team workspace?{' '}
+              <button
+                onClick={handleOnboardingComplete}
+                className="underline hover:text-gray-600 transition-colors"
+              >
+                Skip setup for now
+              </button>
+            </p>
           )}
         </div>
       </div>
