@@ -203,7 +203,7 @@ export default function SubscriptionPage() {
         });
         const data = await res.json();
         if (data.url) window.location.href = data.url;
-        else setMessage(data.error || 'Something went wrong. Please try again.');
+        else { setIsError(true); setMessage(data.error || 'Something went wrong. Please try again.'); }
         return;
       }
 
@@ -263,13 +263,27 @@ export default function SubscriptionPage() {
         const syncOnReturn = async () => {
           if (document.visibilityState !== 'visible') return;
           document.removeEventListener('visibilitychange', syncOnReturn);
-          try {
-            const syncRes  = await fetch('/api/stripe/sync-plan', { method: 'POST' });
-            const syncData = syncRes.ok ? await syncRes.json() : null;
-            if (syncData?.subscriptionStatus) {
-              await update({ planType: syncData.plan, subscriptionStatus: syncData.subscriptionStatus });
-            }
-          } catch { /* non-fatal */ }
+
+          const trySync = async (): Promise<string | null> => {
+            try {
+              const syncRes  = await fetch('/api/stripe/sync-plan', { method: 'POST' });
+              const syncData = syncRes.ok ? await syncRes.json() : null;
+              if (syncData?.subscriptionStatus) {
+                await update({ planType: syncData.plan, subscriptionStatus: syncData.subscriptionStatus });
+                return syncData.subscriptionStatus as string;
+              }
+            } catch { /* non-fatal */ }
+            return null;
+          };
+
+          // Wait 2s for the Stripe webhook to be processed before reading the DB.
+          // If the status is still active after the first attempt, retry once more after 3s.
+          await new Promise(r => setTimeout(r, 2000));
+          const status = await trySync();
+          if (status === 'active') {
+            await new Promise(r => setTimeout(r, 3000));
+            await trySync();
+          }
         };
         document.addEventListener('visibilitychange', syncOnReturn);
       }
