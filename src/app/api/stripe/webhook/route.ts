@@ -134,6 +134,39 @@ export async function POST(request: NextRequest) {
           console.warn('[stripe/webhook] subscription.updated: no price ID on subscription items');
         }
 
+        // If this subscription is being cancelled, check whether the customer has
+        // another active subscription before downgrading the DB. This prevents a
+        // stale cancel event for an old subscription from overwriting a newly
+        // created active subscription.
+        if (isCanceled) {
+          const otherActive = await stripe.subscriptions.list({
+            customer: customerId,
+            status:   'active',
+            limit:    1,
+          });
+          const other = otherActive.data.find(s => s.id !== subscription.id);
+          if (other) {
+            const otherPriceId = other.items.data[0]?.price?.id ?? '';
+            const otherPlan    = getPlanFromPriceId(otherPriceId);
+            await withAdminDb(async (req) => {
+              await req
+                .input('customerId', mssql.NVarChar(50), customerId)
+                .input('planType',   mssql.NVarChar(20), otherPlan)
+                .query(`
+                  UPDATE Tenants
+                  SET subscription_status       = 'active',
+                      plan_type                 = @planType,
+                      subscription_cancelled_at = NULL,
+                      data_deletion_warned_at   = NULL
+                  WHERE stripe_customer_id = @customerId
+                    AND deleted_at IS NULL
+                `);
+            });
+            console.log(`[stripe/webhook] Cancel event for ${customerId} ignored — another active sub exists (plan=${otherPlan})`);
+            break;
+          }
+        }
+
         await withAdminDb(async (req) => {
           req
             .input('customerId', mssql.NVarChar(50), customerId)
@@ -144,7 +177,6 @@ export async function POST(request: NextRequest) {
             await req.query(`
               UPDATE Tenants
               SET subscription_status        = @status,
-                  plan_type                  = 'starter',
                   subscription_cancelled_at  = ISNULL(subscription_cancelled_at, GETUTCDATE()),
                   data_deletion_warned_at    = NULL
               WHERE stripe_customer_id = @customerId
@@ -178,6 +210,36 @@ export async function POST(request: NextRequest) {
       case 'customer.subscription.deleted': {
         const subscription = event.data.object as Stripe.Subscription;
         const customerId = subscription.customer as string;
+
+        // If the customer has another active subscription, don't mark them as canceled.
+        // This prevents a delete event for an old subscription from overwriting a newly
+        // created active subscription.
+        const otherActiveSubs = await stripe.subscriptions.list({
+          customer: customerId,
+          status:   'active',
+          limit:    1,
+        });
+        const otherActive = otherActiveSubs.data.find(s => s.id !== subscription.id);
+        if (otherActive) {
+          const otherPriceId = otherActive.items.data[0]?.price?.id ?? '';
+          const otherPlan    = getPlanFromPriceId(otherPriceId);
+          await withAdminDb(async (req) => {
+            await req
+              .input('customerId', mssql.NVarChar(50), customerId)
+              .input('planType',   mssql.NVarChar(20), otherPlan)
+              .query(`
+                UPDATE Tenants
+                SET subscription_status       = 'active',
+                    plan_type                 = @planType,
+                    subscription_cancelled_at = NULL,
+                    data_deletion_warned_at   = NULL
+                WHERE stripe_customer_id = @customerId
+                  AND deleted_at IS NULL
+              `);
+          });
+          console.log(`[stripe/webhook] Delete event for ${customerId} ignored — another active sub exists (plan=${otherPlan})`);
+          break;
+        }
 
         // Issue a prorated refund for unused time in the billing period.
         // Only applies when cancelled immediately (canceledAt < periodEnd).

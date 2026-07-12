@@ -89,7 +89,7 @@ export default function SubscriptionPage() {
   const [loading, setLoading] = useState<PlanType | null>(null);
   const [message, setMessage] = useState('');
   const [isError, setIsError] = useState(false);
-  const [confirmChange, setConfirmChange] = useState<{ plan: PlanType; isUpgrade: boolean; trialing?: boolean } | null>(null);
+  const [confirmChange, setConfirmChange] = useState<{ plan: PlanType; isUpgrade: boolean; trialing?: boolean; resubscribing?: boolean } | null>(null);
 
   // When Stripe redirects back after a confirmed upgrade, sync plan immediately
   useEffect(() => {
@@ -144,6 +144,12 @@ export default function SubscriptionPage() {
     // Trialing user changing plan → show confirmation modal
     if (subscriptionStatus === 'trialing') {
       setConfirmChange({ plan, isUpgrade: PLAN_ORDER[plan] > PLAN_ORDER[currentPlan], trialing: true });
+      return;
+    }
+
+    // Canceled / no subscription → confirm before routing to Stripe checkout
+    if (!isSubscribed) {
+      setConfirmChange({ plan, isUpgrade: true, resubscribing: true });
       return;
     }
 
@@ -356,7 +362,7 @@ export default function SubscriptionPage() {
         <div className="mb-8 p-5 bg-white border border-gray-200 rounded-xl">
           <h2 className="text-sm font-semibold text-gray-900 mb-1">Manage billing or cancel</h2>
           <p className="text-sm text-gray-500 mb-4">
-            Update your payment method, download invoices, or cancel your subscription via the Stripe billing portal. Cancellations take effect at the end of your current billing period — you keep full access until then.
+            Update your payment method, download invoices, or cancel your subscription via the Stripe billing portal. Cancellations take effect immediately and any unused time is refunded to your original payment method.
           </p>
           <button
             onClick={handleManagePortal}
@@ -390,10 +396,15 @@ export default function SubscriptionPage() {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
           <div className="bg-white rounded-xl shadow-xl max-w-md w-full p-6">
             <h2 className="text-lg font-bold text-gray-900 mb-2">
-              {confirmChange.trialing ? 'Confirm plan change' : confirmChange.isUpgrade ? 'Confirm upgrade' : 'Confirm downgrade'}
+              {confirmChange.resubscribing ? 'Confirm subscription' : confirmChange.trialing ? 'Confirm plan change' : confirmChange.isUpgrade ? 'Confirm upgrade' : 'Confirm downgrade'}
             </h2>
             <p className="text-sm text-gray-600 mb-4">
-              {confirmChange.trialing ? (
+              {confirmChange.resubscribing ? (
+                <>
+                  You&apos;re subscribing to <strong>{PLAN_LIMITS[confirmChange.plan].label}</strong> at{' '}
+                  <strong>£{PLAN_LIMITS[confirmChange.plan].priceGbp.toFixed(2)}/month</strong>.
+                </>
+              ) : confirmChange.trialing ? (
                 <>
                   You&apos;re switching to <strong>{PLAN_LIMITS[confirmChange.plan].label}</strong> at{' '}
                   <strong>£{PLAN_LIMITS[confirmChange.plan].priceGbp.toFixed(2)}/month</strong>.
@@ -406,11 +417,13 @@ export default function SubscriptionPage() {
               )}
             </p>
             <p className="text-sm text-gray-600 mb-6">
-              {confirmChange.trialing
-                ? 'You won\'t be charged until your trial ends. If your trial has already expired, you\'ll be taken to Stripe to complete payment.'
-                : confirmChange.isUpgrade
-                  ? 'You\'ll be charged the prorated difference for the remaining days in your current billing period.'
-                  : 'Any unused time on your current plan will be credited and automatically deducted from your next invoice — you won\'t be charged twice.'}
+              {confirmChange.resubscribing
+                ? 'You\'ll be taken to Stripe to complete payment. Make sure you\'ve selected the right plan before continuing.'
+                : confirmChange.trialing
+                  ? 'You won\'t be charged until your trial ends. If your trial has already expired, you\'ll be taken to Stripe to complete payment.'
+                  : confirmChange.isUpgrade
+                    ? 'You\'ll be charged the prorated difference for the remaining days in your current billing period.'
+                    : 'Any unused time on your current plan will be credited and automatically deducted from your next invoice — you won\'t be charged twice.'}
             </p>
             <div className="flex gap-3">
               <button
@@ -427,13 +440,13 @@ export default function SubscriptionPage() {
                 }}
                 disabled={loading === confirmChange.plan}
                 className={`flex-1 flex items-center justify-center gap-2 px-4 py-2.5 text-sm font-semibold text-white rounded-lg transition-colors disabled:opacity-60 ${
-                  confirmChange.trialing || confirmChange.isUpgrade ? 'bg-indigo-600 hover:bg-indigo-700' : 'bg-red-600 hover:bg-red-700'
+                  confirmChange.resubscribing || confirmChange.trialing || confirmChange.isUpgrade ? 'bg-indigo-600 hover:bg-indigo-700' : 'bg-red-600 hover:bg-red-700'
                 }`}
               >
                 {loading === confirmChange.plan && (
                   <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
                 )}
-                {confirmChange.trialing ? 'Confirm' : confirmChange.isUpgrade ? 'Confirm upgrade' : 'Confirm downgrade'}
+                {confirmChange.resubscribing ? 'Continue to Stripe' : confirmChange.trialing ? 'Confirm' : confirmChange.isUpgrade ? 'Confirm upgrade' : 'Confirm downgrade'}
               </button>
             </div>
           </div>
