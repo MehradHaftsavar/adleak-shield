@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@/lib/auth';
 import { stripe } from '@/lib/stripe';
 import { withAdminDb } from '@/lib/db/client';
+import { checkUsageAgainstPlan } from '@/lib/checkPlanUsage';
 import * as mssql from 'mssql';
 import type { PlanType } from '@/types/auth';
 
@@ -43,6 +44,12 @@ export async function POST(request: NextRequest) {
 
     if (!tenantRow) {
       return NextResponse.json({ error: 'Tenant not found' }, { status: 404 });
+    }
+
+    // Limit check: block resubscription to a plan the user's current usage exceeds
+    const limitCheck = await checkUsageAgainstPlan(tenantId, plan);
+    if (!limitCheck.ok) {
+      return NextResponse.json({ error: limitCheck.error }, { status: 400 });
     }
 
     const customerParam = tenantRow.stripe_customer_id

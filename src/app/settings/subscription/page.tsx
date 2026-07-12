@@ -151,19 +151,39 @@ export default function SubscriptionPage() {
 
     try {
       if (subscriptionStatus === 'trialing') {
-        // Trialing: update plan_type in DB only — no charge until trial ends
         const res  = await fetch('/api/user/plan', {
           method:  'POST',
           headers: { 'Content-Type': 'application/json' },
           body:    JSON.stringify({ plan }),
         });
         const data = await res.json();
-        if (res.ok && data.success) {
-          await update({ planType: plan });
-          setMessage(`Plan updated to ${PLAN_LIMITS[plan].label}. You'll be billed this amount when your trial ends.`);
-        } else {
+
+        if (!res.ok) {
+          setIsError(true);
           setMessage(data.error || 'Something went wrong. Please try again.');
+          return;
         }
+
+        // Returning subscriber with admin-extended trial — needs a new Stripe subscription
+        if (data.redirect === 'checkout') {
+          const checkoutRes  = await fetch('/api/stripe/checkout', {
+            method:  'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body:    JSON.stringify({ plan }),
+          });
+          const checkoutData = await checkoutRes.json();
+          if (checkoutData.url) {
+            window.location.href = checkoutData.url;
+          } else {
+            setIsError(true);
+            setMessage(checkoutData.error || 'Something went wrong. Please try again.');
+          }
+          return;
+        }
+
+        // Genuine trial user — plan preference saved, billed at trial end
+        await update({ planType: plan });
+        setMessage(`Plan updated to ${PLAN_LIMITS[plan].label}. You'll be billed this amount when your trial ends.`);
         return;
       }
 
