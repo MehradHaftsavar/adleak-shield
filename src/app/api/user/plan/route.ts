@@ -28,7 +28,7 @@ export async function POST(request: NextRequest) {
     const tenantRow = await withAdminDb(async (req) => {
       const r = await req
         .input('tenantId', mssql.UniqueIdentifier, tenantId)
-        .query(`SELECT subscription_status, stripe_customer_id FROM Tenants WHERE tenant_id = @tenantId`);
+        .query(`SELECT subscription_status, stripe_customer_id, trial_ends_at FROM Tenants WHERE tenant_id = @tenantId`);
       return r.recordset[0] ?? null;
     });
 
@@ -51,12 +51,17 @@ export async function POST(request: NextRequest) {
 
     // Returning subscriber (has had a paid sub before) — must create a new subscription
     // through Stripe Checkout rather than just updating the DB preference.
-    if (tenantRow.stripe_customer_id) {
+    // Also redirect expired-trial users: their trial has ended so they need to pay now.
+    const trialExpired =
+      tenantRow.trial_ends_at != null &&
+      new Date(tenantRow.trial_ends_at) < new Date();
+
+    if (tenantRow.stripe_customer_id || trialExpired) {
       return NextResponse.json({ redirect: 'checkout' });
     }
 
-    // Genuine trial user (never subscribed) — update plan preference in DB.
-    // Payment starts at trial end via Stripe.
+    // Genuine active trial user (never subscribed, trial still running) —
+    // update plan preference in DB. Payment starts at trial end via Stripe.
     await withAdminDb(async (req) => {
       await req
         .input('plan',     mssql.NVarChar(20),    plan)
