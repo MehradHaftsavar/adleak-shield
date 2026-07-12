@@ -37,18 +37,31 @@ export async function POST() {
     // Exclude cancel_at_period_end subs — treated as canceled same as webhook logic
     const sub = subscriptions.data.find(s => !s.cancel_at_period_end) ?? null;
     if (!sub) {
-      // No truly active subscription — ensure DB reflects canceled state
-      await withAdminDb(async (req) => {
-        await req
+      // No truly active Stripe subscription — check current DB status before writing anything.
+      // Only correct to 'canceled' if DB currently says 'active' (stale state).
+      // Never touch trialing users — they have no Stripe sub by design.
+      const currentRow = await withAdminDb(async (req) => {
+        const r = await req
           .input('tenantId', mssql.UniqueIdentifier, tenantId)
-          .query(`
-            UPDATE Tenants
-            SET subscription_status       = 'canceled',
-                subscription_cancelled_at = ISNULL(subscription_cancelled_at, GETUTCDATE())
-            WHERE tenant_id = @tenantId
-          `);
+          .query(`SELECT subscription_status FROM Tenants WHERE tenant_id = @tenantId`);
+        return r.recordset[0] ?? null;
       });
-      return NextResponse.json({ subscriptionStatus: 'canceled', plan: null });
+      const currentStatus = currentRow?.subscription_status ?? null;
+
+      if (currentStatus === 'active') {
+        await withAdminDb(async (req) => {
+          await req
+            .input('tenantId', mssql.UniqueIdentifier, tenantId)
+            .query(`
+              UPDATE Tenants
+              SET subscription_status       = 'canceled',
+                  subscription_cancelled_at = ISNULL(subscription_cancelled_at, GETUTCDATE())
+              WHERE tenant_id = @tenantId
+            `);
+        });
+      }
+
+      return NextResponse.json({ subscriptionStatus: currentStatus === 'active' ? 'canceled' : currentStatus, plan: null });
     }
 
     const priceId = sub.items.data[0]?.price?.id;
