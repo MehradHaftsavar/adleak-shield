@@ -91,6 +91,13 @@ export default function SubscriptionPage() {
   const [isError, setIsError] = useState(false);
   const [confirmChange, setConfirmChange] = useState<{ plan: PlanType; isUpgrade: boolean; trialing?: boolean; resubscribing?: boolean } | null>(null);
 
+  // Always refresh subscription status from DB on page load.
+  // Calling update() with no args triggers a DB round-trip in the JWT callback
+  // and re-reads subscription_status + plan_type, so the page is never stale.
+  useEffect(() => {
+    if (status === 'authenticated') void update();
+  }, [status]); // eslint-disable-line
+
   // When Stripe redirects back after a confirmed upgrade, sync plan immediately
   useEffect(() => {
     if (searchParams.get('upgrade') === 'success') {
@@ -269,27 +276,10 @@ export default function SubscriptionPage() {
         const syncOnReturn = async () => {
           if (document.visibilityState !== 'visible') return;
           document.removeEventListener('visibilitychange', syncOnReturn);
-
-          const trySync = async (): Promise<string | null> => {
-            try {
-              const syncRes  = await fetch('/api/stripe/sync-plan', { method: 'POST' });
-              const syncData = await syncRes.json();
-              if (syncData?.subscriptionStatus) {
-                await update({ planType: syncData.plan ?? undefined, subscriptionStatus: syncData.subscriptionStatus });
-                return syncData.subscriptionStatus as string;
-              }
-            } catch { /* non-fatal */ }
-            return null;
-          };
-
-          // Wait 2s for the Stripe webhook to be processed before reading the DB.
-          // If the status is still active after the first attempt, retry once more after 3s.
-          await new Promise(r => setTimeout(r, 2000));
-          const status = await trySync();
-          if (status === 'active') {
-            await new Promise(r => setTimeout(r, 3000));
-            await trySync();
-          }
+          // Wait for Stripe webhook to process, then refresh session from DB.
+          // update() with no args triggers a DB round-trip in the JWT callback.
+          await new Promise(r => setTimeout(r, 2500));
+          await update();
         };
         document.addEventListener('visibilitychange', syncOnReturn);
       }
@@ -325,6 +315,15 @@ export default function SubscriptionPage() {
         <div className="mb-6 p-4 bg-green-50 border border-green-200 rounded-lg">
           <p className="text-sm text-green-800 font-medium">
             Active subscription — {PLAN_LIMITS[currentPlan].label}
+          </p>
+        </div>
+      )}
+
+      {!isSubscribed && subscriptionStatus === 'canceled' && (
+        <div className="mb-6 p-4 bg-amber-50 border border-amber-200 rounded-lg">
+          <p className="text-sm text-amber-900 font-semibold mb-1">No active subscription</p>
+          <p className="text-sm text-amber-800">
+            Your subscription has been cancelled. You can still manage your domains, campaigns, and team members up to the limits of your previous plan — but ad traffic data will not be collected until you subscribe again.
           </p>
         </div>
       )}
