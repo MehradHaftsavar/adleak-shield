@@ -81,7 +81,7 @@ function PlanCard({
 }
 
 export default function SubscriptionPage() {
-  const { data: session, status, update } = useSession();
+  const { data: session, status } = useSession();
   const router       = useRouter();
   const searchParams = useSearchParams();
 
@@ -90,28 +90,35 @@ export default function SubscriptionPage() {
   const [message, setMessage] = useState('');
   const [isError, setIsError] = useState(false);
   const [confirmChange, setConfirmChange] = useState<{ plan: PlanType; isUpgrade: boolean; trialing?: boolean; resubscribing?: boolean } | null>(null);
-  // Refresh subscription status from DB once on mount so the page is never stale.
-  // Empty deps — fires exactly once per mount, never re-fires regardless of session changes.
+  // Live subscription truth fetched from Stripe/DB, kept in LOCAL state.
+  // We deliberately do NOT call next-auth update() for passive refreshes: the
+  // SettingsAuthGuard unmounts this page whenever the session goes into 'loading',
+  // which would remount the page and re-fire the refresh in an infinite loop.
+  // Local state keeps the page in sync without ever flipping the global session.
+  const [liveSub, setLiveSub] = useState<{ plan: PlanType | null; status: string } | null>(null);
+
+  // Refresh subscription status on mount so the page is never stale after a
+  // portal cancellation or plan change. sync-plan reconciles Stripe → DB and
+  // returns the true status/plan; we store it locally and render from it.
   useEffect(() => {
-    void update();
+    fetch('/api/stripe/sync-plan', { method: 'POST' })
+      .then(r => r.json())
+      .then(d => {
+        if (d?.subscriptionStatus) {
+          setLiveSub({ plan: (d.plan ?? null) as PlanType | null, status: d.subscriptionStatus });
+        }
+      })
+      .catch(() => { /* non-fatal — fall back to session values */ });
   }, []); // eslint-disable-line
 
-  // When Stripe redirects back after a confirmed upgrade, sync plan immediately
+  // When Stripe redirects back after a confirmed upgrade, show the success message
+  // and clear the query param. The actual data refresh is handled by the mount
+  // effect above (sync-plan → liveSub); we intentionally do NOT call update() here
+  // to avoid the guard-driven unmount/remount loop.
   useEffect(() => {
     if (searchParams.get('upgrade') === 'success') {
-      fetch('/api/stripe/sync-plan', { method: 'POST' })
-        .then(r => r.ok ? r.json() : null)
-        .then(async (data) => {
-          if (data?.plan) await update({ planType: data.plan, subscriptionStatus: data.subscriptionStatus });
-          else await update();
-          router.replace('/settings/subscription');
-          setMessage('Plan upgraded successfully. Your new plan is now active.');
-        })
-        .catch(async () => {
-          await update();
-          router.replace('/settings/subscription');
-          setMessage('Plan upgraded successfully. Your new plan is now active.');
-        });
+      router.replace('/settings/subscription');
+      setMessage('Plan upgraded successfully. Your new plan is now active.');
     }
   }, []); // eslint-disable-line
 
@@ -198,8 +205,10 @@ export default function SubscriptionPage() {
           return;
         }
 
-        // Genuine trial user — plan preference saved, billed at trial end
-        await update({ planType: plan });
+        // Genuine trial user — plan preference saved, billed at trial end.
+        // Update local state (not session) so the message persists and the page
+        // doesn't unmount via the auth guard.
+        setLiveSub({ plan, status: 'trialing' });
         setMessage(`Plan updated to ${PLAN_LIMITS[plan].label}. You'll be billed this amount when your trial ends.`);
         window.scrollTo({ top: 0, behavior: 'smooth' });
         return;
@@ -232,9 +241,11 @@ export default function SubscriptionPage() {
         return;
       }
 
-      // Downgrade: immediate with prorated credit
+      // Downgrade: immediate with prorated credit.
+      // Update local state (not session) so the message persists and the page
+      // doesn't unmount via the auth guard.
       if (upgradeRes.ok && upgradeData.immediateDowngrade) {
-        await update({ planType: plan });
+        setLiveSub({ plan, status: 'active' });
         setMessage(`Plan switched to ${PLAN_LIMITS[plan].label}. A prorated credit for your unused time has been applied to your next invoice.`);
         return;
       }
@@ -274,10 +285,17 @@ export default function SubscriptionPage() {
         const syncOnReturn = async () => {
           if (document.visibilityState !== 'visible') return;
           document.removeEventListener('visibilitychange', syncOnReturn);
-          // Wait for Stripe webhook to process, then refresh session from DB.
-          // update() with no args triggers a DB round-trip in the JWT callback.
+          // Wait for the Stripe webhook to process, then reconcile via sync-plan
+          // into LOCAL state — never call next-auth update() here, since the
+          // SettingsAuthGuard would unmount/remount this page on the loading flip.
           await new Promise(r => setTimeout(r, 2500));
-          await update();
+          try {
+            const r = await fetch('/api/stripe/sync-plan', { method: 'POST' });
+            const d = await r.json();
+            if (d?.subscriptionStatus) {
+              setLiveSub({ plan: (d.plan ?? null) as PlanType | null, status: d.subscriptionStatus });
+            }
+          } catch { /* non-fatal */ }
         };
         document.addEventListener('visibilitychange', syncOnReturn);
       }
@@ -292,8 +310,11 @@ export default function SubscriptionPage() {
     );
   }
 
-  const currentPlan        = (session?.user?.planType ?? 'starter') as PlanType;
-  const subscriptionStatus = session?.user?.subscriptionStatus as string | undefined;
+  // Prefer the locally-fetched live truth (from sync-plan) over the JWT session,
+  // which may be stale after a portal action. Fall back to session when no live
+  // value is available (e.g. sync-plan skipped for a never-subscribed trial user).
+  const currentPlan        = (liveSub?.plan ?? session?.user?.planType ?? 'starter') as PlanType;
+  const subscriptionStatus = liveSub?.status ?? (session?.user?.subscriptionStatus as string | undefined);
   const isSubscribed       = subscriptionStatus === 'active';
 
   return (
