@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useSession } from 'next-auth/react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { CreditCard, Check } from 'lucide-react';
@@ -90,12 +90,15 @@ export default function SubscriptionPage() {
   const [message, setMessage] = useState('');
   const [isError, setIsError] = useState(false);
   const [confirmChange, setConfirmChange] = useState<{ plan: PlanType; isUpgrade: boolean; trialing?: boolean; resubscribing?: boolean } | null>(null);
+  const didRefresh = useRef(false);
 
-  // Always refresh subscription status from DB on page load.
-  // Calling update() with no args triggers a DB round-trip in the JWT callback
-  // and re-reads subscription_status + plan_type, so the page is never stale.
+  // Refresh subscription status from DB once on page load so the page is never stale.
+  // useRef guard prevents re-firing when update() temporarily sets status to 'loading'.
   useEffect(() => {
-    if (status === 'authenticated') void update();
+    if (status === 'authenticated' && !didRefresh.current) {
+      didRefresh.current = true;
+      void update();
+    }
   }, [status]); // eslint-disable-line
 
   // When Stripe redirects back after a confirmed upgrade, sync plan immediately
