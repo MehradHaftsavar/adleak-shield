@@ -8,6 +8,12 @@ export function SettingsAuthGuard({ children }: { children: React.ReactNode }) {
   const { status } = useSession();
   const router = useRouter();
   const patched = useRef(false);
+  // Track whether we've ever shown an authenticated page. Once we have, we keep
+  // children mounted even if the session briefly re-enters 'loading' during a
+  // next-auth update() call. Unmounting on every transient 'loading' caused pages
+  // that call update() (e.g. the subscription page) to remount in an infinite loop.
+  const hasAuthenticated = useRef(false);
+  if (status === 'authenticated') hasAuthenticated.current = true;
 
   useEffect(() => {
     if (status === 'unauthenticated') {
@@ -34,7 +40,18 @@ export function SettingsAuthGuard({ children }: { children: React.ReactNode }) {
     };
   }, [router]);
 
-  if (status === 'loading' || status === 'unauthenticated') {
+  // Redirecting after logout / session loss — don't render protected children.
+  if (status === 'unauthenticated') {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="w-8 h-8 border-4 border-gray-200 border-t-gray-600 rounded-full animate-spin" />
+      </div>
+    );
+  }
+
+  // Only block on the very first load. A transient 'loading' during a session
+  // update() (after we've already authenticated) keeps children mounted.
+  if (status === 'loading' && !hasAuthenticated.current) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="w-8 h-8 border-4 border-gray-200 border-t-gray-600 rounded-full animate-spin" />
