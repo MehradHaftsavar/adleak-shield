@@ -220,6 +220,33 @@ export const authConfig: NextAuthConfig = {
           } catch {
             // Non-fatal — keep existing token values
           }
+
+          // Also refresh subscription status/plan from the DB on the same cadence,
+          // so a change made outside the app (e.g. cancellation in the Stripe
+          // portal, or a webhook update) heals the JWT within one cycle instead of
+          // requiring a sign-out. Runs on the same 10-minute timer as domains.
+          try {
+            const fresh = await withAdminDb(async (req) => {
+              const r = await req
+                .input('tenantId', mssql.UniqueIdentifier, token.tenantId as string)
+                .query(`
+                  SELECT subscription_status, trial_ends_at,
+                         ISNULL(plan_type, 'starter') AS plan_type
+                  FROM   Tenants
+                  WHERE  tenant_id = @tenantId
+                `);
+              return r.recordset[0] ?? null;
+            });
+            if (fresh) {
+              token.subscriptionStatus = fresh.subscription_status;
+              token.planType = (fresh.plan_type ?? 'starter') as PlanType;
+              token.trialEndsAt = fresh.trial_ends_at
+                ? new Date(fresh.trial_ends_at).toISOString()
+                : token.trialEndsAt;
+            }
+          } catch {
+            // Non-fatal — keep existing token values
+          }
         }
       }
 

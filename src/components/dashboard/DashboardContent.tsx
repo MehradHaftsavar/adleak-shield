@@ -39,6 +39,7 @@ interface DashboardStatus {
   }>;
   hasUnregisteredTraffic: boolean;
   subscriptionStatus: string | null;
+  planType: string | null;
   trialEndsAt: string | null;
   isPaywalled: boolean;
   daysLeftInTrial: number | null;
@@ -139,7 +140,10 @@ export function DashboardContent() {
       // JWT so the navbar Subscribe/Manage buttons update without a sign-out.
       loadStatus().then(async (freshStatus) => {
         if (freshStatus?.subscriptionStatus) {
-          await updateSession({ subscriptionStatus: freshStatus.subscriptionStatus });
+          await updateSession({
+            subscriptionStatus: freshStatus.subscriptionStatus,
+            ...(freshStatus.planType ? { planType: freshStatus.planType } : {}),
+          });
         }
       });
     }

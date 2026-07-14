@@ -115,7 +115,8 @@ export async function GET(request: NextRequest) {
       const r = await req
         .input('tenantId', mssql.UniqueIdentifier, effectiveTenantId)
         .query(`
-          SELECT subscription_status, trial_ends_at
+          SELECT subscription_status, trial_ends_at,
+                 ISNULL(plan_type, 'starter') AS plan_type
           FROM Tenants
           WHERE tenant_id = @tenantId
         `);
@@ -124,6 +125,7 @@ export async function GET(request: NextRequest) {
 
     const subscriptionStatus: string | null = tenantRow?.subscription_status ?? null;
     const trialEndsAt: Date | null = tenantRow?.trial_ends_at ?? null;
+    const planType: string = tenantRow?.plan_type ?? 'starter';
 
     const isActive = subscriptionStatus === 'active';
     const isTrialing = subscriptionStatus === 'trialing' && trialEndsAt !== null && new Date(trialEndsAt) > new Date();
@@ -138,6 +140,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({
       ...result,
       subscriptionStatus,
+      planType,
       trialEndsAt: trialEndsAt ? new Date(trialEndsAt).toISOString() : null,
       isPaywalled,
       daysLeftInTrial,

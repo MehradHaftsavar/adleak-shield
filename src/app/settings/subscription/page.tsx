@@ -95,25 +95,29 @@ export default function SubscriptionPage() {
   const hasAuthed = useRef(false);
   if (status === 'authenticated') hasAuthed.current = true;
 
-  // Refresh subscription status on mount so the page — and the JWT the rest of the
-  // app reads (dashboard paywall etc.) — is never stale after a portal cancellation
-  // or plan change. sync-plan reconciles Stripe → DB (handles cancel_at_period_end),
-  // then update() pulls the corrected status/plan from the DB into the JWT.
-  // This is safe from the previous remount loop because SettingsAuthGuard now keeps
-  // children mounted during a transient session 'loading' once authenticated.
-  useEffect(() => {
-    (async () => {
-      try { await fetch('/api/stripe/sync-plan', { method: 'POST' }); } catch { /* non-fatal */ }
-      try { await update(); } catch { /* non-fatal */ }
-    })();
-  }, []); // eslint-disable-line
+  // We do NOT refresh the JWT on every page mount. The token is refreshed only when
+  // a subscription change completes (upgrade/downgrade/resubscribe below, and the
+  // dashboard's payment=success handler), plus the periodic 10-minute refresh in the
+  // auth callback which heals any out-of-band change (e.g. a Stripe-portal cancel).
 
-  // When Stripe redirects back after a confirmed upgrade, show the success message
-  // and clear the query param. The mount effect above handles the data refresh.
+  // When Stripe redirects back after a confirmed upgrade, pull the new plan/status
+  // from Stripe (sync-plan) into the JWT with explicit values, then show the message.
   useEffect(() => {
     if (searchParams.get('upgrade') === 'success') {
-      router.replace('/settings/subscription');
-      setMessage('Plan upgraded successfully. Your new plan is now active.');
+      (async () => {
+        try {
+          const r = await fetch('/api/stripe/sync-plan', { method: 'POST' });
+          const d = await r.json();
+          if (d?.subscriptionStatus) {
+            await update({
+              ...(d.plan ? { planType: d.plan } : {}),
+              subscriptionStatus: d.subscriptionStatus,
+            });
+          }
+        } catch { /* non-fatal */ }
+        router.replace('/settings/subscription');
+        setMessage('Plan upgraded successfully. Your new plan is now active.');
+      })();
     }
   }, []); // eslint-disable-line
 
@@ -283,8 +287,16 @@ export default function SubscriptionPage() {
           // (Stripe → DB) and pull the corrected status into the JWT via update()
           // so both this page and the dashboard reflect the change immediately.
           await new Promise(r => setTimeout(r, 2500));
-          try { await fetch('/api/stripe/sync-plan', { method: 'POST' }); } catch { /* non-fatal */ }
-          try { await update(); } catch { /* non-fatal */ }
+          try {
+            const r = await fetch('/api/stripe/sync-plan', { method: 'POST' });
+            const d = await r.json();
+            if (d?.subscriptionStatus) {
+              await update({
+                ...(d.plan ? { planType: d.plan } : {}),
+                subscriptionStatus: d.subscriptionStatus,
+              });
+            }
+          } catch { /* non-fatal */ }
         };
         document.addEventListener('visibilitychange', syncOnReturn);
       }
