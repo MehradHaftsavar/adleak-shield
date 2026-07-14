@@ -44,23 +44,32 @@ export async function POST(request: NextRequest) {
           break;
         }
 
+        // Derive plan from the subscription's price ID so activation never leaves
+        // a stale plan_type behind (e.g. a prior trial's plan). Prefer the metadata
+        // plan when present, falling back to the price-ID mapping.
+        const createdPriceId = subscription.items.data[0]?.price?.id ?? '';
+        const createdPlan = (subscription.metadata?.plan
+          ?? (createdPriceId ? getPlanFromPriceId(createdPriceId) : 'starter')) as string;
+
         // Always store stripe_customer_id so customer.subscription.updated
         // can find the tenant by customerId even if status starts as 'incomplete'.
         await withAdminDb(async (req) => {
           req
             .input('customerId', mssql.NVarChar(50), customerId)
-            .input('tenantId', mssql.UniqueIdentifier, tenantId);
+            .input('tenantId', mssql.UniqueIdentifier, tenantId)
+            .input('planType', mssql.NVarChar(20), createdPlan);
 
           if (subscription.status === 'active') {
             await req.query(`
               UPDATE Tenants
               SET stripe_customer_id        = @customerId,
                   subscription_status       = 'active',
+                  plan_type                 = @planType,
                   subscription_cancelled_at = NULL,
                   data_deletion_warned_at   = NULL
               WHERE tenant_id = @tenantId
             `);
-            console.log(`[stripe/webhook] Tenant ${tenantId} activated via subscription.created`);
+            console.log(`[stripe/webhook] Tenant ${tenantId} activated via subscription.created, plan=${createdPlan}`);
           } else {
             // Not active yet (e.g. incomplete / trialing) — just store the customer ID
             await req.query(`
