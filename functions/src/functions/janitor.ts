@@ -78,6 +78,7 @@ app.timer("janitor", {
     let tenantsPurged = 0;
     let tenantsWarned = 0;
     let errorCount    = 0;
+    const errorMessages: string[] = [];
 
     // 1. Load all tenants — Tenants table has no RLS, withAdminDb is safe
     let tenants: TenantRow[];
@@ -114,6 +115,8 @@ app.timer("janitor", {
         if (outcome === "warned") tenantsWarned++;
       } catch (err) {
         errorCount++;
+        const msg = err instanceof Error ? err.message : String(err);
+        errorMessages.push(`${tenant.tenant_id}: ${msg}`);
         context.error(`[Janitor] Error on tenant ${tenant.tenant_id}:`, err);
       }
     }
@@ -127,7 +130,9 @@ app.timer("janitor", {
       : "success";
 
     await writeJanitorLog(now, tenantsPurged, tenantsWarned,
-      errorCount > 0 ? `${errorCount} tenant(s) had errors` : null,
+      errorMessages.length > 0
+        ? `${errorCount} tenant(s) had errors — ${errorMessages.join(' | ')}`
+        : null,
       context);
   },
 });

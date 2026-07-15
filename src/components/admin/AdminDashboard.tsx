@@ -528,9 +528,14 @@ export function AdminDashboard() {
                               {p.status === 'success' ? (
                                 <span className="text-green-400 text-xs font-semibold">✓ success</span>
                               ) : (
-                                <span className="text-red-400 text-xs font-semibold" title={p.errorMessage ?? ''}>
-                                  ✗ {p.status}
-                                </span>
+                                <div className="max-w-md">
+                                  <span className="text-red-400 text-xs font-semibold">✗ {p.status}</span>
+                                  {p.errorMessage && (
+                                    <p className="mt-0.5 text-[11px] leading-snug text-red-300/70 break-words whitespace-pre-wrap">
+                                      {p.errorMessage}
+                                    </p>
+                                  )}
+                                </div>
                               )}
                             </td>
                             <td className="px-5 py-2.5 text-right text-xs text-gray-400">{p.deletedSessions.toLocaleString()}</td>
