@@ -252,25 +252,37 @@ export async function POST(request: NextRequest) {
           break;
         }
 
-        // Issue a prorated refund for unused time in the billing period.
-        // Only applies when cancelled immediately (canceledAt < periodEnd).
+        // Issue a prorated refund for the unused portion of the paid period.
+        // IMPORTANT: an immediate cancellation truncates subscription.current_period_end
+        // to the cancel time, which would zero out the proration. So we derive the
+        // ORIGINAL period from the paid invoice's line item instead.
         try {
-          const canceledAt    = subscription.canceled_at ?? Math.floor(Date.now() / 1000);
-          const periodStart   = subscription.current_period_start;
-          const periodEnd     = subscription.current_period_end;
-          const totalSeconds  = periodEnd - periodStart;
-          const unusedSeconds = periodEnd - canceledAt;
+          const invoiceId = typeof subscription.latest_invoice === 'string'
+            ? subscription.latest_invoice
+            : (subscription.latest_invoice as Stripe.Invoice | null)?.id;
 
-          if (unusedSeconds > 0 && totalSeconds > 0) {
-            const invoiceId = typeof subscription.latest_invoice === 'string'
-              ? subscription.latest_invoice
-              : (subscription.latest_invoice as Stripe.Invoice | null)?.id;
+          if (!invoiceId) {
+            console.log(`[stripe/webhook] Refund skipped for ${customerId}: subscription has no latest_invoice`);
+          } else {
+            const invoice = await stripe.invoices.retrieve(invoiceId, { expand: ['charge'] });
+            const charge  = invoice.charge as Stripe.Charge | null;
 
-            if (invoiceId) {
-              const invoice = await stripe.invoices.retrieve(invoiceId, { expand: ['charge'] });
-              const charge  = invoice.charge as Stripe.Charge | null;
+            if (!charge?.paid) {
+              console.log(`[stripe/webhook] Refund skipped for ${customerId}: invoice ${invoiceId} has no paid charge`);
+            } else {
+              // Prefer the subscription line item's period (the true billing window
+              // that was paid for); fall back to the invoice-level period.
+              const line        = invoice.lines?.data?.[0];
+              const periodStart = line?.period?.start ?? invoice.period_start;
+              const periodEnd   = line?.period?.end   ?? invoice.period_end;
+              const canceledAt  = subscription.canceled_at ?? Math.floor(Date.now() / 1000);
 
-              if (charge?.paid) {
+              const totalSeconds  = periodEnd - periodStart;
+              const unusedSeconds = periodEnd - canceledAt;
+
+              if (totalSeconds <= 0 || unusedSeconds <= 0) {
+                console.log(`[stripe/webhook] Refund skipped for ${customerId}: no unused time (period ${periodStart}→${periodEnd}, canceledAt ${canceledAt})`);
+              } else {
                 const alreadyRefunded = charge.amount_refunded ?? 0;
                 const available       = charge.amount_captured - alreadyRefunded;
                 const refundAmount    = Math.min(
@@ -278,13 +290,15 @@ export async function POST(request: NextRequest) {
                   available,
                 );
 
-                if (refundAmount > 0) {
+                if (refundAmount <= 0) {
+                  console.log(`[stripe/webhook] Refund skipped for ${customerId}: computed amount 0 (captured ${charge.amount_captured}, alreadyRefunded ${alreadyRefunded}, unused ${unusedSeconds}/${totalSeconds}s)`);
+                } else {
                   await stripe.refunds.create({
                     charge: charge.id,
                     amount: refundAmount,
                     reason: 'requested_by_customer',
                   });
-                  console.log(`[stripe/webhook] Refunded ${refundAmount} pence to ${customerId} for unused subscription time`);
+                  console.log(`[stripe/webhook] Refunded ${refundAmount} pence to ${customerId} (unused ${unusedSeconds}/${totalSeconds}s of paid period)`);
                 }
               }
             }

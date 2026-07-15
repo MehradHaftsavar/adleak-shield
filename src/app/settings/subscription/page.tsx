@@ -19,12 +19,14 @@ function PlanCard({
   isSubscribed,
   onSelect,
   loading,
+  disabled,
 }: {
   plan:         PlanType;
   isCurrent:    boolean;
   isSubscribed: boolean;
   onSelect:     (plan: PlanType) => void;
   loading:      boolean;
+  disabled:     boolean;
 }) {
   const limits = PLAN_LIMITS[plan];
   const features = [
@@ -69,8 +71,8 @@ function PlanCard({
       {!isCurrent && (
         <button
           onClick={() => onSelect(plan)}
-          disabled={loading}
-          className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-60 text-white font-semibold rounded-lg text-sm transition-colors"
+          disabled={loading || disabled}
+          className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-60 disabled:cursor-not-allowed text-white font-semibold rounded-lg text-sm transition-colors"
         >
           {loading && <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />}
           {loading ? 'Processing…' : isSubscribed ? 'Switch to this plan' : 'Subscribe'}
@@ -95,10 +97,37 @@ export default function SubscriptionPage() {
   const hasAuthed = useRef(false);
   if (status === 'authenticated') hasAuthed.current = true;
 
-  // We do NOT refresh the JWT on every page mount. The token is refreshed only when
-  // a subscription change completes (upgrade/downgrade/resubscribe below, and the
-  // dashboard's payment=success handler), plus the periodic 10-minute refresh in the
-  // auth callback which heals any out-of-band change (e.g. a Stripe-portal cancel).
+  // Live subscription truth read straight from the DB (not the JWT), so the banner
+  // and plan cards on THIS page are always accurate on load — even after a change
+  // made elsewhere (e.g. a portal cancel that returns you to the dashboard). This is
+  // a read only; it never re-issues the JWT. The JWT is still updated only on real
+  // completion events (below + the dashboard's payment=success) plus the 10-min heal.
+  const [liveSub, setLiveSub]       = useState<{ status: string; plan: PlanType; trialEndsAt: string | null } | null>(null);
+  const [subLoading, setSubLoading] = useState(true);
+  const fetchedSub = useRef(false);
+  useEffect(() => {
+    if (status !== 'authenticated' || fetchedSub.current) return;
+    fetchedSub.current = true;
+    (async () => {
+      try {
+        const r = await fetch('/api/user/subscription-status');
+        const d = await r.json();
+        if (r.ok && d?.subscriptionStatus !== undefined) {
+          setLiveSub({
+            status:      d.subscriptionStatus,
+            plan:        (d.planType ?? 'starter') as PlanType,
+            trialEndsAt: d.trialEndsAt ?? null,
+          });
+        }
+      } catch { /* non-fatal — fall back to session values */ }
+      finally { setSubLoading(false); }
+    })();
+  }, [status]); // eslint-disable-line
+
+  // The JWT (read by other pages/navbar) is updated only when a subscription change
+  // completes: subscribe/resubscribe → dashboard payment=success; upgrade → upgrade=
+  // success effect below; downgrade/trialing change → executeSwitch; cancellation →
+  // portal-return handler. Plus the periodic 10-minute refresh heals anything else.
 
   // When Stripe redirects back after a confirmed upgrade, pull the new plan/status
   // from Stripe (sync-plan) into the JWT with explicit values, then show the message.
@@ -113,6 +142,11 @@ export default function SubscriptionPage() {
               ...(d.plan ? { planType: d.plan } : {}),
               subscriptionStatus: d.subscriptionStatus,
             });
+            setLiveSub(prev => ({
+              status:      d.subscriptionStatus,
+              plan:        (d.plan ?? prev?.plan ?? 'starter') as PlanType,
+              trialEndsAt: prev?.trialEndsAt ?? null,
+            }));
           }
         } catch { /* non-fatal */ }
         router.replace('/settings/subscription');
@@ -205,9 +239,10 @@ export default function SubscriptionPage() {
         }
 
         // Genuine trial user — plan preference saved, billed at trial end.
-        // update({ planType }) stamps the JWT directly (no DB round-trip), so the
-        // dashboard reflects the new plan immediately.
+        // update({ planType }) stamps the JWT (dashboard reflects it); setLiveSub
+        // updates this page's display immediately.
         await update({ planType: plan });
+        setLiveSub(prev => ({ status: 'trialing', plan, trialEndsAt: prev?.trialEndsAt ?? null }));
         setMessage(`Plan updated to ${PLAN_LIMITS[plan].label}. You'll be billed this amount when your trial ends.`);
         window.scrollTo({ top: 0, behavior: 'smooth' });
         return;
@@ -241,9 +276,10 @@ export default function SubscriptionPage() {
       }
 
       // Downgrade: immediate with prorated credit.
-      // update({ planType }) stamps the JWT directly so the dashboard reflects it.
+      // update({ planType }) stamps the JWT; setLiveSub updates this page's display.
       if (upgradeRes.ok && upgradeData.immediateDowngrade) {
         await update({ planType: plan });
+        setLiveSub(prev => ({ status: 'active', plan, trialEndsAt: prev?.trialEndsAt ?? null }));
         setMessage(`Plan switched to ${PLAN_LIMITS[plan].label}. A prorated credit for your unused time has been applied to your next invoice.`);
         return;
       }
@@ -295,6 +331,11 @@ export default function SubscriptionPage() {
                 ...(d.plan ? { planType: d.plan } : {}),
                 subscriptionStatus: d.subscriptionStatus,
               });
+              setLiveSub(prev => ({
+                status:      d.subscriptionStatus,
+                plan:        (d.plan ?? prev?.plan ?? 'starter') as PlanType,
+                trialEndsAt: prev?.trialEndsAt ?? null,
+              }));
             }
           } catch { /* non-fatal */ }
         };
@@ -311,8 +352,9 @@ export default function SubscriptionPage() {
     );
   }
 
-  const currentPlan        = (session?.user?.planType ?? 'starter') as PlanType;
-  const subscriptionStatus = session?.user?.subscriptionStatus as string | undefined;
+  // Prefer the live DB truth; fall back to the session while it's still loading.
+  const currentPlan        = (liveSub?.plan ?? session?.user?.planType ?? 'starter') as PlanType;
+  const subscriptionStatus = liveSub?.status ?? (session?.user?.subscriptionStatus as string | undefined);
   const isSubscribed       = subscriptionStatus === 'active';
 
   return (
@@ -327,8 +369,9 @@ export default function SubscriptionPage() {
         </div>
       </div>
 
-      {/* Current status banner */}
-      {isSubscribed && (
+      {/* Current status banner — only shown once the live status has loaded, so a
+          stale session value can never flash the wrong banner. */}
+      {!subLoading && isSubscribed && (
         <div className="mb-6 p-4 bg-green-50 border border-green-200 rounded-lg">
           <p className="text-sm text-green-800 font-medium">
             Active subscription — {PLAN_LIMITS[currentPlan].label}
@@ -336,7 +379,7 @@ export default function SubscriptionPage() {
         </div>
       )}
 
-      {!isSubscribed && subscriptionStatus === 'canceled' && (
+      {!subLoading && !isSubscribed && subscriptionStatus === 'canceled' && (
         <div className="mb-6 p-4 bg-amber-50 border border-amber-200 rounded-lg">
           <p className="text-sm text-amber-900 font-semibold mb-1">No active subscription</p>
           <p className="text-sm text-amber-800">
@@ -374,7 +417,7 @@ export default function SubscriptionPage() {
       )}
 
       {/* Billing management */}
-      {isSubscribed && (
+      {!subLoading && isSubscribed && (
         <div className="mb-8 p-5 bg-white border border-gray-200 rounded-xl">
           <h2 className="text-sm font-semibold text-gray-900 mb-1">Manage billing or cancel</h2>
           <p className="text-sm text-gray-500 mb-4">
@@ -399,6 +442,7 @@ export default function SubscriptionPage() {
             isSubscribed={isSubscribed}
             onSelect={handlePlanSelect}
             loading={loading === plan}
+            disabled={subLoading}
           />
         ))}
       </div>
