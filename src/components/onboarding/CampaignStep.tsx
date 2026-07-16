@@ -267,6 +267,7 @@ export function CampaignStep({ onComplete, onBack }: CampaignStepProps) {
     const url = workspaceTenantId
       ? `/api/campaigns?id=${id}&workspace=${workspaceTenantId}`
       : `/api/campaigns?id=${id}`;
+    setPageError('');
     try {
       const res = await fetch(url, { method: 'DELETE' });
       if (res.ok) {
@@ -279,9 +280,15 @@ export function CampaignStep({ onComplete, onBack }: CampaignStepProps) {
         } else {
           setOwnCampaigns(prev => prev.filter(c => c.id !== id));
         }
+      } else {
+        // e.g. a revoked/downgraded member — surface the server's reason instead
+        // of silently closing the modal with no visible effect.
+        const data = await res.json().catch(() => ({}));
+        setPageError(data.error || 'You no longer have access to remove this campaign.');
       }
     } catch (err) {
       console.error('Failed to delete campaign:', err);
+      setPageError('Network error. Please try again.');
     } finally {
       setConfirmDelete(null);
     }

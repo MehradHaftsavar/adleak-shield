@@ -365,7 +365,7 @@ export async function PATCH(request: NextRequest) {
         session.user.email as string,
         workspaceTenantId,
       );
-      if (editorDomains.length === 0) return forbidden('Editors only');
+      if (editorDomains.length === 0) return forbidden('Editors only — no access to this domain');
 
       const domainFilter = buildDomainFilter(null, editorDomains, 'domain_id');
 
@@ -455,7 +455,7 @@ export async function DELETE(request: NextRequest) {
         session.user.email as string,
         workspaceParam,
       );
-      if (editorDomains.length === 0) return forbidden('Editors only');
+      if (editorDomains.length === 0) return forbidden('Editors only — no access to this domain');
 
       const domainFilter = buildDomainFilter(null, editorDomains, 'domain_id');
 
