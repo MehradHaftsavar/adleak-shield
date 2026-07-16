@@ -29,17 +29,14 @@ async function loadAccessibleDomains(
   const memberAccessRows = await withAdminDb(async (req) => {
     const r = await req
       .input('_email',    mssql.NVarChar(255),    email.toLowerCase().trim())
-      .input('_tenantId', mssql.UniqueIdentifier, tenantId)
       .query(`
         SELECT tm.tenant_id, tm.role, t.email AS tenant_owner_email, mda.domain_id
         FROM   TeamMembers tm
         INNER JOIN Tenants t              ON t.tenant_id  = tm.tenant_id
         INNER JOIN MemberDomainAccess mda ON mda.member_id = tm.member_id
-        INNER JOIN Tenants me             ON me.tenant_id  = @_tenantId
         WHERE  tm.email = @_email
           AND  tm.accepted_at IS NOT NULL
           AND  t.deleted_at IS NULL
-          AND  tm.accepted_at >= me.created_at
       `);
     return r.recordset as { tenant_id: string; role: string; tenant_owner_email: string; domain_id: string }[];
   });
