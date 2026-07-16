@@ -8,7 +8,15 @@ import { CampaignStep } from '@/components/onboarding/CampaignStep';
 import { SnippetStep } from '@/components/onboarding/SnippetStep';
 export default function OnboardingPage() {
   const router = useRouter();
-  const { update, status } = useSession();
+  const { data: session, update, status } = useSession();
+
+  // A user who has accepted an invite has a domain belonging to ANOTHER tenant in
+  // their accessible list (own domains carry their own tenantId). That marks them as
+  // someone joining a team workspace — for whom "skip setup" is the expected path.
+  const ownTenantId = session?.user?.tenantId;
+  const isTeamMember = (session?.user?.allAccessibleDomains ?? []).some(
+    d => d.tenantId !== ownTenantId
+  );
   const [currentStep, setCurrentStep] = useState<1 | 2 | 3>(1);
   const [domain, setDomain] = useState<string>('');
   const [campaigns, setCampaigns] = useState<any[]>([]);
@@ -206,13 +214,18 @@ export default function OnboardingPage() {
             />
           )}
 
-          {/* Skip — visible on steps 1 and 2 only (step 3 has its own complete button) */}
+          {/* Skip — visible on steps 1 and 2 only (step 3 has its own complete button).
+              For invited team members this is the expected path, so make it prominent. */}
           {currentStep !== 3 && (
-            <p className="mt-6 text-center text-sm text-gray-400">
+            <p className={`mt-6 text-center ${isTeamMember ? 'text-base text-gray-700 font-medium' : 'text-sm text-gray-400'}`}>
               Joining a team workspace?{' '}
               <button
                 onClick={handleOnboardingComplete}
-                className="underline hover:text-gray-600 transition-colors"
+                className={`underline transition-colors ${
+                  isTeamMember
+                    ? 'text-indigo-600 font-semibold hover:text-indigo-700'
+                    : 'hover:text-gray-600'
+                }`}
               >
                 Skip setup for now
               </button>
