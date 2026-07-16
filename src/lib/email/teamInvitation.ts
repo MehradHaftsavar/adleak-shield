@@ -4,18 +4,30 @@ export interface TeamInvitationEmailOptions {
   role: 'editor' | 'visitor';
   acceptUrl: string;
   expiresInDays?: number;
+  domainNames?: string[];
 }
 
 export function buildTeamInvitationEmail(opts: TeamInvitationEmailOptions): {
   subject: string;
   html: string;
 } {
-  const { inviteeEmail, inviterEmail, role, acceptUrl, expiresInDays = 7 } = opts;
+  const { inviteeEmail, inviterEmail, role, acceptUrl, expiresInDays = 7, domainNames = [] } = opts;
 
   const roleLabel = role === 'editor' ? 'Editor' : 'Viewer';
+  const roleArticle = role === 'editor' ? 'an' : 'a';
   const roleDesc  = role === 'editor'
     ? 'view data and manage campaigns'
     : 'view data (read-only)';
+
+  // Escape domain names before embedding in HTML (they're user-provided).
+  const escapeHtml = (s: string) =>
+    s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  const domainLine = domainNames.length > 0
+    ? `<p style="margin:0 0 24px;font-size:15px;color:#374151;line-height:1.6;">
+         ${domainNames.length > 1 ? 'Domains' : 'Domain'} you'll have access to:
+         <strong>${domainNames.map(escapeHtml).join(', ')}</strong>.
+       </p>`
+    : '';
 
   const subject = `${inviterEmail} shared AdLeak Shield access with you`;
 
@@ -48,8 +60,9 @@ export function buildTeamInvitationEmail(opts: TeamInvitationEmailOptions): {
               </h1>
               <p style="margin:0 0 24px;font-size:15px;color:#374151;line-height:1.6;">
                 <strong>${inviterEmail}</strong> has invited you to join their AdLeak Shield workspace
-                as a <strong>${roleLabel}</strong>. As a ${roleLabel} you can ${roleDesc}.
+                as ${roleArticle} <strong>${roleLabel}</strong>. As ${roleArticle} ${roleLabel} you can ${roleDesc}.
               </p>
+              ${domainLine}
 
               <!-- CTA button -->
               <table cellpadding="0" cellspacing="0" style="margin:0 0 28px;">

@@ -6,6 +6,8 @@
 import { auth } from '@/lib/auth';
 import { cookies } from 'next/headers';
 import { NextResponse } from 'next/server';
+import { withAdminDb } from '@/lib/db/client';
+import * as mssql from 'mssql';
 import type { AccessibleDomain } from '@/types/auth';
 
 export const IMP_COOKIE       = 'als_imp';
@@ -169,4 +171,47 @@ export function blockedInImpersonation() {
 // ---------------------------------------------------------------------------
 export function forbidden(message = 'Insufficient permissions') {
   return NextResponse.json({ error: message }, { status: 403 });
+}
+
+// ---------------------------------------------------------------------------
+// getLiveMemberEditorDomains
+//
+// Re-checks a member's CURRENT editor access against the DB (not the cached JWT).
+// Returns the domain IDs the member currently has an accepted 'editor' grant on
+// for the given workspace tenant. If access was revoked (MemberDomainAccess row
+// deleted), the role downgraded to visitor, or the member removed, the relevant
+// domains simply won't appear — so a stale JWT can't authorise writes.
+//
+// Use in member-WRITE routes (create/update/delete). Reads may keep using the JWT
+// (the owner is fine with the member's UI lagging until re-login / token refresh).
+// Fails closed: on any DB error it returns [] so the write is denied.
+// ---------------------------------------------------------------------------
+export async function getLiveMemberEditorDomains(
+  email: string,
+  workspaceTenantId: string,
+): Promise<string[]> {
+  if (!email || !workspaceTenantId) return [];
+  try {
+    const rows = await withAdminDb(async (req) => {
+      const r = await req
+        .input('email',    mssql.NVarChar(255),    email.toLowerCase().trim())
+        .input('tenantId', mssql.UniqueIdentifier,  workspaceTenantId)
+        .query(`
+          SELECT mda.domain_id
+          FROM   TeamMembers tm
+          INNER JOIN Tenants t              ON t.tenant_id   = tm.tenant_id
+          INNER JOIN MemberDomainAccess mda ON mda.member_id = tm.member_id
+          WHERE  tm.email       = @email
+            AND  tm.tenant_id   = @tenantId
+            AND  tm.role        = 'editor'
+            AND  tm.accepted_at IS NOT NULL
+            AND  t.deleted_at   IS NULL
+        `);
+      return r.recordset as Array<{ domain_id: string }>;
+    });
+    return rows.map(r => r.domain_id);
+  } catch (err) {
+    console.error('[adminAuth] getLiveMemberEditorDomains failed (denying write):', err);
+    return [];
+  }
 }

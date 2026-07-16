@@ -3,7 +3,7 @@ import { z } from 'zod';
 import { auth } from '@/lib/auth';
 import { withTenantDb, withAdminDb } from '@/lib/db/client';
 import * as mssql from 'mssql';
-import { getEffectiveTenantId, blockedInImpersonation, forbidden, buildDomainFilter } from '@/lib/adminAuth';
+import { getEffectiveTenantId, blockedInImpersonation, forbidden, buildDomainFilter, getLiveMemberEditorDomains } from '@/lib/adminAuth';
 import { PLAN_LIMITS } from '@/lib/planLimits';
 import type { PlanType } from '@/types/auth';
 
@@ -150,13 +150,16 @@ export async function POST(request: NextRequest) {
 
     // ── Invited workspace branch ─────────────────────────────────────────────
     if (workspaceTenantId && workspaceTenantId !== session.user.tenantId) {
-      const allAccessible = (session.user.allAccessibleDomains ?? []) as Array<{
-        tenantId: string; domainId: string; role: string;
-      }>;
-      const domainAccess = allAccessible.find(
-        d => d.tenantId === workspaceTenantId && d.domainId === bodyDomainId && d.role === 'editor'
+      // Re-check access against the DB, not the (possibly stale) JWT — a member
+      // whose access was just revoked must not be able to write even if their
+      // cached token still lists this domain.
+      const liveEditorDomains = await getLiveMemberEditorDomains(
+        session.user.email as string,
+        workspaceTenantId,
       );
-      if (!domainAccess) return forbidden('Editors only — no access to this domain');
+      if (!bodyDomainId || !liveEditorDomains.includes(bodyDomainId)) {
+        return forbidden('Editors only — no access to this domain');
+      }
 
       const validation = campaignSchema.safeParse({
         googleCampaignId,
@@ -356,12 +359,12 @@ export async function PATCH(request: NextRequest) {
 
     // ── Invited workspace branch ─────────────────────────────────────────────
     if (workspaceTenantId && workspaceTenantId !== session.user.tenantId) {
-      const allAccessible = (session.user.allAccessibleDomains ?? []) as Array<{
-        tenantId: string; domainId: string; role: string;
-      }>;
-      const editorDomains = allAccessible
-        .filter(d => d.tenantId === workspaceTenantId && d.role === 'editor')
-        .map(d => d.domainId);
+      // Re-check editor access against the DB (not the stale JWT) so a revoked
+      // member can't update campaigns via a cached token.
+      const editorDomains = await getLiveMemberEditorDomains(
+        session.user.email as string,
+        workspaceTenantId,
+      );
       if (editorDomains.length === 0) return forbidden('Editors only');
 
       const domainFilter = buildDomainFilter(null, editorDomains, 'domain_id');
@@ -446,12 +449,12 @@ export async function DELETE(request: NextRequest) {
 
     // ── Invited workspace branch ─────────────────────────────────────────────
     if (workspaceParam && workspaceParam !== session.user.tenantId) {
-      const allAccessible = (session.user.allAccessibleDomains ?? []) as Array<{
-        tenantId: string; domainId: string; role: string;
-      }>;
-      const editorDomains = allAccessible
-        .filter(d => d.tenantId === workspaceParam && d.role === 'editor')
-        .map(d => d.domainId);
+      // Re-check editor access against the DB (not the stale JWT) so a revoked
+      // member can't delete campaigns via a cached token.
+      const editorDomains = await getLiveMemberEditorDomains(
+        session.user.email as string,
+        workspaceParam,
+      );
       if (editorDomains.length === 0) return forbidden('Editors only');
 
       const domainFilter = buildDomainFilter(null, editorDomains, 'domain_id');

@@ -83,12 +83,14 @@ export async function POST(request: NextRequest) {
 
     // Load tenant's current domains via withTenantDb — Domains has RLS, withAdminDb returns nothing
     const allDomains = await withTenantDb(tenantId, async (req) => {
-      const r = await req.query(`SELECT domain_id FROM Domains`);
-      return r.recordset.map((d: any) => d.domain_id as string);
+      const r = await req.query(`SELECT domain_id, domain_name FROM Domains`);
+      return r.recordset.map((d: any) => ({ id: d.domain_id as string, name: d.domain_name as string }));
     });
-    const domains = domainIds && domainIds.length > 0
-      ? allDomains.filter(id => domainIds.includes(id))
+    const grantedDomains = domainIds && domainIds.length > 0
+      ? allDomains.filter(d => domainIds.includes(d.id))
       : allDomains;
+    const domains      = grantedDomains.map(d => d.id);
+    const domainNames  = grantedDomains.map(d => d.name);
 
     // Generate secure token
     const rawToken  = crypto.randomBytes(32).toString('base64url');
@@ -152,6 +154,7 @@ export async function POST(request: NextRequest) {
       role,
       acceptUrl,
       expiresInDays: 7,
+      domainNames,
     });
 
     try {
@@ -161,7 +164,7 @@ export async function POST(request: NextRequest) {
         to:       email,
         subject,
         html,
-        text:     `${session.user.email} has invited you to join their AdLeak Shield workspace as a ${role}.\n\nAccept your invitation here:\n${acceptUrl}\n\nThis link expires in 7 days. If you weren't expecting this, you can safely ignore it.`,
+        text:     `${session.user.email} has invited you to join their AdLeak Shield workspace as a ${role}${domainNames.length > 0 ? ` for the following domain${domainNames.length > 1 ? 's' : ''}: ${domainNames.join(', ')}` : ''}.\n\nAccept your invitation here:\n${acceptUrl}\n\nThis link expires in 7 days. If you weren't expecting this, you can safely ignore it.`,
       });
     } catch (emailErr) {
       // Non-fatal — invitation is created; user can resend later

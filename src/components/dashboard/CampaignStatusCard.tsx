@@ -6,6 +6,7 @@ interface Campaign {
   id: string;
   googleCampaignId: string;
   slotNumber: number;
+  name: string | null;
   domain: string;
   status: string;
   sessionCount: number;
@@ -49,7 +50,7 @@ export function CampaignStatusCard({ campaign, hasUnregisteredTraffic }: Campaig
       <div className="flex items-start justify-between mb-3">
         <div>
           <h3 className="font-semibold text-gray-900">
-            Campaign {campaign.slotNumber}
+            {campaign.name?.trim() || `Campaign ${campaign.slotNumber}`}
           </h3>
           <p className="text-sm text-gray-600 mt-1">
             ID: {campaign.googleCampaignId}
