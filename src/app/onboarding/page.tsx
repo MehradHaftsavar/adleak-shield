@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useSession } from 'next-auth/react';
+import { Users, ArrowRight } from 'lucide-react';
 import { DomainStep } from '@/components/onboarding/DomainStep';
 import { CampaignStep } from '@/components/onboarding/CampaignStep';
 import { SnippetStep } from '@/components/onboarding/SnippetStep';
@@ -208,15 +209,24 @@ export default function OnboardingPage() {
 
           {/* Skip — visible on steps 1 and 2 only (step 3 has its own complete button). */}
           {currentStep !== 3 && (
-            <p className="mt-6 text-center text-base text-gray-700 font-medium">
-              Joining a team workspace?{' '}
+            <div className="mt-6 flex items-center justify-between gap-4 bg-indigo-50 border border-indigo-200 rounded-lg px-5 py-4">
+              <div className="flex items-center gap-3">
+                <div className="flex-shrink-0 w-9 h-9 rounded-full bg-indigo-100 flex items-center justify-center">
+                  <Users className="w-4.5 h-4.5 text-indigo-600" />
+                </div>
+                <p className="text-sm text-gray-700">
+                  <span className="font-semibold text-gray-900">Joining a team workspace?</span>{' '}
+                  You don't need to set anything up yourself.
+                </p>
+              </div>
               <button
                 onClick={handleOnboardingComplete}
-                className="underline text-indigo-600 font-semibold hover:text-indigo-700 transition-colors"
+                className="flex-shrink-0 inline-flex items-center gap-1.5 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold rounded-lg transition-colors whitespace-nowrap"
               >
                 Skip setup for now
+                <ArrowRight className="w-4 h-4" />
               </button>
-            </p>
+            </div>
           )}
         </div>
       </div>

@@ -2,6 +2,10 @@ import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@/lib/auth';
 import { withTenantDb } from '@/lib/db/client';
 
+// Uses auth()/headers() — always request-time. Declaring this stops Next from
+// attempting a build-time prerender probe (which threw DYNAMIC_SERVER_USAGE).
+export const dynamic = 'force-dynamic';
+
 export async function GET(request: NextRequest) {
   try {
     const session = await auth();

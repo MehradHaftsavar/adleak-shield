@@ -5,6 +5,10 @@ import * as mssql from 'mssql';
 import { isPaywalled } from '@/lib/paywallCheck';
 import { getEffectiveTenantId, buildDomainFilter } from '@/lib/adminAuth';
 
+// Uses auth()/headers() — always request-time. Declaring this stops Next from
+// attempting a build-time prerender probe (which threw DYNAMIC_SERVER_USAGE).
+export const dynamic = 'force-dynamic';
+
 export async function GET(request: NextRequest) {
   try {
     const session = await auth();

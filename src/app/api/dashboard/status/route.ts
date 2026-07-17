@@ -4,6 +4,11 @@ import { withTenantDb, withAdminDb } from '@/lib/db/client';
 import * as mssql from 'mssql';
 import { getEffectiveTenantId, buildDomainFilter } from '@/lib/adminAuth';
 
+// Uses auth()/headers() — always request-time. Declaring this stops Next from
+// attempting a build-time prerender probe (which threw DYNAMIC_SERVER_USAGE and
+// opened a DB connection during the build).
+export const dynamic = 'force-dynamic';
+
 export async function GET(request: NextRequest) {
   try {
     const session = await auth();
