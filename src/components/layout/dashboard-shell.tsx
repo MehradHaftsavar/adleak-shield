@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import { SWRConfig } from "swr";
 import { signOut, useSession } from "next-auth/react";
-import { useRouter } from "next/navigation";
+import { useRouter, usePathname } from "next/navigation";
 import Link from "next/link";
 import { LegalFooter } from "@/components/layout/LegalFooter";
 import type { AccessibleDomain } from "@/types/auth";
@@ -162,7 +162,13 @@ export function DashboardShell({ email, tenantId, children }: DashboardShellProp
   });
 
   const router = useRouter();
+  const pathname = usePathname();
   const { data: session, status, update } = useSession();
+
+  // The workspace/domain switcher only filters the dashboard — Settings, Team and
+  // Subscription always act on the user's own account. Showing it elsewhere implied
+  // a context those pages don't have, so it's dashboard-only.
+  const showDomainDropdown = pathname === "/dashboard";
 
   const subscriptionStatus = session?.user?.subscriptionStatus as string | undefined;
   const isActive    = subscriptionStatus === "active" || justSubscribed;
@@ -324,8 +330,9 @@ export function DashboardShell({ email, tenantId, children }: DashboardShellProp
                 AdLeak Shield
               </span>
 
-              {/* Domain dropdown — always visible when at least one domain exists */}
-              {allDomains.length > 0 && (
+              {/* Domain dropdown — dashboard only (it filters the dashboard; other
+                  pages always act on the user's own account) */}
+              {showDomainDropdown && allDomains.length > 0 && (
                 <DomainDropdown
                   domains={allDomains}
                   activeTenantId={activeTenantId}

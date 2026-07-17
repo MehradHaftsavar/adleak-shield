@@ -3,7 +3,7 @@ import { z } from 'zod';
 import { auth } from '@/lib/auth';
 import { withAdminDb, withTenantDb } from '@/lib/db/client';
 import * as mssql from 'mssql';
-import { getEffectiveTenantId, blockedInImpersonation, forbidden } from '@/lib/adminAuth';
+import { getEffectiveTenantId, blockedInImpersonation } from '@/lib/adminAuth';
 import { PLAN_LIMITS } from '@/lib/planLimits';
 import type { PlanType } from '@/types/auth';
 
@@ -25,14 +25,17 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const { isImpersonating, role } = await getEffectiveTenantId(
+    // Settings always acts on the user's OWN account — the INSERT below is hardcoded
+    // to session.user.tenantId, where they are always the owner. The workspace
+    // dropdown (activeTenantId) is a dashboard-only filter, so it must NOT gate this;
+    // doing so wrongly blocked members from managing their own domains whenever an
+    // invited workspace happened to be selected. Editors/visitors still cannot add
+    // domains to someone else's workspace — there is no API path that targets one.
+    const { isImpersonating } = await getEffectiveTenantId(
       session.user.tenantId as string,
       session.user.isOwner as boolean
     );
     if (isImpersonating) return blockedInImpersonation();
-    // Only owners can add domains — editors/visitors work on the owner's behalf
-    if (role === 'visitor') return forbidden('Visitors cannot register domains');
-    if (role === 'editor')  return forbidden('Editors cannot register domains');
 
     const body = await request.json();
     const validation = domainSchema.safeParse(body);
@@ -182,13 +185,13 @@ export async function DELETE(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const { isImpersonating, role } = await getEffectiveTenantId(
+    // Same as POST — the DELETE below is hardcoded to session.user.tenantId (their
+    // own account), so the dashboard-only workspace dropdown must not gate it.
+    const { isImpersonating } = await getEffectiveTenantId(
       session.user.tenantId as string,
       session.user.isOwner as boolean
     );
     if (isImpersonating) return blockedInImpersonation();
-    if (role === 'visitor') return forbidden('Visitors cannot delete domains');
-    if (role === 'editor')  return forbidden('Editors cannot delete domains');
 
     // Optional domainId to delete a specific domain; if omitted, deletes all (legacy)
     let targetDomainId: string | null = null;
