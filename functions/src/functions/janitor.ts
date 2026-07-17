@@ -180,16 +180,26 @@ async function processTenant(
     if (daysSince >= CANCELLED_WARN_DAYS && !tenant.data_deletion_warned_at) {
       const daysLeft     = CANCELLED_PURGE_DAYS - daysSince;
       const deletionDate = formatDate(addDays(cancelledAt, CANCELLED_PURGE_DAYS));
-      ctx.log(`[Janitor] Warning cancelled subscriber ${tenant.tenant_id} (day ${daysSince}, ${daysLeft}d left)`);
 
-      await sendDataDeletionWarningEmail({
-        to:            tenant.email,
-        daysLeft,
-        deletionDate,
-        wasSubscriber: true,
-        dashboardUrl:  DASHBOARD_URL,
-        billingUrl:    DASHBOARD_URL,  // "Manage Billing" button on dashboard opens Stripe portal
-      });
+      // Only attempt the email when the address is well-formed. An invalid address
+      // (e.g. a malformed test account) makes Resend throw — we skip the send but
+      // still stamp warned_at so it doesn't retry (and fail) every night. The purge
+      // at day 90 proceeds regardless; it doesn't need email. A VALID address that
+      // fails to send (transient outage) still throws below → not stamped → retried.
+      if (isValidEmail(tenant.email)) {
+        ctx.log(`[Janitor] Warning cancelled subscriber ${tenant.tenant_id} (day ${daysSince}, ${daysLeft}d left)`);
+        await sendDataDeletionWarningEmail({
+          to:            tenant.email,
+          daysLeft,
+          deletionDate,
+          wasSubscriber: true,
+          dashboardUrl:  DASHBOARD_URL,
+          billingUrl:    DASHBOARD_URL,  // "Manage Billing" button on dashboard opens Stripe portal
+        });
+      } else {
+        ctx.warn(`[Janitor] Skipping warning email for cancelled subscriber ${tenant.tenant_id} — invalid email "${tenant.email}"`);
+      }
+
       await stampWarnedAt(tenant.tenant_id, now);
       return "warned";
     }
@@ -213,16 +223,24 @@ async function processTenant(
     if (daysSince >= TRIAL_WARN_DAYS && !tenant.data_deletion_warned_at) {
       const daysLeft     = TRIAL_PURGE_DAYS - daysSince;
       const deletionDate = formatDate(addDays(trialEnded, TRIAL_PURGE_DAYS));
-      ctx.log(`[Janitor] Warning expired-trial tenant ${tenant.tenant_id} (day ${daysSince}, ${daysLeft}d left)`);
 
-      await sendDataDeletionWarningEmail({
-        to:            tenant.email,
-        daysLeft,
-        deletionDate,
-        wasSubscriber: false,
-        dashboardUrl:  DASHBOARD_URL,
-        billingUrl:    DASHBOARD_URL,
-      });
+      // See the cancelled-subscriber branch above — skip the email for malformed
+      // addresses but still stamp so it doesn't fail every night; purge at day 30
+      // proceeds regardless. Valid addresses that fail to send are still retried.
+      if (isValidEmail(tenant.email)) {
+        ctx.log(`[Janitor] Warning expired-trial tenant ${tenant.tenant_id} (day ${daysSince}, ${daysLeft}d left)`);
+        await sendDataDeletionWarningEmail({
+          to:            tenant.email,
+          daysLeft,
+          deletionDate,
+          wasSubscriber: false,
+          dashboardUrl:  DASHBOARD_URL,
+          billingUrl:    DASHBOARD_URL,
+        });
+      } else {
+        ctx.warn(`[Janitor] Skipping warning email for expired-trial tenant ${tenant.tenant_id} — invalid email "${tenant.email}"`);
+      }
+
       await stampWarnedAt(tenant.tenant_id, now);
       return "warned";
     }
@@ -302,8 +320,16 @@ async function writeJanitorLog(
 }
 
 // ---------------------------------------------------------------------------
-// Date utilities
+// Utilities
 // ---------------------------------------------------------------------------
+
+/** Basic RFC-ish email shape check — enough to keep malformed test addresses
+ *  from making Resend throw. Not a full validator; the signup flow already
+ *  enforces real addresses, so this only catches broken/legacy rows. */
+function isValidEmail(email: string | null | undefined): boolean {
+  if (!email) return false;
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim());
+}
 
 function daysBetween(from: Date, to: Date): number {
   return Math.floor((to.getTime() - from.getTime()) / MS_PER_DAY);
