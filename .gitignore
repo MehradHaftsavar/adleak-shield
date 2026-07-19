@@ -37,5 +37,8 @@ next-env.d.ts
 
 # Claude Code worktrees
 .claude/worktrees/
-"node_modules" 
-".env.local" 
+"node_modules"
+".env.local"
+
+# infra secrets — contains SQL admin password, must never be committed
+infra/params.json
