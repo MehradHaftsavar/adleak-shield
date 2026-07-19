@@ -3,6 +3,7 @@ import type { NextAuthConfig } from "next-auth";
 import type { AccessibleDomain, PlanType } from "@/types/auth";
 
 const edgeConfig: NextAuthConfig = {
+  trustHost: true,
   pages: {
     signIn: "/auth/login",
     error:  "/auth/login",
