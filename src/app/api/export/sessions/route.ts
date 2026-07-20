@@ -42,8 +42,8 @@ export async function GET(request: NextRequest) {
     const country    = searchParams.get('country')    || null;
 
     const rows = await withTenantDb(tenantId, async (req) => {
-      req.input('start',      start + 'T00:00:00Z');
-      req.input('end',        end   + 'T23:59:59Z');
+      req.input('start',      mssql.DateTime, new Date(start + 'T00:00:00Z'));
+      req.input('end',        mssql.DateTime, new Date(end   + 'T23:59:59Z'));
       req.input('keyword',    mssql.NVarChar(200), keyword);
       req.input('campaignId', mssql.NVarChar(36),  campaignId);
       req.input('matchType',  mssql.NVarChar(50),  matchType);
