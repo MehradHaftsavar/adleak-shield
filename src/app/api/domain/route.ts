@@ -154,7 +154,8 @@ export async function GET(_request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    // Setup always operates on the user's own tenant — never the active switched workspace
+    // Setup (add/delete/list-for-management) always operates on the user's own
+    // tenant — never the active switched workspace. This stays unchanged.
     const tenantId = session.user.tenantId as string;
 
     const result = await withTenantDb(tenantId, async (req) => {
@@ -169,6 +170,33 @@ export async function GET(_request: NextRequest) {
         domains:  rows.map((d: any) => ({ domainId: d.domain_id, domainName: d.domain_name, verified: d.verified })),
       };
     });
+
+    // Display-only override: if the dashboard has an active domain selected
+    // (workspace switcher), surface that domain's name as the primary `domain`
+    // field instead of an arbitrary row. Used by the journey panel to label
+    // "Visited <domain>/path" with whatever workspace is actually being viewed.
+    // This never touches domain management above — `domains`/`count` still
+    // reflect the caller's own tenant only.
+    const { tenantId: effectiveTenantId, activeDomainId } = await getEffectiveTenantId(
+      session.user.tenantId as string,
+      session.user.isOwner as boolean
+    );
+
+    if (activeDomainId) {
+      const active = await withTenantDb(effectiveTenantId, async (req) => {
+        req.input('domainId', mssql.UniqueIdentifier, activeDomainId);
+        const r = await req.query(
+          `SELECT domain_id, domain_name, verified FROM Domains WHERE domain_id = @domainId`
+        );
+        return r.recordset[0] ?? null;
+      });
+
+      if (active) {
+        result.domain   = active.domain_name;
+        result.domainId = active.domain_id;
+        result.verified = active.verified || false;
+      }
+    }
 
     return NextResponse.json(result);
 
