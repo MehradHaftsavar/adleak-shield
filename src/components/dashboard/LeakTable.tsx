@@ -97,7 +97,6 @@ export function LeakTable({ dateRange, refreshTrigger }: LeakTableProps) {
   const [data, setData] = useState<LeakTableData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState('');
-  const [clicksCsvLoading, setClicksCsvLoading] = useState(false);
 
   // Journey Timeline
   const [selectedKeyword, setSelectedKeyword] = useState<string | null>(null);
@@ -140,28 +139,6 @@ export function LeakTable({ dateRange, refreshTrigger }: LeakTableProps) {
     if (!data || data.leaks.length === 0) return;
     const csv = generateNegativeKeywordCSV(data.leaks.map(l => ({ keyword: l.keyword, matchType: l.matchType })));
     downloadCSV(csv, `negative-keywords-${new Date().toISOString().split('T')[0]}.csv`);
-  };
-
-  const handleExportClicksCSV = async () => {
-    setClicksCsvLoading(true);
-    try {
-      const params = new URLSearchParams({ start: dateRange.start, end: dateRange.end });
-      const res  = await fetch(`/api/export/clicks?${params}`);
-      if (!res.ok) throw new Error('Export failed');
-      const blob = await res.blob();
-      const url  = URL.createObjectURL(blob);
-      const a    = document.createElement('a');
-      a.href     = url;
-      a.download = `clicks_${dateRange.start}_to_${dateRange.end}.csv`;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
-    } catch (err) {
-      console.error('Clicks CSV export error:', err);
-    } finally {
-      setClicksCsvLoading(false);
-    }
   };
 
   const handleSort = (col: SortKey) => {
@@ -244,17 +221,6 @@ export function LeakTable({ dateRange, refreshTrigger }: LeakTableProps) {
           </div>
           <div className="flex items-center gap-2">
             <button
-              onClick={handleExportClicksCSV}
-              disabled={clicksCsvLoading}
-              className="flex items-center gap-2 px-3 py-2 bg-white border border-gray-300 hover:bg-gray-50 disabled:opacity-50 text-gray-700 text-sm font-medium rounded-lg transition-colors"
-            >
-              {clicksCsvLoading
-                ? <span className="w-3.5 h-3.5 border-2 border-gray-400 border-t-transparent rounded-full animate-spin" />
-                : <Download className="w-3.5 h-3.5" />}
-              <span className="hidden sm:inline">Export Clicks CSV</span>
-              <span className="sm:hidden">Clicks</span>
-            </button>
-            <button
               onClick={handleExportCSV}
               disabled
               className="flex items-center gap-2 px-4 py-2 bg-gray-300 cursor-not-allowed text-white font-semibold rounded-lg"
@@ -323,17 +289,6 @@ export function LeakTable({ dateRange, refreshTrigger }: LeakTableProps) {
             </div>
           </div>
           <div className="flex items-center gap-2">
-            <button
-              onClick={handleExportClicksCSV}
-              disabled={clicksCsvLoading}
-              className="flex items-center gap-2 px-3 py-2 bg-white border border-gray-300 hover:bg-gray-50 disabled:opacity-50 text-gray-700 text-sm font-medium rounded-lg transition-colors"
-            >
-              {clicksCsvLoading
-                ? <span className="w-3.5 h-3.5 border-2 border-gray-400 border-t-transparent rounded-full animate-spin" />
-                : <Download className="w-3.5 h-3.5" />}
-              <span className="hidden sm:inline">Export Clicks CSV</span>
-              <span className="sm:hidden">Clicks</span>
-            </button>
             <button
               onClick={handleExportCSV}
               disabled={rows.length === 0}

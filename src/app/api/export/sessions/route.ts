@@ -75,7 +75,7 @@ export async function GET(request: NextRequest) {
           CASE
             WHEN EXISTS (
               SELECT 1 FROM JourneyEvents je
-              WHERE je.session_id = s.session_id AND je.is_success_event = 1
+              WHERE je.session_id = s.session_id AND je.event_type = 'success_event'
             ) THEN 'Converted'
             WHEN s.is_bounce = 1 THEN 'Bounce'
             ELSE 'Engaged'
@@ -97,13 +97,13 @@ export async function GET(request: NextRequest) {
             @outcome IS NULL
             OR (@outcome = 'converted' AND EXISTS (
                 SELECT 1 FROM JourneyEvents je
-                WHERE je.session_id = s.session_id AND je.is_success_event = 1))
+                WHERE je.session_id = s.session_id AND je.event_type = 'success_event'))
             OR (@outcome = 'bounce' AND s.is_bounce = 1 AND NOT EXISTS (
                 SELECT 1 FROM JourneyEvents je
-                WHERE je.session_id = s.session_id AND je.is_success_event = 1))
+                WHERE je.session_id = s.session_id AND je.event_type = 'success_event'))
             OR (@outcome = 'engaged' AND s.is_bounce = 0 AND NOT EXISTS (
                 SELECT 1 FROM JourneyEvents je
-                WHERE je.session_id = s.session_id AND je.is_success_event = 1))
+                WHERE je.session_id = s.session_id AND je.event_type = 'success_event'))
           )
         ORDER BY s.started_at DESC
       `);
