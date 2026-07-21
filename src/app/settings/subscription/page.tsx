@@ -446,7 +446,7 @@ export default function SubscriptionPage() {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
           <div className="bg-white rounded-xl shadow-xl max-w-md w-full p-6">
             <h2 className="text-lg font-bold text-gray-900 mb-2">
-              {confirmChange.resubscribing ? 'Confirm subscription' : confirmChange.trialing ? 'Confirm plan change' : confirmChange.isUpgrade ? 'Confirm upgrade' : 'Confirm downgrade'}
+              {confirmChange.resubscribing ? 'Confirm subscription' : confirmChange.trialing ? 'Confirm subscription' : confirmChange.isUpgrade ? 'Confirm upgrade' : 'Confirm downgrade'}
             </h2>
             <p className="text-sm text-gray-600 mb-4">
               {confirmChange.resubscribing ? (
@@ -455,10 +455,17 @@ export default function SubscriptionPage() {
                   <strong>£{PLAN_LIMITS[confirmChange.plan].priceGbp.toFixed(2)}/month</strong>.
                 </>
               ) : confirmChange.trialing ? (
-                <>
-                  You&apos;re switching to <strong>{PLAN_LIMITS[confirmChange.plan].label}</strong> at{' '}
-                  <strong>£{PLAN_LIMITS[confirmChange.plan].priceGbp.toFixed(2)}/month</strong>.
-                </>
+                confirmChange.plan === currentPlan ? (
+                  <>
+                    You&apos;re subscribing to <strong>{PLAN_LIMITS[confirmChange.plan].label}</strong> — the plan
+                    you&apos;re already trialing — at <strong>£{PLAN_LIMITS[confirmChange.plan].priceGbp.toFixed(2)}/month</strong>.
+                  </>
+                ) : (
+                  <>
+                    You&apos;re switching to <strong>{PLAN_LIMITS[confirmChange.plan].label}</strong> at{' '}
+                    <strong>£{PLAN_LIMITS[confirmChange.plan].priceGbp.toFixed(2)}/month</strong>.
+                  </>
+                )
               ) : (
                 <>
                   You&apos;re switching from <strong>{PLAN_LIMITS[currentPlan].label}</strong> to{' '}
