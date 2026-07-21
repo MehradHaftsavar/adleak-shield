@@ -7,8 +7,9 @@ import type { PlanType } from '@/types/auth';
 
 export const dynamic = 'force-dynamic';
 
-// Changes plan_type in DB for genuine trialing users (no prior subscription).
-// Returning subscribers (stripe_customer_id exists) are redirected to checkout.
+// Any non-active tenant (trialing, expired trial, canceled, or returning
+// subscriber) is redirected to Stripe Checkout — plan changes always start
+// billing immediately rather than waiting for a trial to end.
 // Active paid subscribers must go through /api/stripe/upgrade.
 export async function POST(request: NextRequest) {
   try {
@@ -28,7 +29,7 @@ export async function POST(request: NextRequest) {
     const tenantRow = await withAdminDb(async (req) => {
       const r = await req
         .input('tenantId', mssql.UniqueIdentifier, tenantId)
-        .query(`SELECT subscription_status, stripe_customer_id, trial_ends_at FROM Tenants WHERE tenant_id = @tenantId`);
+        .query(`SELECT subscription_status FROM Tenants WHERE tenant_id = @tenantId`);
       return r.recordset[0] ?? null;
     });
 
@@ -49,27 +50,10 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: limitCheck.error }, { status: 400 });
     }
 
-    // Returning subscriber (has had a paid sub before) — must create a new subscription
-    // through Stripe Checkout rather than just updating the DB preference.
-    // Also redirect expired-trial users: their trial has ended so they need to pay now.
-    const trialExpired =
-      tenantRow.trial_ends_at != null &&
-      new Date(tenantRow.trial_ends_at) < new Date();
-
-    if (tenantRow.stripe_customer_id || trialExpired) {
-      return NextResponse.json({ redirect: 'checkout' });
-    }
-
-    // Genuine active trial user (never subscribed, trial still running) —
-    // update plan preference in DB. Payment starts at trial end via Stripe.
-    await withAdminDb(async (req) => {
-      await req
-        .input('plan',     mssql.NVarChar(20),    plan)
-        .input('tenantId', mssql.UniqueIdentifier, tenantId)
-        .query(`UPDATE Tenants SET plan_type = @plan WHERE tenant_id = @tenantId`);
-    });
-
-    return NextResponse.json({ success: true, plan: plan as PlanType });
+    // Not an active paid subscriber (trialing — expired or still running,
+    // canceled, or a returning subscriber) — always send to Stripe Checkout
+    // so payment starts now instead of waiting for a trial to end.
+    return NextResponse.json({ redirect: 'checkout' });
   } catch (error) {
     console.error('[user/plan] Error:', error);
     return NextResponse.json({ error: 'Failed to update plan' }, { status: 500 });

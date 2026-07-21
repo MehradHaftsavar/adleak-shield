@@ -221,30 +221,20 @@ export default function SubscriptionPage() {
           return;
         }
 
-        // Returning subscriber with admin-extended trial — needs a new Stripe subscription
-        if (data.redirect === 'checkout') {
-          const checkoutRes  = await fetch('/api/stripe/checkout', {
-            method:  'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body:    JSON.stringify({ plan }),
-          });
-          const checkoutData = await checkoutRes.json();
-          if (checkoutData.url) {
-            window.location.href = checkoutData.url;
-          } else {
-            setIsError(true);
-            setMessage(checkoutData.error || 'Something went wrong. Please try again.');
-          }
-          return;
+        // Any trialing tenant (still running or expired) — always a new Stripe
+        // subscription, so payment starts now instead of waiting for trial end.
+        const checkoutRes  = await fetch('/api/stripe/checkout', {
+          method:  'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body:    JSON.stringify({ plan }),
+        });
+        const checkoutData = await checkoutRes.json();
+        if (checkoutData.url) {
+          window.location.href = checkoutData.url;
+        } else {
+          setIsError(true);
+          setMessage(checkoutData.error || 'Something went wrong. Please try again.');
         }
-
-        // Genuine trial user — plan preference saved, billed at trial end.
-        // update({ planType }) stamps the JWT (dashboard reflects it); setLiveSub
-        // updates this page's display immediately.
-        await update({ planType: plan });
-        setLiveSub(prev => ({ status: 'trialing', plan, trialEndsAt: prev?.trialEndsAt ?? null }));
-        setMessage(`Plan updated to ${PLAN_LIMITS[plan].label}. You'll be billed this amount when your trial ends.`);
-        window.scrollTo({ top: 0, behavior: 'smooth' });
         return;
       }
 
@@ -480,7 +470,7 @@ export default function SubscriptionPage() {
               {confirmChange.resubscribing
                 ? 'You\'ll be taken to Stripe to complete payment. Make sure you\'ve selected the right plan before continuing.'
                 : confirmChange.trialing
-                  ? 'You won\'t be charged until your trial ends. If your trial has already expired, you\'ll be taken to Stripe to complete payment.'
+                  ? 'You\'ll be taken to Stripe to start your subscription now — this ends your trial and starts billing today.'
                   : confirmChange.isUpgrade
                     ? 'You\'ll be charged the prorated difference for the remaining days in your current billing period.'
                     : 'Any unused time on your current plan will be credited and automatically deducted from your next invoice — you won\'t be charged twice.'}
@@ -506,7 +496,7 @@ export default function SubscriptionPage() {
                 {loading === confirmChange.plan && (
                   <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
                 )}
-                {confirmChange.resubscribing ? 'Continue to Stripe' : confirmChange.trialing ? 'Confirm' : confirmChange.isUpgrade ? 'Confirm upgrade' : 'Confirm downgrade'}
+                {confirmChange.resubscribing || confirmChange.trialing ? 'Continue to Stripe' : confirmChange.isUpgrade ? 'Confirm upgrade' : 'Confirm downgrade'}
               </button>
             </div>
           </div>
