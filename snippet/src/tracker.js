@@ -154,6 +154,7 @@
 
       var tag = el.tagName.toLowerCase();
       var href = (el.getAttribute("href") || "").toLowerCase();
+      var text = (el.textContent || el.getAttribute("aria-label") || el.getAttribute("value") || "").trim();
       var isSuccess = false;
 
       if (href.indexOf("tel:") === 0) isSuccess = true;
@@ -172,6 +173,7 @@
         pagePath: window.location.pathname,
         elementTag: tag,
         elementHref: href.substring(0, 500),
+        elementText: text.substring(0, 100),
       });
 
       // For success events on <a> links: delay navigation by 150ms so the

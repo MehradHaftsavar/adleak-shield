@@ -50,6 +50,28 @@ function isThankYouPage(path: string | null | undefined): boolean {
   );
 }
 
+// Google Ads' {matchtype} ValueTrack parameter sends single-letter codes on
+// real ad clicks ("e"/"p"/"b"), not full words — only our own manual test
+// URLs use full words. Normalise both into one canonical lowercase form so
+// storage, filters, and display are consistent regardless of source.
+function normaliseMatchType(raw: string | null | undefined): string | null {
+  if (!raw) return null;
+  const v = raw.trim().toLowerCase();
+  switch (v) {
+    case "e": return "exact";
+    case "p": return "phrase";
+    case "b": return "broad";
+    case "exact":
+    case "phrase":
+    case "broad":
+      return v;
+    default:
+      // Unrecognised (e.g. Google's "u" for unknown match type) — keep as-is
+      // rather than discarding it.
+      return v;
+  }
+}
+
 interface CampaignLookup {
   tenantId: string;
   campaignId: string;
@@ -187,7 +209,7 @@ async function ensureSession(
     .input("campaignId", mssql.UniqueIdentifier, campaignId)
     .input("fp", mssql.NVarChar, sessionFingerprint.substring(0, 64))
     .input("keyword", mssql.NVarChar, session.keyword ?? null)
-    .input("matchType", mssql.NVarChar, session.matchType ?? null)
+    .input("matchType", mssql.NVarChar, normaliseMatchType(session.matchType))
     .input("device", mssql.NVarChar, session.device ?? null)
     .input("gclid", mssql.NVarChar, session.gclid ?? null)
     .input("ipMasked", mssql.NVarChar, msg.ipMasked.substring(0, 20))
@@ -242,7 +264,7 @@ async function insertClickLog(
     .input("sessionId", mssql.UniqueIdentifier, sessionId)
     .input("campaignId", mssql.UniqueIdentifier, campaignId)
     .input("keyword", mssql.NVarChar, session?.keyword ?? null)
-    .input("matchType", mssql.NVarChar, session?.matchType ?? null)
+    .input("matchType", mssql.NVarChar, normaliseMatchType(session?.matchType))
     .input(
       "landingPath",
       mssql.NVarChar,
