@@ -211,6 +211,36 @@
   );
 
   // ===========================================================================
+  // FORM INTERACT — fires once per session the first time a visitor starts
+  // filling in a form field (textarea, select, or a real text-like input —
+  // excludes hidden/submit/button/reset). Signals engagement even if they
+  // never actually submit.
+  // ===========================================================================
+  var hasFiredFormInteract = false;
+  document.addEventListener(
+    "focusin",
+    function (e) {
+      if (hasFiredFormInteract) return;
+      var target = e.target;
+      if (!target) return;
+      var tag = (target.tagName || "").toLowerCase();
+      var type = ((target.getAttribute && target.getAttribute("type")) || "").toLowerCase();
+      var isFormField =
+        tag === "textarea" ||
+        tag === "select" ||
+        (tag === "input" && ["hidden", "submit", "button", "reset"].indexOf(type) === -1);
+      if (isFormField) {
+        hasFiredFormInteract = true;
+        send("form_interact", {
+          sessionFingerprint: session.sessionFingerprint,
+          pagePath: window.location.pathname,
+        });
+      }
+    },
+    true
+  );
+
+  // ===========================================================================
   // HEARTBEAT
   // Tells the server "this user is still on the page" periodically.
   // Uses ACTIVE dwell time (excludes time tab was hidden).
