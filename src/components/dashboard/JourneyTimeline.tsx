@@ -292,7 +292,22 @@ function TimelineEventRow({ event, index, domain }: { event: JourneyEvent; index
   if (isPageview) {
     label = `Visited ${pageLabel}`;
   } else if (isSuccess) {
-    label = `✅ ${event.elementText || event.elementHref || event.elementTag || 'Success event'}`;
+    const href = event.elementHref || '';
+    if (href.startsWith('tel:')) {
+      label = `Conversion: Called ${href.slice(4)}`;
+    } else if (href.startsWith('mailto:')) {
+      label = `Conversion: Emailed ${href.slice(7)}`;
+    } else if (href.includes('wa.me') || href.includes('wa.link')) {
+      label = 'Conversion: Messaged via WhatsApp';
+    } else if (event.elementTag === 'form') {
+      label = 'Conversion: Submitted a form';
+    } else if (event.elementText) {
+      label = `Conversion: Clicked "${event.elementText}"`;
+    } else if (!href && !event.elementTag) {
+      label = `Conversion: Reached ${pageLabel}`;
+    } else {
+      label = `Conversion: ${href || event.elementTag || 'Success event'}`;
+    }
   } else {
     label = `Clicked ${event.elementText || event.elementHref || event.elementTag || 'element'}`;
   }
