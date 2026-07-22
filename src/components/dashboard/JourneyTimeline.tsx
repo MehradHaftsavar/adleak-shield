@@ -300,7 +300,9 @@ function TimelineEventRow({ event, index, domain }: { event: JourneyEvent; index
     } else if (href.includes('wa.me') || href.includes('wa.link')) {
       label = 'Conversion: Messaged via WhatsApp';
     } else if (event.elementTag === 'form') {
-      label = 'Conversion: Submitted a form';
+      label = event.elementText
+        ? `Conversion: Submitted form "${event.elementText}"`
+        : 'Conversion: Submitted a form';
     } else if (event.elementText) {
       label = `Conversion: Clicked "${event.elementText}"`;
     } else if (!href && !event.elementTag) {
@@ -309,15 +311,25 @@ function TimelineEventRow({ event, index, domain }: { event: JourneyEvent; index
       label = `Conversion: ${href || event.elementTag || 'Success event'}`;
     }
   } else {
-    label = `Clicked ${event.elementText || event.elementHref || event.elementTag || 'element'}`;
+    const what = event.elementTag === 'a' ? 'link' : event.elementTag === 'button' ? 'button' : 'element';
+    label = event.elementText
+      ? `Clicked "${event.elementText}" ${what}`
+      : event.elementHref
+      ? `Clicked ${what} (${event.elementHref})`
+      : `Clicked ${what}`;
   }
 
   return (
     <div className="relative flex items-start gap-3 pl-6">
       <div className={`absolute left-0 mt-1 w-3.5 h-3.5 rounded-full border-2 border-white shrink-0 ring-2 ${dotColour}`} />
 
-      <div className={`flex-1 min-w-0 rounded-lg border p-2.5 ${isSuccess ? 'bg-green-50 border-green-200' : 'bg-white border-gray-200'}`}>
-        <p className={`text-sm font-medium truncate ${isSuccess ? 'text-green-800' : 'text-gray-900'}`}>
+      <div className={`relative flex-1 min-w-0 rounded-lg border p-2.5 ${isSuccess ? 'bg-green-50 border-green-200' : 'bg-white border-gray-200'}`}>
+        {!isPageview && (
+          <span className="absolute top-1.5 right-2.5 text-[10px] text-gray-400 truncate max-w-[45%]">
+            {pageLabel}
+          </span>
+        )}
+        <p className={`text-sm font-medium truncate ${isSuccess ? 'text-green-800' : 'text-gray-900'} ${!isPageview ? 'pr-2' : ''}`}>
           {label}
         </p>
 

@@ -29,9 +29,11 @@ const THANK_YOU_PATHS = [
   '/signup', '/sign-up', '/sign_up', '/register', '/registration',
   '/get-started', '/get_started', '/onboarding', '/welcome',
   '/success', '/account-created', '/account/created',
-  // Contact / enquiry (service businesses)
-  '/contact', '/contact-us', '/contact_us', '/contactus',
-  '/enquiry', '/enquire', '/enquiry-sent', '/enquiry-received',
+  // Contact / enquiry (service businesses) — note: '/contact' itself is
+  // deliberately excluded. Merely landing on a contact page isn't a
+  // conversion; the actual form submission is tracked separately via the
+  // real "submit" event, which fires regardless of this list.
+  '/enquiry-sent', '/enquiry-received',
   '/message-sent', '/message-received',
   // Quote / booking (trades)
   '/quote', '/get-a-quote', '/free-quote', '/request-a-quote', '/quote-request',

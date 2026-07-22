@@ -200,11 +200,15 @@
   // ===========================================================================
   document.addEventListener(
     "submit",
-    function () {
+    function (e) {
+      var form = e.target;
+      var formLabel =
+        (form && (form.id || form.getAttribute("name") || form.getAttribute("action"))) || "";
       send("success_event", {
         sessionFingerprint: session.sessionFingerprint,
         pagePath: window.location.pathname,
         elementTag: "form",
+        elementText: formLabel.substring(0, 100),
       });
     },
     true
