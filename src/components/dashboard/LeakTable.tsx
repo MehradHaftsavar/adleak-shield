@@ -177,7 +177,7 @@ export function LeakTable({ dateRange, refreshTrigger }: LeakTableProps) {
   const totalPages = Math.max(1, Math.ceil(rows.length / PAGE_SIZE));
   const pageRows = rows.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
 
-  const thClass = "px-4 sm:px-6 py-3 text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer select-none hover:bg-gray-100 transition-colors";
+  const thClass = "px-2.5 sm:px-3.5 py-2 text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer select-none hover:bg-gray-100 transition-colors";
 
   if (isLoading) {
     return (
@@ -387,32 +387,32 @@ export function LeakTable({ dateRange, refreshTrigger }: LeakTableProps) {
                 className="hover:bg-blue-50 transition-colors cursor-pointer group"
                 onClick={() => { setSelectedKeyword(leak.keyword); setSelectedMatchType(leak.matchType); }}
               >
-                <td className="px-4 sm:px-6 py-4 whitespace-nowrap">
+                <td className="px-2.5 sm:px-3.5 py-2 whitespace-nowrap">
                   <div className="flex items-center gap-2">
                     <span className="font-medium text-gray-900">{leak.keyword}</span>
                     <ExternalLink className="w-3.5 h-3.5 text-gray-400 opacity-0 group-hover:opacity-100 transition-opacity" />
                   </div>
                 </td>
-                <td className="px-4 sm:px-6 py-4 whitespace-nowrap">
+                <td className="px-2.5 sm:px-3.5 py-2 whitespace-nowrap">
                   <span className="inline-flex px-2 py-1 text-xs font-medium rounded-full bg-blue-100 text-blue-800">
                     {leak.matchType}
                   </span>
                 </td>
-                <td className="px-4 sm:px-6 py-4 whitespace-nowrap text-sm text-gray-700">
+                <td className="px-2.5 sm:px-3.5 py-2 whitespace-nowrap text-sm text-gray-700">
                   {leak.googleCampaignId}
                 </td>
-                <td className="px-4 sm:px-6 py-4 whitespace-nowrap text-right text-sm text-gray-900">
+                <td className="px-2.5 sm:px-3.5 py-2 whitespace-nowrap text-right text-sm text-gray-900">
                   {leak.totalClicks}
                 </td>
-                <td className="px-4 sm:px-6 py-4 whitespace-nowrap text-right text-sm text-gray-900">
+                <td className="px-2.5 sm:px-3.5 py-2 whitespace-nowrap text-right text-sm text-gray-900">
                   {leak.bounceClicks}
                 </td>
-                <td className="px-4 sm:px-6 py-4 whitespace-nowrap text-right text-sm">
+                <td className="px-2.5 sm:px-3.5 py-2 whitespace-nowrap text-right text-sm">
                   <span className={`font-semibold ${leak.bounceRate > 80 ? 'text-red-600' : leak.bounceRate > 50 ? 'text-orange-600' : 'text-gray-900'}`}>
                     {leak.bounceRate.toFixed(1)}%
                   </span>
                 </td>
-                <td className="px-4 sm:px-6 py-4 whitespace-nowrap text-right text-sm font-bold text-red-600">
+                <td className="px-2.5 sm:px-3.5 py-2 whitespace-nowrap text-right text-sm font-bold text-red-600">
                   £{leak.estimatedWaste.toFixed(2)}
                 </td>
               </tr>
