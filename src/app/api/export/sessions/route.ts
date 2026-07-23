@@ -85,6 +85,7 @@ export async function GET(request: NextRequest) {
         LEFT JOIN Campaigns c ON c.campaign_id = s.campaign_id
         WHERE s.started_at >= @start
           AND s.started_at <= @end
+          AND s.keyword <> 'adleak_test'
           ${domainFilter}
           AND (@keyword    IS NULL OR s.keyword       LIKE '%' + @keyword + '%')
           AND (@campaignId IS NULL OR s.campaign_id   = CAST(@campaignId AS UNIQUEIDENTIFIER))
