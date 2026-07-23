@@ -274,13 +274,16 @@ function TimelineView({
 }
 
 function TimelineEventRow({ event, index, domain }: { event: JourneyEvent; index: number; domain: string | null }) {
-  const isSuccess  = event.eventType === 'success_event';
-  const isPageview = event.eventType === 'pageview';
+  const isSuccess      = event.eventType === 'success_event';
+  const isPageview     = event.eventType === 'pageview';
+  const isFormInteract = event.eventType === 'form_interact';
 
   const dotColour = isSuccess
     ? 'bg-green-500 ring-green-300'
     : isPageview
     ? 'bg-blue-400 ring-blue-200'
+    : isFormInteract
+    ? 'bg-amber-400 ring-amber-200'
     : 'bg-gray-400 ring-gray-200';
 
   const pagePath = event.pagePath || '/';
@@ -310,6 +313,8 @@ function TimelineEventRow({ event, index, domain }: { event: JourneyEvent; index
     } else {
       label = `Conversion: ${href || event.elementTag || 'Success event'}`;
     }
+  } else if (isFormInteract) {
+    label = 'Started filling out a form';
   } else {
     const what = event.elementTag === 'a' ? 'link' : event.elementTag === 'button' ? 'button' : 'element';
     label = event.elementText
@@ -323,17 +328,17 @@ function TimelineEventRow({ event, index, domain }: { event: JourneyEvent; index
     <div className="relative flex items-start gap-3 pl-6">
       <div className={`absolute left-0 mt-1 w-3.5 h-3.5 rounded-full border-2 border-white shrink-0 ring-2 ${dotColour}`} />
 
-      <div className={`relative flex-1 min-w-0 rounded-lg border p-2.5 ${isSuccess ? 'bg-green-50 border-green-200' : 'bg-white border-gray-200'}`}>
-        {!isPageview && (
-          <span className="absolute top-1.5 right-2.5 text-[10px] text-gray-400 truncate max-w-[45%]">
-            {pageLabel}
-          </span>
-        )}
-        <p className={`text-sm font-medium truncate ${isSuccess ? 'text-green-800' : 'text-gray-900'} ${!isPageview ? 'pr-2' : ''}`}>
+      <div className={`flex-1 min-w-0 rounded-lg border p-3 ${isSuccess ? 'bg-green-50 border-green-200' : 'bg-white border-gray-200'}`}>
+        <p className={`text-sm font-medium break-words ${isSuccess ? 'text-green-800' : 'text-gray-900'}`}>
           {label}
         </p>
 
-        <div className="flex items-center gap-3 mt-1 flex-wrap">
+        <div className="flex items-center gap-3 mt-1.5 flex-wrap">
+          {!isPageview && (
+            <span className="text-xs text-gray-400 truncate max-w-[200px]">
+              {pageLabel}
+            </span>
+          )}
           {event.dwellTimeMs != null && (
             <span className="text-xs text-gray-500">
               {formatDuration(event.dwellTimeMs)} dwell
