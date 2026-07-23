@@ -467,7 +467,7 @@ export function SessionsTable({ campaigns, dateRange, refreshTrigger }: Sessions
               <option value="">All Campaigns</option>
               {campaigns.map(c => (
                 <option key={c.id} value={c.id}>
-                  {c.name || `Campaign ${c.slotNumber}`}
+                  {c.name ? `${c.name} (${c.googleCampaignId})` : `Campaign ${c.slotNumber} (${c.googleCampaignId})`}
                 </option>
               ))}
             </select>
