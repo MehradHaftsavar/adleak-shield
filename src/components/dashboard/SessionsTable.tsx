@@ -643,7 +643,7 @@ export function SessionsTable({ campaigns, dateRange, refreshTrigger }: Sessions
               <thead className="bg-gray-50 border-b border-gray-200">
                 <tr>
                   {(() => {
-                    const thClass = "px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer select-none hover:bg-gray-100 transition-colors";
+                    const thClass = "px-2.5 sm:px-3.5 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer select-none hover:bg-gray-100 transition-colors";
                     const thR = thClass.replace('text-left', 'text-right');
                     return (<>
                       <th className={thClass} onClick={() => handleSort('keyword')}>Keyword <SortIcon col="keyword" sortKey={sortKey} sortDir={sortDir} /></th>
@@ -668,36 +668,36 @@ export function SessionsTable({ campaigns, dateRange, refreshTrigger }: Sessions
                     onClick={() => setSelectedSession(s)}
                     className="hover:bg-blue-50 transition-colors cursor-pointer group"
                   >
-                    <td className="px-4 sm:px-6 py-3 whitespace-nowrap">
+                    <td className="px-2.5 sm:px-3.5 py-2 whitespace-nowrap">
                       <div className="flex items-center gap-2">
                         <span className="font-medium text-gray-900 text-sm">{s.keyword}</span>
                         <ChevronRight className="w-3.5 h-3.5 text-gray-400 opacity-0 group-hover:opacity-100 transition-opacity" />
                       </div>
                     </td>
                     {cols.matchType && (
-                      <td className="px-4 sm:px-6 py-3 whitespace-nowrap">
+                      <td className="px-2.5 sm:px-3.5 py-2 whitespace-nowrap">
                         <span className="inline-flex px-2 py-0.5 text-xs font-medium rounded-full bg-blue-100 text-blue-800">
                           {s.matchType || '—'}
                         </span>
                       </td>
                     )}
                     {cols.date && (
-                      <td className="px-4 sm:px-6 py-3 whitespace-nowrap text-sm text-gray-600">
+                      <td className="px-2.5 sm:px-3.5 py-2 whitespace-nowrap text-sm text-gray-600">
                         {formatDate(s.startedAt)}
                       </td>
                     )}
                     {cols.campaignName && (
-                      <td className="px-4 sm:px-6 py-3 whitespace-nowrap text-sm text-gray-600">
+                      <td className="px-2.5 sm:px-3.5 py-2 whitespace-nowrap text-sm text-gray-600">
                         {s.campaignName || '—'}
                       </td>
                     )}
                     {cols.campaign && (
-                      <td className="px-4 sm:px-6 py-3 whitespace-nowrap text-sm text-gray-600">
+                      <td className="px-2.5 sm:px-3.5 py-2 whitespace-nowrap text-sm text-gray-600">
                         {s.googleCampaignId}
                       </td>
                     )}
                     {effectiveCols.device && (
-                      <td className="px-4 sm:px-6 py-3 whitespace-nowrap">
+                      <td className="px-2.5 sm:px-3.5 py-2 whitespace-nowrap">
                         <span className="inline-flex items-center gap-1.5 text-sm text-gray-600">
                           <DeviceIcon device={s.device} />
                           {s.device || 'Desktop'}
@@ -705,12 +705,12 @@ export function SessionsTable({ campaigns, dateRange, refreshTrigger }: Sessions
                       </td>
                     )}
                     {cols.location && (
-                      <td className="px-4 sm:px-6 py-3 whitespace-nowrap text-sm text-gray-600">
+                      <td className="px-2.5 sm:px-3.5 py-2 whitespace-nowrap text-sm text-gray-600">
                         {formatLocation(s.city, s.country)}
                       </td>
                     )}
                     {cols.duration && (
-                      <td className="px-4 sm:px-6 py-3 whitespace-nowrap text-right">
+                      <td className="px-2.5 sm:px-3.5 py-2 whitespace-nowrap text-right">
                         <span className="inline-flex items-center gap-1 text-sm text-gray-600">
                           <Clock className="w-3.5 h-3.5 text-gray-400" />
                           {formatDuration(s.totalDurationMs)}
@@ -718,16 +718,16 @@ export function SessionsTable({ campaigns, dateRange, refreshTrigger }: Sessions
                       </td>
                     )}
                     {cols.adGroup && (
-                      <td className="px-4 sm:px-6 py-3 whitespace-nowrap">
+                      <td className="px-2.5 sm:px-3.5 py-2 whitespace-nowrap">
                         <span className="text-sm text-gray-500 font-mono">{s.adGroupId ?? '—'}</span>
                       </td>
                     )}
                     {cols.adId && (
-                      <td className="px-4 sm:px-6 py-3 whitespace-nowrap">
+                      <td className="px-2.5 sm:px-3.5 py-2 whitespace-nowrap">
                         <span className="text-sm text-gray-500 font-mono">{s.adId ?? '—'}</span>
                       </td>
                     )}
-                    <td className="px-4 sm:px-6 py-3 whitespace-nowrap">
+                    <td className="px-2.5 sm:px-3.5 py-2 whitespace-nowrap">
                       <OutcomeBadge isBounce={s.isBounce} hasSuccessEvent={s.hasSuccessEvent} />
                     </td>
                   </tr>
