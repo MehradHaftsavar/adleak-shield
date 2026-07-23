@@ -462,7 +462,7 @@ export function SessionsTable({ campaigns, dateRange, refreshTrigger }: Sessions
             <select
               value={campaignId}
               onChange={e => setCampaignId(e.target.value)}
-              className="w-full xl:col-span-2 px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
             >
               <option value="">All Campaigns</option>
               {campaigns.map(c => (
