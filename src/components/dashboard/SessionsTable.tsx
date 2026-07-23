@@ -18,45 +18,45 @@ import {
   Download,
 } from 'lucide-react';
 
-type ColKey = 'matchType' | 'date' | 'campaign' | 'device' | 'location' | 'duration' | 'adGroup' | 'adId' | 'position';
+type ColKey = 'matchType' | 'date' | 'campaignName' | 'campaign' | 'device' | 'location' | 'duration' | 'adGroup' | 'adId';
 
 const COL_LABELS: Record<ColKey, string> = {
-  matchType: 'Match Type',
-  date:      'Date',
-  campaign:  'Campaign',
-  device:    'Device',
-  location:  'Location',
-  duration:  'Duration',
-  adGroup:   'Ad Group',
-  adId:      'Ad ID',
-  position:  'Ad Position',
+  matchType:    'Match Type',
+  date:         'Date',
+  campaignName: 'Campaign Name',
+  campaign:     'Campaign ID',
+  device:       'Device',
+  location:     'Location',
+  duration:     'Duration',
+  adGroup:      'Ad Group',
+  adId:         'Ad ID',
 };
 
 const DEFAULT_COLS: Record<ColKey, boolean> = {
-  matchType: true,
-  date:      true,
-  campaign:  true,
-  device:    false,
-  location:  true,
-  duration:  true,
-  adGroup:   false,
-  adId:      false,
-  position:  false,
+  matchType:    true,
+  date:         true,
+  campaignName: true,
+  campaign:     false,
+  device:       false,
+  location:     true,
+  duration:     true,
+  adGroup:      false,
+  adId:         false,
 };
 
 const MOBILE_COLS: Record<ColKey, boolean> = {
-  matchType: false,
-  date:      false,
-  campaign:  false,
-  device:    false,
-  location:  false,
-  duration:  false,
-  adGroup:   false,
-  adId:      false,
-  position:  false,
+  matchType:    false,
+  date:         false,
+  campaignName: false,
+  campaign:     false,
+  device:       false,
+  location:     false,
+  duration:     false,
+  adGroup:      false,
+  adId:         false,
 };
 
-type SortKey = 'keyword' | 'matchType' | 'date' | 'campaign' | 'device' | 'location' | 'duration' | 'adGroup' | 'adId' | 'position' | 'outcome';
+type SortKey = 'keyword' | 'matchType' | 'date' | 'campaignName' | 'campaign' | 'device' | 'location' | 'duration' | 'adGroup' | 'adId' | 'outcome';
 type SortDir = 'asc' | 'desc';
 
 function SortIcon({ col, sortKey, sortDir }: { col: SortKey; sortKey: SortKey; sortDir: SortDir }) {
@@ -81,6 +81,7 @@ interface Session {
   city:             string | null;
   country:          string | null;
   googleCampaignId: string;
+  campaignName:     string | null;
   campaignId:       string;
   eventCount:       number;
   hasSuccessEvent:  boolean;
@@ -90,22 +91,13 @@ interface Campaign {
   id:               string;
   googleCampaignId: string;
   slotNumber:       number;
+  name:             string | null;
 }
 
 interface SessionsTableProps {
   campaigns: Campaign[];
   dateRange: { start: string; end: string };
   refreshTrigger: number;
-}
-
-function formatAdPosition(pos: string | null): string {
-  if (!pos) return '—';
-  if (pos === 'none') return 'Display Network';
-  const m = pos.match(/^(\d+)(t|o)(\d+)$/);
-  if (!m) return pos;
-  const [, page, placement, rank] = m;
-  const loc = placement === 't' ? 'Top' : 'Bottom';
-  return page === '1' ? `${loc} #${rank}` : `Pg ${page} ${loc} #${rank}`;
 }
 
 // Converts an ISO 3166-1 alpha-2 code (e.g. "GB") to its flag emoji using
@@ -203,7 +195,6 @@ export function SessionsTable({ campaigns, dateRange, refreshTrigger }: Sessions
       if (outcome)    params.set('outcome',    outcome);
       if (adGroupId)  params.set('adGroupId',  adGroupId);
       if (adId)       params.set('adId',       adId);
-      if (adPosition) params.set('adPosition', adPosition);
       if (country)    params.set('country',    country);
       const res  = await fetch(`/api/export/sessions?${params}`);
       if (!res.ok) throw new Error('Export failed');
@@ -233,14 +224,12 @@ export function SessionsTable({ campaigns, dateRange, refreshTrigger }: Sessions
   // Filters — ad detail
   const [adGroupId,   setAdGroupId]   = useState('');
   const [adId,        setAdId]        = useState('');
-  const [adPosition,  setAdPosition]  = useState('');
   const [showAdFilters, setShowAdFilters] = useState(false);
 
   // Cached dropdown options — populated from sessions when no ad filter is active,
   // so selecting a value doesn't collapse the dropdown to a single item.
   const [adGroupOptions,   setAdGroupOptions]   = useState<string[]>([]);
   const [adIdOptions,      setAdIdOptions]      = useState<string[]>([]);
-  const [adPositionOptions, setAdPositionOptions] = useState<string[]>([]);
   const [countryOptions,   setCountryOptions]   = useState<string[]>([]);
   // Journey slide-over
   const [selectedSession, setSelectedSession] = useState<Session | null>(null);
@@ -313,7 +302,6 @@ export function SessionsTable({ campaigns, dateRange, refreshTrigger }: Sessions
       if (outcome)    params.set('outcome',    outcome);
       if (adGroupId)  params.set('adGroupId',  adGroupId);
       if (adId)       params.set('adId',       adId);
-      if (adPosition) params.set('adPosition', adPosition);
       if (country)    params.set('country',    country);
 
       const res  = await fetch(`/api/sessions?${params}`, { cache: 'no-store' });
@@ -326,16 +314,16 @@ export function SessionsTable({ campaigns, dateRange, refreshTrigger }: Sessions
     } finally {
       setIsLoading(false);
     }
-  }, [batch, keyword, campaignId, matchType, device, outcome, adGroupId, adId, adPosition, country, dateRange, sortKey, sortDir, refreshTrigger]);
+  }, [batch, keyword, campaignId, matchType, device, outcome, adGroupId, adId, country, dateRange, sortKey, sortDir, refreshTrigger]);
 
   // Reset to the first page/batch whenever filters, sort, or date range change
   useEffect(() => {
     setBatch(1);
     setSubPage(1);
-  }, [keyword, campaignId, matchType, device, outcome, adGroupId, adId, adPosition, country, dateRange, sortKey, sortDir]);
+  }, [keyword, campaignId, matchType, device, outcome, adGroupId, adId, country, dateRange, sortKey, sortDir]);
 
   useEffect(() => {
-    const hasText = keyword || adGroupId || adId || adPosition;
+    const hasText = keyword || adGroupId || adId;
     const timer = setTimeout(loadSessions, hasText ? 400 : 0);
     return () => clearTimeout(timer);
   }, [loadSessions]);
@@ -344,13 +332,11 @@ export function SessionsTable({ campaigns, dateRange, refreshTrigger }: Sessions
   // Keeping them frozen while a filter IS active prevents the selected value from
   // disappearing from its own dropdown.
   useEffect(() => {
-    if (!adGroupId && !adId && !adPosition) {
+    if (!adGroupId && !adId) {
       const groups = [...new Set(sessions.map(s => s.adGroupId).filter((v): v is string => !!v))].sort();
       const ids    = [...new Set(sessions.map(s => s.adId).filter((v): v is string => !!v))].sort();
-      const pos    = [...new Set(sessions.map(s => s.adPosition).filter((v): v is string => !!v))].sort();
       if (groups.length) setAdGroupOptions(groups);
       if (ids.length)    setAdIdOptions(ids);
-      if (pos.length)    setAdPositionOptions(pos);
     }
     if (!country) {
       const countries = [...new Set(sessions.map(s => s.country).filter((v): v is string => !!v))].sort();
@@ -386,7 +372,7 @@ export function SessionsTable({ campaigns, dateRange, refreshTrigger }: Sessions
       <div className="bg-white rounded-lg border border-gray-200">
         {/* Header */}
         <div className="p-6 border-b border-gray-200">
-          <div className="flex items-center justify-between gap-3 mb-5">
+          <div className="flex flex-wrap items-center justify-between gap-3 mb-5">
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center flex-shrink-0">
                 <Users className="w-5 h-5 text-blue-600" />
@@ -397,20 +383,19 @@ export function SessionsTable({ campaigns, dateRange, refreshTrigger }: Sessions
               </div>
             </div>
 
+            <div className="flex items-center gap-2 flex-wrap">
             {/* Download CSV */}
-            <div className="flex items-center gap-2 flex-shrink-0">
-              <button
-                type="button"
-                onClick={handleExportCSV}
-                disabled={csvLoading}
-                className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors text-gray-600 disabled:opacity-50"
-              >
-                {csvLoading
-                  ? <span className="w-3.5 h-3.5 border-2 border-gray-400 border-t-transparent rounded-full animate-spin" />
-                  : <Download className="w-3.5 h-3.5" />}
-                Export CSV
-              </button>
-            </div>
+            <button
+              type="button"
+              onClick={handleExportCSV}
+              disabled={csvLoading}
+              className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors text-gray-600 disabled:opacity-50"
+            >
+              {csvLoading
+                ? <span className="w-3.5 h-3.5 border-2 border-gray-400 border-t-transparent rounded-full animate-spin" />
+                : <Download className="w-3.5 h-3.5" />}
+              Export CSV
+            </button>
 
             {/* Column picker */}
             <div className="relative flex-shrink-0" ref={colPickerRef}>
@@ -456,6 +441,7 @@ export function SessionsTable({ campaigns, dateRange, refreshTrigger }: Sessions
                 </div>
               )}
             </div>
+            </div>
           </div>
 
           {/* Filters */}
@@ -481,7 +467,7 @@ export function SessionsTable({ campaigns, dateRange, refreshTrigger }: Sessions
               <option value="">All Campaigns</option>
               {campaigns.map(c => (
                 <option key={c.id} value={c.id}>
-                  Campaign {c.slotNumber} ({c.googleCampaignId})
+                  {c.name || `Campaign ${c.slotNumber}`}
                 </option>
               ))}
             </select>
@@ -545,10 +531,10 @@ export function SessionsTable({ campaigns, dateRange, refreshTrigger }: Sessions
               onClick={() => setShowAdFilters(v => !v)}
               className="text-xs text-blue-600 hover:text-blue-700 font-medium flex items-center gap-1"
             >
-              {showAdFilters ? '▲ Hide' : '▼ Show'} ad filters (Ad Group, Ad ID, Position)
-              {(adGroupId || adId || adPosition) && (
+              {showAdFilters ? '▲ Hide' : '▼ Show'} ad filters (Ad Group, Ad ID)
+              {(adGroupId || adId) && (
                 <span className="ml-1 inline-flex items-center justify-center w-4 h-4 rounded-full bg-blue-600 text-white text-[10px]">
-                  {[adGroupId, adId, adPosition].filter(Boolean).length}
+                  {[adGroupId, adId].filter(Boolean).length}
                 </span>
               )}
             </button>
@@ -584,21 +570,6 @@ export function SessionsTable({ campaigns, dateRange, refreshTrigger }: Sessions
                     <option key={v} value={v}>{v}</option>
                   ))}
                 </select>
-
-                {/* Ad Position — shows actual values e.g. 1t1, 1t2 */}
-                <select
-                  value={adPosition}
-                  onChange={e => setAdPosition(e.target.value)}
-                  className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                >
-                  <option value="">All Positions</option>
-                  {adPositionOptions.length === 0 && (
-                    <option disabled value="">No data yet</option>
-                  )}
-                  {adPositionOptions.map(v => (
-                    <option key={v} value={v}>{formatAdPosition(v)}</option>
-                  ))}
-                </select>
               </div>
             )}
           </div>
@@ -629,7 +600,7 @@ export function SessionsTable({ campaigns, dateRange, refreshTrigger }: Sessions
           </div>
         ) : sessions.length === 0 ? (
           (() => {
-            const hasFilters = !!(keyword || campaignId || matchType || device || outcome || adGroupId || adId || adPosition || country);
+            const hasFilters = !!(keyword || campaignId || matchType || device || outcome || adGroupId || adId || country);
             return hasFilters ? (
               /* Filters active — nothing matched */
               <div className="p-10 text-center">
@@ -639,7 +610,7 @@ export function SessionsTable({ campaigns, dateRange, refreshTrigger }: Sessions
                 <p className="text-gray-700 font-medium">No sessions match your filters</p>
                 <p className="text-gray-400 text-sm mt-1">Try clearing a filter or widening the date range</p>
                 <button
-                  onClick={() => { setKeyword(''); setCampaignId(''); setMatchType(''); setDevice(''); setOutcome(''); setAdGroupId(''); setAdId(''); setAdPosition(''); setCountry(''); }}
+                  onClick={() => { setKeyword(''); setCampaignId(''); setMatchType(''); setDevice(''); setOutcome(''); setAdGroupId(''); setAdId(''); setCountry(''); }}
                   className="mt-4 px-4 py-2 text-sm font-medium text-blue-600 border border-blue-200 rounded-lg hover:bg-blue-50 transition-colors"
                 >
                   Clear all filters
@@ -678,13 +649,13 @@ export function SessionsTable({ campaigns, dateRange, refreshTrigger }: Sessions
                       <th className={thClass} onClick={() => handleSort('keyword')}>Keyword <SortIcon col="keyword" sortKey={sortKey} sortDir={sortDir} /></th>
                       {cols.matchType && <th className={thClass} onClick={() => handleSort('matchType')}>Match Type <SortIcon col="matchType" sortKey={sortKey} sortDir={sortDir} /></th>}
                       {cols.date      && <th className={thClass} onClick={() => handleSort('date')}>Date <SortIcon col="date" sortKey={sortKey} sortDir={sortDir} /></th>}
-                      {cols.campaign  && <th className={thClass} onClick={() => handleSort('campaign')}>Campaign <SortIcon col="campaign" sortKey={sortKey} sortDir={sortDir} /></th>}
+                      {cols.campaignName && <th className={thClass} onClick={() => handleSort('campaignName')}>Campaign Name <SortIcon col="campaignName" sortKey={sortKey} sortDir={sortDir} /></th>}
+                      {cols.campaign  && <th className={thClass} onClick={() => handleSort('campaign')}>Campaign ID <SortIcon col="campaign" sortKey={sortKey} sortDir={sortDir} /></th>}
                       {effectiveCols.device && <th className={thClass} onClick={() => handleSort('device')}>Device <SortIcon col="device" sortKey={sortKey} sortDir={sortDir} /></th>}
                       {cols.location  && <th className={thClass} onClick={() => handleSort('location')}>Location <SortIcon col="location" sortKey={sortKey} sortDir={sortDir} /></th>}
                       {cols.duration  && <th className={thR}     onClick={() => handleSort('duration')}>Duration <SortIcon col="duration" sortKey={sortKey} sortDir={sortDir} /></th>}
                       {cols.adGroup   && <th className={thClass} onClick={() => handleSort('adGroup')}>Ad Group <SortIcon col="adGroup" sortKey={sortKey} sortDir={sortDir} /></th>}
                       {cols.adId      && <th className={thClass} onClick={() => handleSort('adId')}>Ad ID <SortIcon col="adId" sortKey={sortKey} sortDir={sortDir} /></th>}
-                      {cols.position  && <th className={thClass} onClick={() => handleSort('position')}>Ad Position <SortIcon col="position" sortKey={sortKey} sortDir={sortDir} /></th>}
                       <th className={thClass} onClick={() => handleSort('outcome')}>Outcome <SortIcon col="outcome" sortKey={sortKey} sortDir={sortDir} /></th>
                     </>);
                   })()}
@@ -713,6 +684,11 @@ export function SessionsTable({ campaigns, dateRange, refreshTrigger }: Sessions
                     {cols.date && (
                       <td className="px-4 sm:px-6 py-3 whitespace-nowrap text-sm text-gray-600">
                         {formatDate(s.startedAt)}
+                      </td>
+                    )}
+                    {cols.campaignName && (
+                      <td className="px-4 sm:px-6 py-3 whitespace-nowrap text-sm text-gray-600">
+                        {s.campaignName || '—'}
                       </td>
                     )}
                     {cols.campaign && (
@@ -749,11 +725,6 @@ export function SessionsTable({ campaigns, dateRange, refreshTrigger }: Sessions
                     {cols.adId && (
                       <td className="px-4 sm:px-6 py-3 whitespace-nowrap">
                         <span className="text-sm text-gray-500 font-mono">{s.adId ?? '—'}</span>
-                      </td>
-                    )}
-                    {cols.position && (
-                      <td className="px-4 sm:px-6 py-3 whitespace-nowrap">
-                        <span className="text-sm text-gray-500">{formatAdPosition(s.adPosition)}</span>
                       </td>
                     )}
                     <td className="px-4 sm:px-6 py-3 whitespace-nowrap">

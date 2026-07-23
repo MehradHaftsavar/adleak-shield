@@ -55,7 +55,8 @@ export async function GET(request: NextRequest) {
       keyword:   's.keyword',
       matchType: 's.match_type',
       date:      's.started_at',
-      campaign:  'c.google_campaign_id',
+      campaign:     'c.google_campaign_id',
+      campaignName: 'c.name',
       device:    's.device',
       duration:  's.total_duration_ms',
       adGroup:   's.ad_group_id',
@@ -171,6 +172,7 @@ export async function GET(request: NextRequest) {
           s.city,
           s.country,
           c.google_campaign_id,
+          c.name AS campaign_name,
           c.campaign_id AS campaign_uuid,
           (
             SELECT COUNT(*) FROM JourneyEvents je
@@ -203,6 +205,7 @@ export async function GET(request: NextRequest) {
           city:              row.city         ?? null,
           country:           row.country      ?? null,
           googleCampaignId:  row.google_campaign_id,
+          campaignName:      row.campaign_name ?? null,
           campaignId:        row.campaign_uuid,
           eventCount:        row.event_count,
           hasSuccessEvent:   row.success_count > 0,

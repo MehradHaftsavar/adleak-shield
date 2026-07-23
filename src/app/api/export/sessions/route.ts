@@ -71,6 +71,7 @@ export async function GET(request: NextRequest) {
           s.ad_id,
           s.ad_position,
           c.google_campaign_id,
+          c.name AS campaign_name,
           c.slot_number,
           CASE
             WHEN EXISTS (
@@ -110,7 +111,7 @@ export async function GET(request: NextRequest) {
       return result.recordset;
     });
 
-    const header = 'Session ID,Keyword,Match Type,Device,Date,Duration (ms),Outcome,City,Country,Campaign ID,Slot,Ad Group ID,Ad ID,Ad Position,IP (masked),GCLID';
+    const header = 'Session ID,Keyword,Match Type,Device,Date,Duration (ms),Outcome,City,Country,Campaign Name,Campaign ID,Ad Group ID,Ad ID,GCLID';
     const csvRows = rows.map((r: any) =>
       [
         escapeCsv(r.session_id),
@@ -122,12 +123,10 @@ export async function GET(request: NextRequest) {
         escapeCsv(r.outcome),
         escapeCsv(r.city),
         escapeCsv(r.country),
+        escapeCsv(r.campaign_name),
         escapeCsv(r.google_campaign_id),
-        escapeCsv(r.slot_number),
         escapeCsv(r.ad_group_id),
         escapeCsv(r.ad_id),
-        escapeCsv(r.ad_position),
-        escapeCsv(r.ip_masked),
         escapeCsv(r.gclid),
       ].join(',')
     );
