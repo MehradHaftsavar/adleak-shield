@@ -29,7 +29,7 @@ interface SessionSummary {
 
 interface JourneyEvent {
   eventId:        string;
-  eventType:      'pageview' | 'click' | 'success_event';
+  eventType:      'pageview' | 'click' | 'success_event' | 'form_interact';
   pagePath:       string | null;
   elementTag:     string | null;
   elementHref:    string | null;
