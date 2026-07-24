@@ -33,7 +33,30 @@
   var INGEST_URL = "__INGEST_URL__"; // e.g. https://adleak-functions.azurewebsites.net/api/ingest
   var HEARTBEAT_MS = 15000;          // Send heartbeat every 15 seconds
   var STORAGE_KEY = "_als_session";   // sessionStorage key for our data
-  var SUCCESS_HOSTS = ["wa.link", "wa.me"]; // WhatsApp link patterns
+  var SUCCESS_HOSTS = ["wa.link", "wa.me", "api.whatsapp.com", "web.whatsapp.com"]; // WhatsApp link patterns
+
+  // Tier 1 — safe to match ANYWHERE on the page, no form required. These are
+  // words with essentially no legitimate use except opening a direct
+  // communication channel (unlike "quote"/"contact us", which are commonly
+  // just navigation links to another page).
+  var TIER1_TEXT_MATCHES = [
+    "whatsapp", "messenger", "live chat", "chat with us", "chat now", "start chat", "click to chat",
+  ];
+
+  // Tier 2 — only counts as a conversion when the element is the completing
+  // action of a REAL <form> the visitor has already typed into (see
+  // interactedForms below). Deliberately excludes words like "continue"/
+  // "next" (multi-step form navigation, not completion) and "learn more"/
+  // "read more" (generic navigation).
+  var TIER2_FORM_TEXT_MATCHES = [
+    "send message", "send enquiry", "send an enquiry", "submit", "submit enquiry",
+    "request a callback", "request callback", "get a quote", "get quote",
+    "request a quote", "request quote", "book now", "book appointment", "confirm booking",
+    "request info", "request information", "enquire now", "make an enquiry",
+    "get in touch", "contact us", "sign up", "register", "schedule", "schedule appointment",
+    "claim offer",
+  ];
+  var interactedForms = []; // <form> elements the visitor has typed into — gates Tier 2 matches
 
   // ===========================================================================
   // PRE-WARM CONNECTION
@@ -157,6 +180,8 @@
       var text = (el.textContent || el.getAttribute("aria-label") || el.getAttribute("value") || "").trim();
       var isSuccess = false;
 
+      var lowerText = text.toLowerCase();
+
       if (href.indexOf("tel:") === 0) isSuccess = true;
       else if (href.indexOf("mailto:") === 0) isSuccess = true;
       else if (href.indexOf("https://") === 0) {
@@ -164,6 +189,39 @@
           if (href.indexOf("https://" + SUCCESS_HOSTS[i]) === 0) {
             isSuccess = true;
             break;
+          }
+        }
+      }
+
+      // Tier 1 — text match, safe anywhere on the page (direct channel-opening actions)
+      if (!isSuccess) {
+        for (var t1 = 0; t1 < TIER1_TEXT_MATCHES.length; t1++) {
+          if (lowerText.indexOf(TIER1_TEXT_MATCHES[t1]) !== -1) {
+            isSuccess = true;
+            break;
+          }
+        }
+      }
+
+      // Tier 2 — text match, ONLY when this is the completing action of a
+      // <form> the visitor has actually typed into. Three independent
+      // conditions must all hold: inside a real form, that form already had
+      // form_interact fire, and the text matches a submission-intent phrase.
+      if (!isSuccess && el.closest) {
+        var parentForm = el.closest("form");
+        if (parentForm && interactedForms.indexOf(parentForm) !== -1) {
+          var looksLikeCancel =
+            (el.getAttribute("type") || "").toLowerCase() === "reset" ||
+            lowerText.indexOf("cancel") !== -1 ||
+            lowerText.indexOf("clear") !== -1 ||
+            lowerText.indexOf("reset") !== -1;
+          if (!looksLikeCancel) {
+            for (var t2 = 0; t2 < TIER2_FORM_TEXT_MATCHES.length; t2++) {
+              if (lowerText.indexOf(TIER2_FORM_TEXT_MATCHES[t2]) !== -1) {
+                isSuccess = true;
+                break;
+              }
+            }
           }
         }
       }
@@ -224,7 +282,6 @@
   document.addEventListener(
     "focusin",
     function (e) {
-      if (hasFiredFormInteract) return;
       var target = e.target;
       if (!target) return;
       var tag = (target.tagName || "").toLowerCase();
@@ -233,13 +290,22 @@
         tag === "textarea" ||
         tag === "select" ||
         (tag === "input" && ["hidden", "submit", "button", "reset"].indexOf(type) === -1);
-      if (isFormField) {
-        hasFiredFormInteract = true;
-        send("form_interact", {
-          sessionFingerprint: session.sessionFingerprint,
-          pagePath: window.location.pathname,
-        });
+      if (!isFormField) return;
+
+      // Remember which <form> this field belongs to — powers the click
+      // handler's Tier 2 "submit button inside an engaged form" detection
+      // above, independent of whether we've already sent form_interact.
+      var parentForm = target.closest ? target.closest("form") : null;
+      if (parentForm && interactedForms.indexOf(parentForm) === -1) {
+        interactedForms.push(parentForm);
       }
+
+      if (hasFiredFormInteract) return;
+      hasFiredFormInteract = true;
+      send("form_interact", {
+        sessionFingerprint: session.sessionFingerprint,
+        pagePath: window.location.pathname,
+      });
     },
     true
   );

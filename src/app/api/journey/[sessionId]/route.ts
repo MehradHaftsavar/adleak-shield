@@ -37,7 +37,11 @@ export async function GET(
           s.device,
           s.started_at,
           s.total_duration_ms,
-          s.is_bounce
+          s.is_bounce,
+          CASE WHEN EXISTS (
+            SELECT 1 FROM JourneyEvents je
+            WHERE je.session_id = s.session_id AND je.event_type = 'success_event'
+          ) THEN 1 ELSE 0 END AS has_success_event
         FROM Sessions s
         INNER JOIN Campaigns c ON c.campaign_id = s.campaign_id
         WHERE s.session_id = @sessionId
@@ -76,6 +80,7 @@ export async function GET(
           startedAt:       sessionRow.started_at,
           totalDurationMs: sessionRow.total_duration_ms,
           isBounce:        sessionRow.is_bounce === true || sessionRow.is_bounce === 1,
+          hasSuccessEvent: sessionRow.has_success_event === true || sessionRow.has_success_event === 1,
         },
         events: eventsResult.recordset.map(row => ({
           eventId:        row.event_id,

@@ -40,7 +40,7 @@ interface JourneyEvent {
 }
 
 interface JourneyDetail {
-  session: Omit<SessionSummary, 'eventCount' | 'hasSuccessEvent'>;
+  session: Omit<SessionSummary, 'eventCount'>;
   events:  JourneyEvent[];
 }
 
@@ -224,13 +224,18 @@ function TimelineView({
       {/* Session summary bar */}
       <div className="px-4 py-3 bg-gray-50 border-b border-gray-200 shrink-0">
         <div className="flex items-center gap-2 flex-wrap">
-          {session.isBounce ? (
+          {session.hasSuccessEvent ? (
+            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+              <CheckCircle className="w-3 h-3" />
+              Converted
+            </span>
+          ) : session.isBounce ? (
             <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">
               <AlertCircle className="w-3 h-3" />
               Bounce
             </span>
           ) : (
-            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
               <CheckCircle className="w-3 h-3" />
               Engaged
             </span>
