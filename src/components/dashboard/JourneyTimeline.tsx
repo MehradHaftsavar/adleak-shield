@@ -25,6 +25,7 @@ interface SessionSummary {
   isBounce:        boolean;
   eventCount:      number;
   hasSuccessEvent: boolean;
+  maxScrollPct:    number | null;
 }
 
 interface JourneyEvent {
@@ -251,6 +252,11 @@ function TimelineView({
           <span className="text-xs text-gray-400">
             {session.matchType} match
           </span>
+          {session.maxScrollPct != null && (
+            <span className="text-xs text-gray-400">
+              {session.maxScrollPct}% scrolled
+            </span>
+          )}
         </div>
         <p className="text-xs text-gray-400 mt-1">
           {formatDate(session.startedAt)} at {formatTime(session.startedAt)}

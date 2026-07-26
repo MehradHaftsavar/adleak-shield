@@ -38,6 +38,7 @@ export async function GET(
           s.started_at,
           s.total_duration_ms,
           s.is_bounce,
+          s.max_scroll_pct,
           CASE WHEN EXISTS (
             SELECT 1 FROM JourneyEvents je
             WHERE je.session_id = s.session_id AND je.event_type = 'success_event'
@@ -81,6 +82,7 @@ export async function GET(
           totalDurationMs: sessionRow.total_duration_ms,
           isBounce:        sessionRow.is_bounce === true || sessionRow.is_bounce === 1,
           hasSuccessEvent: sessionRow.has_success_event === true || sessionRow.has_success_event === 1,
+          maxScrollPct:    sessionRow.max_scroll_pct ?? null,
         },
         events: eventsResult.recordset.map(row => ({
           eventId:        row.event_id,

@@ -321,12 +321,14 @@ async function insertJourneyEvent(
 async function updateSessionDwell(
   tx: mssql.Transaction,
   sessionId: string,
-  dwellMs: number
+  dwellMs: number,
+  scrollPct?: number | null
 ): Promise<void> {
   await new mssql.Request(tx)
     .input("sessionId", mssql.UniqueIdentifier, sessionId)
     .input("dwellMs", mssql.Int, Math.min(dwellMs, 86_400_000))
     .input("shortDwell", mssql.Bit, dwellMs < 5000 ? 1 : 0)
+    .input("scrollPct", mssql.TinyInt, scrollPct ?? null)
     .query(
       `UPDATE Sessions
          SET total_duration_ms = @dwellMs,
@@ -337,6 +339,11 @@ async function updateSessionDwell(
                    AND event_type IN ('click', 'success_event')
                ) THEN 1
                ELSE 0
+             END,
+             max_scroll_pct = CASE
+               WHEN @scrollPct IS NOT NULL AND (max_scroll_pct IS NULL OR @scrollPct > max_scroll_pct)
+                 THEN @scrollPct
+               ELSE max_scroll_pct
              END
        WHERE session_id = @sessionId`
     );
@@ -579,12 +586,12 @@ export async function queueWorkerHandler(
               .query(`UPDATE Sessions SET is_bounce = 0 WHERE session_id = @sessionId AND is_bounce = 1`);
           }
           if (env.eventType === "heartbeat" && env.payload.dwellMs) {
-            await updateSessionDwell(tx, sessionId, env.payload.dwellMs);
+            await updateSessionDwell(tx, sessionId, env.payload.dwellMs, env.payload.scrollPct);
           }
           break;
         case "page_end":
           if (env.payload.dwellMs) {
-            await updateSessionDwell(tx, sessionId, env.payload.dwellMs);
+            await updateSessionDwell(tx, sessionId, env.payload.dwellMs, env.payload.scrollPct);
           }
           break;
       }
