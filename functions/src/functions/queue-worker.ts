@@ -322,30 +322,57 @@ async function updateSessionDwell(
   tx: mssql.Transaction,
   sessionId: string,
   dwellMs: number,
-  scrollPct?: number | null
+  scrollPct?: number | null,
+  isPageEnd?: boolean
 ): Promise<void> {
+  const dwellClamped = Math.min(dwellMs, 86_400_000);
+
   await new mssql.Request(tx)
     .input("sessionId", mssql.UniqueIdentifier, sessionId)
-    .input("dwellMs", mssql.Int, Math.min(dwellMs, 86_400_000))
+    .input("dwellMs", mssql.Int, dwellClamped)
     .input("shortDwell", mssql.Bit, dwellMs < 5000 ? 1 : 0)
     .input("scrollPct", mssql.TinyInt, scrollPct ?? null)
     .query(
-      `UPDATE Sessions
-         SET total_duration_ms = @dwellMs,
-             is_bounce = CASE
-               WHEN @shortDwell = 1 AND NOT EXISTS (
-                 SELECT 1 FROM JourneyEvents
-                 WHERE session_id = @sessionId
-                   AND event_type IN ('click', 'success_event')
-               ) THEN 1
-               ELSE 0
-             END,
-             max_scroll_pct = CASE
-               WHEN @scrollPct IS NOT NULL AND (max_scroll_pct IS NULL OR @scrollPct > max_scroll_pct)
-                 THEN @scrollPct
-               ELSE max_scroll_pct
-             END
-       WHERE session_id = @sessionId`
+      isPageEnd
+        ? // page_end: this page is genuinely over — its dwell is final, so
+          // permanently bank it into completed_pages_duration_ms rather than
+          // just overwriting total_duration_ms with this one page's number.
+          `UPDATE Sessions
+             SET completed_pages_duration_ms = completed_pages_duration_ms + @dwellMs,
+                 total_duration_ms = completed_pages_duration_ms + @dwellMs,
+                 is_bounce = CASE
+                   WHEN @shortDwell = 1 AND NOT EXISTS (
+                     SELECT 1 FROM JourneyEvents
+                     WHERE session_id = @sessionId
+                       AND event_type IN ('click', 'success_event')
+                   ) THEN 1
+                   ELSE 0
+                 END,
+                 max_scroll_pct = CASE
+                   WHEN @scrollPct IS NOT NULL AND (max_scroll_pct IS NULL OR @scrollPct > max_scroll_pct)
+                     THEN @scrollPct
+                   ELSE max_scroll_pct
+                 END
+           WHERE session_id = @sessionId`
+        : // heartbeat: the page is still open — this is a live, not-yet-final
+          // number, so it's recomputed on top of the locked-in base without
+          // touching completed_pages_duration_ms itself.
+          `UPDATE Sessions
+             SET total_duration_ms = ISNULL(completed_pages_duration_ms, 0) + @dwellMs,
+                 is_bounce = CASE
+                   WHEN @shortDwell = 1 AND NOT EXISTS (
+                     SELECT 1 FROM JourneyEvents
+                     WHERE session_id = @sessionId
+                       AND event_type IN ('click', 'success_event')
+                   ) THEN 1
+                   ELSE 0
+                 END,
+                 max_scroll_pct = CASE
+                   WHEN @scrollPct IS NOT NULL AND (max_scroll_pct IS NULL OR @scrollPct > max_scroll_pct)
+                     THEN @scrollPct
+                   ELSE max_scroll_pct
+                 END
+           WHERE session_id = @sessionId`
     );
 }
 
@@ -586,12 +613,12 @@ export async function queueWorkerHandler(
               .query(`UPDATE Sessions SET is_bounce = 0 WHERE session_id = @sessionId AND is_bounce = 1`);
           }
           if (env.eventType === "heartbeat" && env.payload.dwellMs) {
-            await updateSessionDwell(tx, sessionId, env.payload.dwellMs, env.payload.scrollPct);
+            await updateSessionDwell(tx, sessionId, env.payload.dwellMs, env.payload.scrollPct, false);
           }
           break;
         case "page_end":
           if (env.payload.dwellMs) {
-            await updateSessionDwell(tx, sessionId, env.payload.dwellMs, env.payload.scrollPct);
+            await updateSessionDwell(tx, sessionId, env.payload.dwellMs, env.payload.scrollPct, true);
           }
           break;
       }
