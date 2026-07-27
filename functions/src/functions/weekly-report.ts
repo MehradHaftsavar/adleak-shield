@@ -56,6 +56,7 @@ async function getTenantWeeklyLeaks(tenantId: string): Promise<LeakRow[]> {
         WHERE s.started_at >= @startDate
           AND s.started_at <= @endDate
           AND s.keyword IS NOT NULL
+          AND s.keyword <> 'adleak_test'
         GROUP BY s.keyword, s.match_type, COALESCE(s.session_cpc, c.avg_cpc)
         HAVING SUM(CASE WHEN s.is_bounce = 1 THEN 1 ELSE 0 END) > 0
         ORDER BY estimated_waste DESC
