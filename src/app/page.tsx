@@ -134,7 +134,7 @@ const FEATURES = [
   {
     icon: '⚡',
     title: 'Lightweight Tracking Script',
-    desc: 'A tiny <5KB script you paste once into your site header. No plugins, no cookies. Works on any website — WordPress, Squarespace, custom code.',
+    desc: 'A tiny <6KB script you paste once into your site header. No plugins, no cookies. Works on any website — WordPress, Squarespace, custom code.',
   },
   {
     icon: '📧',
@@ -359,7 +359,7 @@ const FAQS = [
   },
   {
     q: "Will it slow down my website or affect my visitors?",
-    a: "No. The tracking snippet is under 5KB and loads asynchronously — meaning it never blocks your page from loading. Your visitors won't notice any difference. It also uses zero cookies, so you don't need to update your cookie banner or consent mechanism.",
+    a: "No. The tracking snippet is under 6KB and loads asynchronously — meaning it never blocks your page from loading. Your visitors won't notice any difference. It also uses zero cookies, so you don't need to update your cookie banner or consent mechanism.",
   },
   {
     q: "Is AdLeak Shield GDPR compliant?",

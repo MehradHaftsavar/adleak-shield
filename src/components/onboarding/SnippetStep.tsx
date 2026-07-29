@@ -61,7 +61,7 @@ export function SnippetStep({ domain, onComplete, onBack }: SnippetStepProps) {
         setTemplate(data.template);
       } else {
         // No own domain — still show the generic snippet code
-        setSnippet('<!-- AdLeak Shield -->\n<script src="https://www.adleakshield.com/tracker.js" defer></script>');
+        setSnippet('<!-- AdLeak Shield -->\n<script src="https://www.adleakshield.com/tracker.js" async></script>');
         setTemplate('{lpurl}?keyword={keyword}&campaignid={campaignid}&matchtype={matchtype}&adgroupid={adgroupid}&adid={creative}&adposition={adposition}&gclid={gclid}');
       }
 

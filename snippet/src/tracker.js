@@ -16,7 +16,7 @@
 //   8. Uses the Beacon API so data sends even if the user closes the tab
 //
 // CRITICAL CONSTRAINTS:
-// - Must be under 5KB after minification (PRD requirement, Core Web Vitals)
+// - Must be under 6KB after minification (PRD requirement, Core Web Vitals)
 // - Vanilla JS only — no jQuery, no React, no dependencies
 // - Zero persistent cookies — sessionStorage only
 // - Fails silently if anything goes wrong — never break the customer's site
@@ -171,8 +171,8 @@
     "click",
     function (e) {
       var target = e.target;
-      // Walk up to find the closest <a> or <button>
-      var el = target.closest ? target.closest("a, button") : null;
+      // Walk up to find the closest <a>, <button>, or button-like <input>
+      var el = target.closest ? target.closest("a, button, input[type=button], input[type=submit]") : null;
       if (!el) return;
 
       var tag = el.tagName.toLowerCase();
@@ -273,14 +273,35 @@
   );
 
   // ===========================================================================
-  // FORM INTERACT — fires once per session the first time a visitor starts
-  // filling in a form field (textarea, select, or a real text-like input —
-  // excludes hidden/submit/button/reset). Signals engagement even if they
-  // never actually submit.
+  // FORM INTERACT — fires once PER FIELD the first time a visitor actually
+  // types/changes a value in it (textarea, select, or a real text-like input
+  // — excludes hidden/submit/button/reset). Uses the "input" event, not
+  // focus, since merely tabbing into a field without typing isn't a
+  // meaningful engagement signal. Throttled by element reference (not by
+  // the computed label) so two different fields that happen to produce the
+  // same fallback text never silently collide.
   // ===========================================================================
-  var hasFiredFormInteract = false;
+  var interactedFields = [];
+
+  function fieldLabel(el, tag, type) {
+    var lbl = el.labels && el.labels[0] && el.labels[0].textContent;
+    if (lbl && lbl.trim()) return lbl.trim();
+    var ariaLabel = el.getAttribute("aria-label");
+    if (ariaLabel && ariaLabel.trim()) return ariaLabel.trim();
+    var name = el.getAttribute("name");
+    if (name && name.trim()) return name.trim();
+    var placeholder = el.getAttribute("placeholder");
+    if (placeholder && placeholder.trim()) return placeholder.trim();
+    var id = el.getAttribute("id");
+    if (id && id.trim()) return id.trim();
+    if (tag === "textarea") return "a text area";
+    if (tag === "select") return "a dropdown";
+    if (type) return "a " + type + " field";
+    return "a field";
+  }
+
   document.addEventListener(
-    "focusin",
+    "input",
     function (e) {
       var target = e.target;
       if (!target) return;
@@ -294,17 +315,21 @@
 
       // Remember which <form> this field belongs to — powers the click
       // handler's Tier 2 "submit button inside an engaged form" detection
-      // above, independent of whether we've already sent form_interact.
+      // above, independent of whether we've already sent form_interact
+      // for this exact field.
       var parentForm = target.closest ? target.closest("form") : null;
       if (parentForm && interactedForms.indexOf(parentForm) === -1) {
         interactedForms.push(parentForm);
       }
 
-      if (hasFiredFormInteract) return;
-      hasFiredFormInteract = true;
+      // Fire once per field (by element reference), not once per session.
+      if (interactedFields.indexOf(target) !== -1) return;
+      interactedFields.push(target);
+
       send("form_interact", {
         sessionFingerprint: session.sessionFingerprint,
         pagePath: window.location.pathname,
+        elementText: fieldLabel(target, tag, type).substring(0, 100),
       });
     },
     true

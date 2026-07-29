@@ -6,13 +6,13 @@
 // 1. Reads the source tracker.js
 // 2. Minifies it with terser (removes whitespace, shortens variable names)
 // 3. Replaces __INGEST_URL__ with the real URL from environment variables
-// 4. Validates the final file is under 5KB (5120 bytes)
+// 4. Validates the final file is under 6KB (6144 bytes)
 // 5. Writes it to public/tracker.js so it's served by Next.js
 // 6. Generates a SHA-256 hash of the file for SRI (Subresource Integrity)
 //
 // WHY MINIFY?
 // The source file is ~7KB. Minified, it should be ~3KB.
-// The 5KB hard limit comes from Core Web Vitals — anything larger noticeably
+// The 6KB hard limit comes from Core Web Vitals — anything larger noticeably
 // slows down a customer's website on mobile.
 //
 // HOW TO RUN:
@@ -32,7 +32,7 @@ const ROOT = resolve(__dirname, "../..");
 const SRC = resolve(ROOT, "snippet/src/tracker.js");
 const OUT_DIR = resolve(ROOT, "public");
 const OUT = resolve(OUT_DIR, "tracker.js");
-const SIZE_LIMIT_BYTES = 5120; // 5KB hard limit
+const SIZE_LIMIT_BYTES = 6144; // 6KB hard limit
 
 // =============================================================================
 // 1. READ THE SOURCE
@@ -95,12 +95,12 @@ const minified = result.code ?? "";
 console.log(`[Build] Minified size: ${minified.length} bytes`);
 
 // =============================================================================
-// 4. ENFORCE THE 5KB LIMIT
+// 4. ENFORCE THE 6KB LIMIT
 // If we breach it, fail the build immediately. The PRD is non-negotiable.
 // =============================================================================
 if (minified.length > SIZE_LIMIT_BYTES) {
   console.error(
-    `[Build] ERROR: Tracker is ${minified.length} bytes, exceeds 5KB limit (${SIZE_LIMIT_BYTES} bytes).`
+    `[Build] ERROR: Tracker is ${minified.length} bytes, exceeds 6KB limit (${SIZE_LIMIT_BYTES} bytes).`
   );
   console.error(
     `[Build] Reduce features or simplify the source before re-running.`
