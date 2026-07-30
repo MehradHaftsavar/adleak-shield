@@ -300,6 +300,15 @@
     return "a field";
   }
 
+  // Picks a verb matching what actually happened — typing text is not the
+  // same action as ticking a box, dragging a slider, or picking a colour.
+  function fieldVerb(tag, type) {
+    if (tag === "select" || type === "checkbox" || type === "radio") return "Selected";
+    if (type === "range") return "Adjusted";
+    if (type === "color" || type === "file") return "Interacted with";
+    return "Typed into";
+  }
+
   document.addEventListener(
     "input",
     function (e) {
@@ -326,10 +335,11 @@
       if (interactedFields.indexOf(target) !== -1) return;
       interactedFields.push(target);
 
+      var message = fieldVerb(tag, type) + " " + fieldLabel(target, tag, type);
       send("form_interact", {
         sessionFingerprint: session.sessionFingerprint,
         pagePath: window.location.pathname,
-        elementText: fieldLabel(target, tag, type).substring(0, 100),
+        elementText: message.substring(0, 100),
       });
     },
     true

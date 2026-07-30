@@ -325,9 +325,7 @@ function TimelineEventRow({ event, index, domain }: { event: JourneyEvent; index
       label = `Conversion: ${href || event.elementTag || 'Success event'}`;
     }
   } else if (isFormInteract) {
-    label = event.elementText
-      ? `Typed into ${event.elementText}`
-      : 'Started filling out a form';
+    label = event.elementText || 'Started filling out a form';
   } else {
     const what = event.elementTag === 'a' ? 'link' : event.elementTag === 'button' ? 'button' : 'element';
     label = event.elementText
