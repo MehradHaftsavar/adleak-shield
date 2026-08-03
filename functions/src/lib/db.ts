@@ -70,6 +70,18 @@ async function getPool(): Promise<mssql.ConnectionPool> {
   throw new Error("Unreachable");
 }
 
+// pool.connected only reflects whether .connect() ever succeeded and .close()
+// was never called — it does NOT detect a connection that Azure SQL or the
+// network silently killed while idle. That surfaces as this specific error
+// the moment a query is attempted on it. Distinguish it from real query/data
+// errors so we only retry the connection-is-dead case.
+function isDeadConnectionError(err: unknown): boolean {
+  return (
+    err instanceof mssql.ConnectionError ||
+    (err instanceof Error && err.message.includes("Connection is closed"))
+  );
+}
+
 /**
  * Run callback inside a transaction with TenantId set on session_context.
  * The callback receives the transaction itself.
@@ -78,8 +90,23 @@ export async function withTenantDb<T>(
   tenantId: string,
   callback: (transaction: mssql.Transaction) => Promise<T>
 ): Promise<T> {
-  const pool = await getPool();
-  const transaction = new mssql.Transaction(pool);
+  try {
+    return await runTenantDb(tenantId, callback);
+  } catch (err) {
+    if (isDeadConnectionError(err)) {
+      pool = null;
+      return await runTenantDb(tenantId, callback);
+    }
+    throw err;
+  }
+}
+
+async function runTenantDb<T>(
+  tenantId: string,
+  callback: (transaction: mssql.Transaction) => Promise<T>
+): Promise<T> {
+  const p = await getPool();
+  const transaction = new mssql.Transaction(p);
   await transaction.begin();
 
   try {
@@ -106,9 +133,19 @@ export async function withTenantDb<T>(
 export async function withAdminDb<T>(
   callback: (request: mssql.Request) => Promise<T>
 ): Promise<T> {
-  const pool = await getPool();
-  const request = new mssql.Request(pool);
-  return callback(request);
+  try {
+    const p = await getPool();
+    const request = new mssql.Request(p);
+    return await callback(request);
+  } catch (err) {
+    if (isDeadConnectionError(err)) {
+      pool = null;
+      const p = await getPool();
+      const request = new mssql.Request(p);
+      return await callback(request);
+    }
+    throw err;
+  }
 }
 
 // Export sql namespace for use in other files
