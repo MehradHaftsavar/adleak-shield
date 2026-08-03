@@ -124,6 +124,24 @@
   });
 
   // ===========================================================================
+  // BACK/FORWARD-CACHE RESTORE
+  // Pressing the browser's back/forward button (or a swipe-back gesture) can
+  // restore this exact page from bfcache instead of doing a real reload — the
+  // script does NOT re-run, so the "pageview" send above never fires for that
+  // return visit. pageshow with persisted=true is the browser's own signal
+  // that this happened, so send a distinct marker for it instead (existing
+  // click/heartbeat/etc. listeners are still alive and already work fine).
+  // ===========================================================================
+  window.addEventListener("pageshow", function (e) {
+    if (e.persisted) {
+      send("bfpv", {
+        sessionFingerprint: session.sessionFingerprint,
+        pagePath: window.location.pathname,
+      });
+    }
+  });
+
+  // ===========================================================================
   // ACTIVE DWELL TIME
   // Tracks how long the user was actually LOOKING at the page — not counting
   // time the tab was hidden (switched away, minimised). This makes bounce

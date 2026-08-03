@@ -291,7 +291,7 @@ async function insertJourneyEvent(
 ): Promise<void> {
   const env = msg.envelope;
   const dbEventType =
-    eventType === "session_start" || eventType === "pageview"
+    eventType === "session_start" || eventType === "pageview" || eventType === "bfpv"
       ? "pageview"
       : eventType === "page_end"
       ? "heartbeat"
@@ -573,6 +573,7 @@ export async function queueWorkerHandler(
             .query(`UPDATE Sessions SET is_bounce = 0 WHERE session_id = @sessionId AND is_bounce = 1`);
           break;
         case "pageview":
+        case "bfpv":
         case "click":
         case "success_event":
         case "heartbeat":

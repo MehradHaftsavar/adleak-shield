@@ -20,6 +20,11 @@ const EVENT_TYPES = [
   "success_event",
   "page_end",
   "form_interact",
+  // Fired on browser back/forward-cache restores — these never re-run the
+  // tracker's page-load code (no new page fetch happens), so without this
+  // the journey would otherwise show a silent gap when a visitor uses the
+  // back button to return to an earlier page in the same session.
+  "bfpv",
 ] as const;
 
 // Session payload (sent on session_start only)
