@@ -69,7 +69,7 @@ export async function GET(
         FROM JourneyEvents
         WHERE session_id = @sessionId
           AND event_type <> 'heartbeat'
-        ORDER BY occurred_at ASC
+        ORDER BY COALESCE(client_ts, DATEDIFF_BIG(MILLISECOND, '19700101', occurred_at)) ASC
       `);
 
       return {
