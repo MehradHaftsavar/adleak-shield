@@ -8,6 +8,14 @@ import mssql from "mssql";
 import { ManagedIdentityCredential  } from "@azure/identity";
 
 let pool: mssql.ConnectionPool | null = null;
+// When the pool goes stale, up to batchSize (16) concurrent invocations can
+// all discover it dead in the same instant. Without this, each one raced to
+// build its own competing ConnectionPool and stomped on the shared `pool`
+// variable — which is exactly what caused retries to fail with the same
+// "Connection is closed" error. Caching the in-flight promise means only the
+// first caller actually reconnects; everyone else just awaits that same
+// attempt and shares its result.
+let connecting: Promise<mssql.ConnectionPool> | null = null;
 
 async function getToken(): Promise<string> {
   const credential = new ManagedIdentityCredential ();
@@ -22,7 +30,18 @@ async function getToken(): Promise<string> {
 
 async function getPool(): Promise<mssql.ConnectionPool> {
   if (pool && pool.connected) return pool;
+  if (connecting) return connecting;
 
+  connecting = connectPool();
+  try {
+    pool = await connecting;
+    return pool;
+  } finally {
+    connecting = null;
+  }
+}
+
+async function connectPool(): Promise<mssql.ConnectionPool> {
   const server = process.env.DATABASE_SERVER;
   const database = process.env.DATABASE_NAME;
   if (!server || !database) {
@@ -49,12 +68,12 @@ async function getPool(): Promise<mssql.ConnectionPool> {
 
   let attempts = 0;
   const maxAttempts = 6;
-  pool = new mssql.ConnectionPool(config);
+  const newPool = new mssql.ConnectionPool(config);
 
   while (attempts < maxAttempts) {
     try {
-      await pool.connect();
-      return pool;
+      await newPool.connect();
+      return newPool;
     } catch (err) {
       attempts++;
       if (attempts >= maxAttempts) {
