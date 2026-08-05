@@ -49,11 +49,11 @@
   // "next" (multi-step form navigation, not completion) and "learn more"/
   // "read more" (generic navigation).
   var TIER2_FORM_TEXT_MATCHES = [
-    "send message", "send enquiry", "send an enquiry", "submit", "submit enquiry",
+    "send message", "send enquiry", "send an enquiry", "submit",
     "request a callback", "request callback", "get a quote", "get quote",
     "request a quote", "request quote", "book now", "book appointment", "confirm booking",
-    "request info", "request information", "enquire now", "make an enquiry",
-    "get in touch", "contact us", "sign up", "register", "schedule", "schedule appointment",
+    "request info", "enquire now", "make an enquiry",
+    "get in touch", "contact us", "sign up", "register", "schedule",
     "claim offer",
   ];
   var interactedForms = []; // <form> elements the visitor has typed into — gates Tier 2 matches
@@ -105,10 +105,14 @@
     saveSession(session);
 
     // Send the initial "landing" event — this creates the Session in our DB
+    var referrerHost = "";
+    try {
+      if (document.referrer) referrerHost = new URL(document.referrer).hostname.substring(0, 253);
+    } catch (e) {}
     send("session_start", {
       session: session,
       pagePath: window.location.pathname,
-      referrerHost: getReferrerHost(),
+      referrerHost: referrerHost,
     });
   }
 
@@ -118,7 +122,14 @@
   var pageStart = Date.now();
   var maxScrollPct = 0;
 
-  send("pageview", {
+  // Browsers without bfcache (e.g. Android WebView) have no choice but to do
+  // a real reload on back/forward — this catches that case via the standard
+  // Navigation Timing API so it's labelled the same as a true bfcache
+  // restore, without needing any browser/device detection.
+  var cameFromBack;
+  try { cameFromBack = performance.getEntriesByType("navigation")[0].type === "back_forward"; } catch (e) {}
+
+  send(cameFromBack ? "bfpv" : "pageview", {
     sessionFingerprint: session.sessionFingerprint,
     pagePath: window.location.pathname,
   });
@@ -150,6 +161,13 @@
   // ===========================================================================
   var hiddenAt = document.hidden ? Date.now() : 0; // if already hidden on load
   var totalHiddenMs = 0;
+  // How much of this page's dwell time has already been sent via page_end.
+  // A bfcache-restored page can fire pagehide more than once for the SAME
+  // script instance (pageStart never resets) — without this, each later
+  // page_end would resend the FULL cumulative dwell, and the server (which
+  // adds each page_end's value on top of what's already banked) would count
+  // the earlier portion twice.
+  var reportedDwellMs = 0;
 
   function activeDwellMs() {
     var currentHidden = (hiddenAt > 0) ? (Date.now() - hiddenAt) : 0;
@@ -200,25 +218,14 @@
 
       var lowerText = text.toLowerCase();
 
-      if (href.indexOf("tel:") === 0) isSuccess = true;
-      else if (href.indexOf("mailto:") === 0) isSuccess = true;
+      if (href.indexOf("tel:") === 0 || href.indexOf("mailto:") === 0) isSuccess = true;
       else if (href.indexOf("https://") === 0) {
-        for (var i = 0; i < SUCCESS_HOSTS.length; i++) {
-          if (href.indexOf("https://" + SUCCESS_HOSTS[i]) === 0) {
-            isSuccess = true;
-            break;
-          }
-        }
+        isSuccess = SUCCESS_HOSTS.some(function (h) { return href.indexOf("https://" + h) === 0; });
       }
 
       // Tier 1 — text match, safe anywhere on the page (direct channel-opening actions)
       if (!isSuccess) {
-        for (var t1 = 0; t1 < TIER1_TEXT_MATCHES.length; t1++) {
-          if (lowerText.indexOf(TIER1_TEXT_MATCHES[t1]) !== -1) {
-            isSuccess = true;
-            break;
-          }
-        }
+        isSuccess = TIER1_TEXT_MATCHES.some(function (m) { return lowerText.indexOf(m) !== -1; });
       }
 
       // Tier 2 — text match, ONLY when this is the completing action of a
@@ -234,12 +241,7 @@
             lowerText.indexOf("clear") !== -1 ||
             lowerText.indexOf("reset") !== -1;
           if (!looksLikeCancel) {
-            for (var t2 = 0; t2 < TIER2_FORM_TEXT_MATCHES.length; t2++) {
-              if (lowerText.indexOf(TIER2_FORM_TEXT_MATCHES[t2]) !== -1) {
-                isSuccess = true;
-                break;
-              }
-            }
+            isSuccess = TIER2_FORM_TEXT_MATCHES.some(function (m) { return lowerText.indexOf(m) !== -1; });
           }
         }
       }
@@ -258,13 +260,9 @@
       if (isSuccess && tag === "a" && href && href.indexOf("#") !== 0 && href.indexOf("javascript") !== 0) {
         e.preventDefault();
         var actualHref = el.getAttribute("href");
-        var opensNewTab = el.getAttribute("target") === "_blank" || el.getAttribute("target") === "_new";
+        var newTab = el.getAttribute("target") === "_blank" || el.getAttribute("target") === "_new";
         setTimeout(function () {
-          if (opensNewTab) {
-            window.open(actualHref);
-          } else {
-            window.location.href = actualHref;
-          }
+          newTab ? window.open(actualHref) : (window.location.href = actualHref);
         }, 150);
       }
     },
@@ -420,10 +418,13 @@
   // ===========================================================================
   window.addEventListener("pagehide", function () {
     clearTimeout(earlyHeartbeat); // no point sending both
+    var totalDwell = activeDwellMs();
+    var newDwell = Math.max(0, totalDwell - reportedDwellMs);
+    reportedDwellMs = totalDwell;
     send("page_end", {
       sessionFingerprint: session.sessionFingerprint,
       pagePath: window.location.pathname,
-      dwellMs: activeDwellMs(),
+      dwellMs: newDwell,
       scrollPct: maxScrollPct,
     });
   });
@@ -468,15 +469,6 @@
     if (w < 768) return "mobile";
     if (w < 1024) return "tablet";
     return "desktop";
-  }
-
-  function getReferrerHost() {
-    try {
-      if (!document.referrer) return "";
-      return new URL(document.referrer).hostname.substring(0, 253);
-    } catch (e) {
-      return "";
-    }
   }
 
   // ===========================================================================
