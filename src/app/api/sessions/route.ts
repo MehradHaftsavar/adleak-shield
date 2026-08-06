@@ -181,7 +181,12 @@ export async function GET(request: NextRequest) {
           (
             SELECT COUNT(*) FROM JourneyEvents je
             WHERE je.session_id = s.session_id AND je.event_type = 'success_event'
-          ) AS success_count
+          ) AS success_count,
+          (
+            SELECT TOP 1 je.occurred_at FROM JourneyEvents je
+            WHERE je.session_id = s.session_id AND je.event_type <> 'heartbeat'
+            ORDER BY COALESCE(je.client_ts, DATEDIFF_BIG(MILLISECOND, '19700101', je.occurred_at)) ASC
+          ) AS first_event_at
         FROM Sessions s
         INNER JOIN Campaigns c ON s.campaign_id = c.campaign_id
         WHERE ${where}
@@ -196,7 +201,7 @@ export async function GET(request: NextRequest) {
           keyword:           row.keyword,
           matchType:         row.match_type,
           device:            row.device,
-          startedAt:         row.started_at,
+          startedAt:         row.first_event_at ?? row.started_at,
           totalDurationMs:   row.total_duration_ms,
           isBounce:          row.is_bounce === true || row.is_bounce === 1,
           adGroupId:         row.ad_group_id  ?? null,

@@ -336,18 +336,23 @@ async function updateSessionDwell(
   await new mssql.Request(tx)
     .input("sessionId", mssql.UniqueIdentifier, sessionId)
     .input("dwellMs", mssql.Int, dwellClamped)
-    .input("shortDwell", mssql.Bit, dwellMs < 5000 ? 1 : 0)
     .input("scrollPct", mssql.TinyInt, scrollPct ?? null)
     .query(
       isPageEnd
         ? // page_end: this page is genuinely over — its dwell is final, so
           // permanently bank it into completed_pages_duration_ms rather than
           // just overwriting total_duration_ms with this one page's number.
+          // is_bounce is checked against the SESSION-WIDE cumulative total
+          // (completed_pages_duration_ms + this page's dwell), not this one
+          // page's dwell in isolation — otherwise a visitor who revisits the
+          // same/another page more than once (each stretch individually
+          // under 5s) would incorrectly stay flagged as a bounce even when
+          // their combined time on site is well past that threshold.
           `UPDATE Sessions
              SET completed_pages_duration_ms = completed_pages_duration_ms + @dwellMs,
                  total_duration_ms = completed_pages_duration_ms + @dwellMs,
                  is_bounce = CASE
-                   WHEN @shortDwell = 1 AND NOT EXISTS (
+                   WHEN (completed_pages_duration_ms + @dwellMs) < 5000 AND NOT EXISTS (
                      SELECT 1 FROM JourneyEvents
                      WHERE session_id = @sessionId
                        AND event_type IN ('click', 'success_event')
@@ -362,11 +367,12 @@ async function updateSessionDwell(
            WHERE session_id = @sessionId`
         : // heartbeat: the page is still open — this is a live, not-yet-final
           // number, so it's recomputed on top of the locked-in base without
-          // touching completed_pages_duration_ms itself.
+          // touching completed_pages_duration_ms itself. Same cumulative-total
+          // bounce check as page_end, for the same reason.
           `UPDATE Sessions
              SET total_duration_ms = ISNULL(completed_pages_duration_ms, 0) + @dwellMs,
                  is_bounce = CASE
-                   WHEN @shortDwell = 1 AND NOT EXISTS (
+                   WHEN (ISNULL(completed_pages_duration_ms, 0) + @dwellMs) < 5000 AND NOT EXISTS (
                      SELECT 1 FROM JourneyEvents
                      WHERE session_id = @sessionId
                        AND event_type IN ('click', 'success_event')

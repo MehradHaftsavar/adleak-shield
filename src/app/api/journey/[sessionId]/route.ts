@@ -72,13 +72,18 @@ export async function GET(
         ORDER BY COALESCE(client_ts, DATEDIFF_BIG(MILLISECOND, '19700101', occurred_at)) ASC
       `);
 
+      // Use the first real event's time (already sorted client_ts-first, above)
+      // rather than started_at, which is just when the DB row was inserted —
+      // that can lag the visitor's actual landing moment by a few seconds.
+      const firstEventAt = eventsResult.recordset[0]?.occurred_at ?? sessionRow.started_at;
+
       return {
         session: {
           sessionId:       sessionRow.session_id,
           keyword:         sessionRow.keyword,
           matchType:       sessionRow.match_type,
           device:          sessionRow.device,
-          startedAt:       sessionRow.started_at,
+          startedAt:       firstEventAt,
           totalDurationMs: sessionRow.total_duration_ms,
           isBounce:        sessionRow.is_bounce === true || sessionRow.is_bounce === 1,
           hasSuccessEvent: sessionRow.has_success_event === true || sessionRow.has_success_event === 1,
