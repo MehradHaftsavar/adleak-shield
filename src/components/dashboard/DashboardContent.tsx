@@ -365,7 +365,11 @@ export function DashboardContent() {
         )}
 
         <div className={status.isPaywalled ? 'select-none pointer-events-none' : ''}>
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-end gap-4 mb-4">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-4">
+            <p className="text-xs text-gray-500 leading-relaxed max-w-md">
+              Keywords that are burning your budget. A &quot;leak&quot; is any keyword where visitors click your ad but leave immediately without engaging — you paid for that click and got nothing back.
+            </p>
+
             <div className="flex flex-wrap items-center gap-2">
               <DateRangePicker onRangeChange={handleLeakDateChange} />
 
@@ -384,6 +388,9 @@ export function DashboardContent() {
         </div>
 
         <div className={status.isPaywalled ? 'select-none pointer-events-none' : ''}>
+          <p className="text-xs text-gray-500 leading-relaxed max-w-md mb-4">
+            Every visit from your Google Ads campaigns, with what each visitor actually did. Bounce means they left within seconds without interacting. Engaged means they stayed longer or clicked something. Converted means they called, messaged, or submitted a form.
+          </p>
           <SessionsTable
             campaigns={status.campaigns}
             dateRange={leakDateRange}

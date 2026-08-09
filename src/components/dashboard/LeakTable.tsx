@@ -283,9 +283,7 @@ export function LeakTable({ dateRange, refreshTrigger }: LeakTableProps) {
               <h2 className="text-xl font-bold text-gray-900">
                 Leak Table
               </h2>
-              <p className="text-xs text-gray-500 leading-relaxed max-w-md mt-0.5">
-                Keywords that are burning your budget. A &quot;leak&quot; is any keyword where visitors click your ad but leave immediately without engaging — you paid for that click and got nothing back.
-              </p>
+              <p className="text-sm text-gray-600">Keywords wasting your ad spend</p>
             </div>
           </div>
           <div className="flex items-center gap-2">
