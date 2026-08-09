@@ -93,6 +93,15 @@ export function DashboardContent() {
   const [upgrading, setUpgrading] = useState(false);
   const [campaignsOpen, setCampaignsOpen] = useState(true);
 
+  // Default to collapsed on phone-width screens only — keeps the server-rendered
+  // default (open) intact for the first paint, then collapses right after mount
+  // if the viewport is narrow, so desktop behavior is untouched.
+  useEffect(() => {
+    if (window.innerWidth < 640) {
+      setCampaignsOpen(false);
+    }
+  }, []);
+
   const planType  = (session?.user?.planType ?? 'starter') as PlanType;
   const planPrice = PLAN_LIMITS[planType].priceGbp.toFixed(2);
 
