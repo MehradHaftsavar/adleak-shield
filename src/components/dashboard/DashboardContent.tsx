@@ -374,30 +374,28 @@ export function DashboardContent() {
         )}
 
         <div className={status.isPaywalled ? 'select-none pointer-events-none' : ''}>
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-4">
-            <p className="text-xs text-gray-500 leading-relaxed max-w-md">
-              Keywords that are burning your budget. A &quot;leak&quot; is any keyword where visitors click your ad but leave immediately without engaging — you paid for that click and got nothing back.
-            </p>
+          <div className="flex flex-wrap items-center justify-end gap-2 mb-3">
+            <DateRangePicker onRangeChange={handleLeakDateChange} />
 
-            <div className="flex flex-wrap items-center gap-2">
-              <DateRangePicker onRangeChange={handleLeakDateChange} />
-
-              <button
-                onClick={handleManualRefresh}
-                className="flex items-center gap-2 px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg transition-colors flex-shrink-0"
-                title="Refresh leak data"
-              >
-                <RefreshCw className="w-4 h-4" />
-                <span className="hidden sm:inline">Refresh</span>
-              </button>
-            </div>
+            <button
+              onClick={handleManualRefresh}
+              className="flex items-center gap-2 px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg transition-colors flex-shrink-0"
+              title="Refresh leak data"
+            >
+              <RefreshCw className="w-4 h-4" />
+              <span className="hidden sm:inline">Refresh</span>
+            </button>
           </div>
+
+          <p className="text-sm text-gray-600 leading-relaxed mb-4">
+            Keywords that are burning your budget. A &quot;leak&quot; is any keyword where visitors click your ad but leave immediately without engaging — you paid for that click and got nothing back.
+          </p>
 
           <LeakTable dateRange={leakDateRange} refreshTrigger={refreshTrigger} />
         </div>
 
         <div className={status.isPaywalled ? 'select-none pointer-events-none' : ''}>
-          <p className="text-xs text-gray-500 leading-relaxed max-w-md mb-4">
+          <p className="text-sm text-gray-600 leading-relaxed mb-4">
             Every visit from your Google Ads campaigns, with what each visitor actually did. Bounce means they left within seconds without interacting. Engaged means they stayed longer or clicked something. Converted means they called, messaged, or submitted a form.
           </p>
           <SessionsTable
