@@ -181,7 +181,7 @@ export function LeakTable({ dateRange, refreshTrigger }: LeakTableProps) {
 
   if (isLoading) {
     return (
-      <div className="bg-white rounded-lg border border-gray-200 p-6">
+      <div className="bg-white rounded-b-lg border border-gray-200 p-6">
         <div className="animate-pulse space-y-4">
           <div className="h-6 bg-gray-200 rounded w-1/4" />
           <div className="h-10 bg-gray-200 rounded" />
@@ -195,7 +195,7 @@ export function LeakTable({ dateRange, refreshTrigger }: LeakTableProps) {
 
   if (error) {
     return (
-      <div className="bg-white rounded-lg border border-gray-200 p-6">
+      <div className="bg-white rounded-b-lg border border-gray-200 p-6">
         <p className="text-red-600">{error}</p>
         <button onClick={loadLeaks} className="mt-4 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">
           Retry
@@ -207,7 +207,7 @@ export function LeakTable({ dateRange, refreshTrigger }: LeakTableProps) {
   if (!data || data.leaks.length === 0) {
     const hasAnySessions = data && data.summary.totalBounceClicks > 0;
     return (
-      <div className="bg-white rounded-lg border border-gray-200">
+      <div className="bg-white rounded-b-lg border border-gray-200">
         {/* Header — always visible so export buttons are reachable even before data arrives */}
         <div className="p-4 sm:p-6 border-b border-gray-200 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div className="flex items-center gap-3">
@@ -271,7 +271,7 @@ export function LeakTable({ dateRange, refreshTrigger }: LeakTableProps) {
 
   return (
     <>
-    <div className="bg-white rounded-lg border border-gray-200">
+    <div className="bg-white rounded-b-lg border border-gray-200">
       {/* Header */}
       <div className="p-6 border-b border-gray-200">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-4">

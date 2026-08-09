@@ -369,7 +369,7 @@ export function SessionsTable({ campaigns, dateRange, refreshTrigger }: Sessions
 
   return (
     <>
-      <div className="bg-white rounded-lg border border-gray-200">
+      <div className="bg-white rounded-b-lg border border-gray-200">
         {/* Header */}
         <div className="p-6 border-b border-gray-200">
           <div className="flex flex-wrap items-center justify-between gap-3 mb-5">
