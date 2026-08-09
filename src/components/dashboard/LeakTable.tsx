@@ -227,8 +227,7 @@ export function LeakTable({ dateRange, refreshTrigger }: LeakTableProps) {
               title="No leak keywords to export yet"
             >
               <Download className="w-4 h-4" />
-              <span className="hidden sm:inline">Export Negative Keywords</span>
-              <span className="sm:hidden">Export</span>
+              Export
             </button>
           </div>
         </div>
@@ -284,7 +283,7 @@ export function LeakTable({ dateRange, refreshTrigger }: LeakTableProps) {
               <h2 className="text-xl font-bold text-gray-900">
                 Leak Table
               </h2>
-              <p className="text-sm text-gray-600">
+              <p className="text-xs text-gray-500 leading-relaxed max-w-md mt-0.5">
                 Keywords that are burning your budget. A &quot;leak&quot; is any keyword where visitors click your ad but leave immediately without engaging — you paid for that click and got nothing back.
               </p>
             </div>
@@ -296,8 +295,7 @@ export function LeakTable({ dateRange, refreshTrigger }: LeakTableProps) {
               className="flex items-center gap-2 px-4 py-2 bg-green-600 hover:bg-green-700 disabled:bg-gray-300 disabled:cursor-not-allowed text-white font-semibold rounded-lg transition-colors"
             >
               <Download className="w-4 h-4" />
-              <span className="hidden sm:inline">Export Negative Keywords</span>
-              <span className="sm:hidden">Export</span>
+              Export
             </button>
           </div>
         </div>
