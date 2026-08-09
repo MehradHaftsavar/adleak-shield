@@ -379,7 +379,9 @@ export function SessionsTable({ campaigns, dateRange, refreshTrigger }: Sessions
               </div>
               <div>
                 <h2 className="text-xl font-bold text-gray-900">All Sessions</h2>
-                <p className="text-sm text-gray-600">Every visit from your Google Ads campaigns</p>
+                <p className="text-sm text-gray-600">
+                  Every visit from your Google Ads campaigns, with what each visitor actually did. Bounce means they left within seconds without interacting. Engaged means they stayed longer or clicked something. Converted means they called, messaged, or submitted a form.
+                </p>
               </div>
             </div>
 

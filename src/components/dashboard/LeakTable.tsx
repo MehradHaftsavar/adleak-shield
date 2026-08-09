@@ -283,9 +283,10 @@ export function LeakTable({ dateRange, refreshTrigger }: LeakTableProps) {
             <div>
               <h2 className="text-xl font-bold text-gray-900">
                 Leak Table
-                <Tooltip placement="down" text="Keywords that are burning your budget. A 'leak' is any keyword where visitors click your ad but leave immediately without engaging — you paid for that click and got nothing back." />
               </h2>
-              <p className="text-sm text-gray-600">Keywords wasting your ad spend</p>
+              <p className="text-sm text-gray-600">
+                Keywords that are burning your budget. A &quot;leak&quot; is any keyword where visitors click your ad but leave immediately without engaging — you paid for that click and got nothing back.
+              </p>
             </div>
           </div>
           <div className="flex items-center gap-2">

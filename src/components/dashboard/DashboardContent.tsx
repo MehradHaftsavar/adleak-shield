@@ -365,11 +365,7 @@ export function DashboardContent() {
         )}
 
         <div className={status.isPaywalled ? 'select-none pointer-events-none' : ''}>
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-4">
-            <h2 className="text-xl font-semibold text-gray-900">
-              Wasted Spend Analysis
-            </h2>
-
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-end gap-4 mb-4">
             <div className="flex flex-wrap items-center gap-2">
               <DateRangePicker onRangeChange={handleLeakDateChange} />
 
@@ -388,9 +384,6 @@ export function DashboardContent() {
         </div>
 
         <div className={status.isPaywalled ? 'select-none pointer-events-none' : ''}>
-          <h2 className="text-xl font-semibold text-gray-900 mb-4">
-            Visitor Journeys
-          </h2>
           <SessionsTable
             campaigns={status.campaigns}
             dateRange={leakDateRange}
