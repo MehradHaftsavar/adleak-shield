@@ -42,7 +42,18 @@ export async function GET(
           CASE WHEN EXISTS (
             SELECT 1 FROM JourneyEvents je
             WHERE je.session_id = s.session_id AND je.event_type = 'success_event'
-          ) THEN 1 ELSE 0 END AS has_success_event
+          ) THEN 1 ELSE 0 END AS has_success_event,
+          -- Smallest gap between the browser's clock and ours across this
+          -- session. The least-delayed event is the most trustworthy reference:
+          -- occurred_at is stamped when the Function handler runs, which a cold
+          -- start can push seconds late (squashing a 20s visit into one second).
+          -- Adding this offset back to each event's client_ts restores real
+          -- spacing, and self-corrects a wrong device clock at the same time.
+          (
+            SELECT MIN(DATEDIFF_BIG(MILLISECOND, '19700101', je.occurred_at) - je.client_ts)
+            FROM JourneyEvents je
+            WHERE je.session_id = s.session_id AND je.client_ts IS NOT NULL
+          ) AS min_lag_ms
         FROM Sessions s
         INNER JOIN Campaigns c ON c.campaign_id = s.campaign_id
         WHERE s.session_id = @sessionId
@@ -65,17 +76,31 @@ export async function GET(
           element_text,
           scroll_depth_pct,
           dwell_time_ms,
-          occurred_at
+          occurred_at,
+          client_ts
         FROM JourneyEvents
         WHERE session_id = @sessionId
           AND event_type <> 'heartbeat'
         ORDER BY COALESCE(client_ts, DATEDIFF_BIG(MILLISECOND, '19700101', occurred_at)) ASC
       `);
 
+      // Rebuild each event's timestamp from the browser's own clock plus the
+      // session's smallest observed server lag. Falls back to the raw
+      // occurred_at whenever client_ts is missing (any event recorded before
+      // that column existed), so historical journeys render exactly as before.
+      const minLagMs = sessionRow.min_lag_ms;
+      const displayTime = (occurredAt: Date, clientTs: unknown): Date => {
+        if (clientTs == null || minLagMs == null) return occurredAt;
+        return new Date(Number(clientTs) + Number(minLagMs));
+      };
+
       // Use the first real event's time (already sorted client_ts-first, above)
       // rather than started_at, which is just when the DB row was inserted —
       // that can lag the visitor's actual landing moment by a few seconds.
-      const firstEventAt = eventsResult.recordset[0]?.occurred_at ?? sessionRow.started_at;
+      const firstEvent = eventsResult.recordset[0];
+      const firstEventAt = firstEvent
+        ? displayTime(firstEvent.occurred_at, firstEvent.client_ts)
+        : sessionRow.started_at;
 
       return {
         session: {
@@ -98,7 +123,7 @@ export async function GET(
           elementText:    row.element_text,
           scrollDepthPct: row.scroll_depth_pct,
           dwellTimeMs:    row.dwell_time_ms,
-          occurredAt:     row.occurred_at,
+          occurredAt:     displayTime(row.occurred_at, row.client_ts),
         })),
       };
     });

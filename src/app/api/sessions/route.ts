@@ -186,7 +186,19 @@ export async function GET(request: NextRequest) {
             SELECT TOP 1 je.occurred_at FROM JourneyEvents je
             WHERE je.session_id = s.session_id AND je.event_type <> 'heartbeat'
             ORDER BY COALESCE(je.client_ts, DATEDIFF_BIG(MILLISECOND, '19700101', je.occurred_at)) ASC
-          ) AS first_event_at
+          ) AS first_event_at,
+          -- Same client-clock correction as the journey detail view, so a
+          -- session shows the same time in both places. See that route for why.
+          (
+            SELECT TOP 1 je.client_ts FROM JourneyEvents je
+            WHERE je.session_id = s.session_id AND je.event_type <> 'heartbeat'
+            ORDER BY COALESCE(je.client_ts, DATEDIFF_BIG(MILLISECOND, '19700101', je.occurred_at)) ASC
+          ) AS first_event_client_ts,
+          (
+            SELECT MIN(DATEDIFF_BIG(MILLISECOND, '19700101', je.occurred_at) - je.client_ts)
+            FROM JourneyEvents je
+            WHERE je.session_id = s.session_id AND je.client_ts IS NOT NULL
+          ) AS min_lag_ms
         FROM Sessions s
         INNER JOIN Campaigns c ON s.campaign_id = c.campaign_id
         WHERE ${where}
@@ -201,7 +213,10 @@ export async function GET(request: NextRequest) {
           keyword:           row.keyword,
           matchType:         row.match_type,
           device:            row.device,
-          startedAt:         row.first_event_at ?? row.started_at,
+          startedAt:
+            row.first_event_client_ts != null && row.min_lag_ms != null
+              ? new Date(Number(row.first_event_client_ts) + Number(row.min_lag_ms))
+              : (row.first_event_at ?? row.started_at),
           totalDurationMs:   row.total_duration_ms,
           isBounce:          row.is_bounce === true || row.is_bounce === 1,
           adGroupId:         row.ad_group_id  ?? null,
