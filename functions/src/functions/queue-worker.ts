@@ -74,11 +74,71 @@ function normaliseMatchType(raw: string | null | undefined): string | null {
   }
 }
 
+// Strips the www. prefix and lowercases so 'www.Example.com' and 'example.com'
+// compare equal. Module-scoped because both the domain-mismatch check and the
+// tenant lookup below must normalise identically.
+const normaliseDomain = (d: string) => d.toLowerCase().replace(/^www\./, '');
+
 interface CampaignLookup {
   tenantId: string;
   campaignId: string;
   domainName: string;
   googleCampaignId: string;
+}
+
+// ---------------------------------------------------------------------------
+// WHY THESE TWO HELPERS EXIST — do not replace them with withAdminDb.
+//
+// The RLS predicate (fn_tenantSecurityPredicate) grants a bypass to
+// USER_NAME() = 'adleak_admin_identity'. That user was never created, so the
+// bypass is dead: any connection WITHOUT SESSION_CONTEXT('TenantId') sees ZERO
+// rows in Sessions/Tenants/Domains. Proven directly — clearing the context and
+// running SELECT COUNT(*) FROM Sessions returns 0 against a table holding 139+
+// rows.
+//
+// withAdminDb sets no context, so it only worked when it happened to draw a
+// pooled connection still carrying context from an earlier withTenantDb call.
+// Fresh connection => session lookup returns nothing => the event was
+// discarded as an "orphan". That silently lost events on ~14% of sessions.
+//
+// The fix: resolve the tenant from CampaignLookupCache (which has no RLS
+// policy and is kept in sync by trg_CampaignCache_Update), then set the
+// context in the SAME SQL batch as the read, so it cannot depend on which
+// connection we draw.
+// ---------------------------------------------------------------------------
+
+async function lookupTenantByDomain(domainName: string): Promise<string | null> {
+  const normalised = normaliseDomain(domainName).substring(0, 253);
+  return withAdminDb(async (request) => {
+    const result = await request
+      .input("domainName", mssql.NVarChar, normalised)
+      .query(
+        `SELECT TOP 1 tenant_id
+         FROM CampaignLookupCache
+         WHERE LOWER(domain_name) = @domainName
+            OR LOWER(domain_name) = 'www.' + @domainName`
+      );
+    return result.recordset[0]?.tenant_id ?? null;
+  });
+}
+
+async function findSessionByFingerprint(
+  tenantId: string,
+  fingerprint: string
+): Promise<{ tenant_id: string; campaign_id: string } | null> {
+  return withAdminDb(async (request) => {
+    const result = await request
+      .input("tid", mssql.UniqueIdentifier, tenantId)
+      .input("fp", mssql.NVarChar, fingerprint.substring(0, 64))
+      .query(
+        `SET NOCOUNT ON;
+         DECLARE @t VARBINARY(128) = CAST(@tid AS VARBINARY(128));
+         EXEC sp_set_session_context N'TenantId', @t, @read_only = 0;
+         SELECT TOP 1 tenant_id, campaign_id
+         FROM Sessions WHERE session_fingerprint = @fp;`
+      );
+    return result.recordset[0] ?? null;
+  });
 }
 
 async function lookupCampaign(
@@ -131,7 +191,15 @@ async function isTenantEligible(tenantId: string): Promise<boolean> {
 }
 
 // Look up domain_id (and tenant_id for case where campaign isn't registered)
-// by domain name — withAdminDb bypasses RLS so it sees all tenants' domains.
+// by domain name.
+//
+// KNOWN LIMITATION: Domains is RLS-protected and withAdminDb sets no tenant
+// context, so this returns null on any connection that isn't already carrying
+// one (see the helper comments above for why the admin bypass is dead). The
+// only caller is the unregistered/domain-mismatch logging path, where a null
+// result degrades logging detail but loses no tracking data — so it is left
+// as-is rather than widening the blast radius of the orphan-loss fix.
+// isTenantEligible has the same issue and the same reasoning.
 async function lookupDomainInfo(
   domainName: string
 ): Promise<{ domainId: string; tenantId: string } | null> {
@@ -342,17 +410,34 @@ async function updateSessionDwell(
         ? // page_end: this page is genuinely over — its dwell is final, so
           // permanently bank it into completed_pages_duration_ms rather than
           // just overwriting total_duration_ms with this one page's number.
-          // is_bounce is checked against the SESSION-WIDE cumulative total
-          // (completed_pages_duration_ms + this page's dwell), not this one
-          // page's dwell in isolation — otherwise a visitor who revisits the
-          // same/another page more than once (each stretch individually
-          // under 5s) would incorrectly stay flagged as a bounce even when
-          // their combined time on site is well past that threshold.
+          //
+          // total_duration_ms is only ever allowed to grow. Beacons do go
+          // missing in transit, and when a page_end is lost, everything its
+          // heartbeats had already reported for that page would otherwise be
+          // wiped out by the NEXT page's page_end (which computes from a
+          // completed_pages_duration_ms that never received the lost value).
+          // That's how a real 17-second visit ended up displaying as 308ms.
+          // Session time can't actually go backwards, so refuse to write a
+          // smaller number than we've already established.
+          //
+          // is_bounce is checked against the SESSION-WIDE running total, not
+          // this one page's dwell in isolation — otherwise a visitor who
+          // revisits the same/another page more than once (each stretch
+          // individually under 5s) would incorrectly stay flagged as a bounce
+          // even when their combined time on site is well past that threshold.
           `UPDATE Sessions
              SET completed_pages_duration_ms = completed_pages_duration_ms + @dwellMs,
-                 total_duration_ms = completed_pages_duration_ms + @dwellMs,
+                 total_duration_ms = CASE
+                   WHEN (completed_pages_duration_ms + @dwellMs) > ISNULL(total_duration_ms, 0)
+                     THEN completed_pages_duration_ms + @dwellMs
+                   ELSE total_duration_ms
+                 END,
                  is_bounce = CASE
-                   WHEN (completed_pages_duration_ms + @dwellMs) < 5000 AND NOT EXISTS (
+                   WHEN (CASE
+                           WHEN (completed_pages_duration_ms + @dwellMs) > ISNULL(total_duration_ms, 0)
+                             THEN completed_pages_duration_ms + @dwellMs
+                           ELSE total_duration_ms
+                         END) < 5000 AND NOT EXISTS (
                      SELECT 1 FROM JourneyEvents
                      WHERE session_id = @sessionId
                        AND event_type IN ('click', 'success_event')
@@ -367,12 +452,21 @@ async function updateSessionDwell(
            WHERE session_id = @sessionId`
         : // heartbeat: the page is still open — this is a live, not-yet-final
           // number, so it's recomputed on top of the locked-in base without
-          // touching completed_pages_duration_ms itself. Same cumulative-total
-          // bounce check as page_end, for the same reason.
+          // touching completed_pages_duration_ms itself. Same monotonic guard
+          // and same cumulative-total bounce check as page_end, for the same
+          // reasons described above.
           `UPDATE Sessions
-             SET total_duration_ms = ISNULL(completed_pages_duration_ms, 0) + @dwellMs,
+             SET total_duration_ms = CASE
+                   WHEN (ISNULL(completed_pages_duration_ms, 0) + @dwellMs) > ISNULL(total_duration_ms, 0)
+                     THEN ISNULL(completed_pages_duration_ms, 0) + @dwellMs
+                   ELSE total_duration_ms
+                 END,
                  is_bounce = CASE
-                   WHEN (ISNULL(completed_pages_duration_ms, 0) + @dwellMs) < 5000 AND NOT EXISTS (
+                   WHEN (CASE
+                           WHEN (ISNULL(completed_pages_duration_ms, 0) + @dwellMs) > ISNULL(total_duration_ms, 0)
+                             THEN ISNULL(completed_pages_duration_ms, 0) + @dwellMs
+                           ELSE total_duration_ms
+                         END) < 5000 AND NOT EXISTS (
                      SELECT 1 FROM JourneyEvents
                      WHERE session_id = @sessionId
                        AND event_type IN ('click', 'success_event')
@@ -431,7 +525,6 @@ export async function queueWorkerHandler(
       return;
     }
 
-    const normaliseDomain = (d: string) => d.toLowerCase().replace(/^www\./, '');
     if (normaliseDomain(env.domain) !== normaliseDomain(campaign.domainName)) {
       context.log("[Worker] Domain mismatch — logging", {
         campaignId: googleCampaignId,
@@ -468,35 +561,42 @@ export async function queueWorkerHandler(
       env.payload.session?.sessionFingerprint;
     if (!fp) return;
 
-    const lookupByFp = () => withAdminDb(async (request) => {
-      const result = await request
-        .input("fp", mssql.NVarChar, fp.substring(0, 64))
-        .query(
-          `SELECT TOP 1 tenant_id, campaign_id
-           FROM Sessions WHERE session_fingerprint = @fp`
-        );
-      return result.recordset[0] ?? null;
-    });
+    // Resolve the tenant from the domain first — without it the Sessions read
+    // below is filtered to zero rows by RLS (see helper comments above).
+    const tenantId = await lookupTenantByDomain(env.domain);
+    if (!tenantId) {
+      // No registered campaign owns this domain, so there is no tenant this
+      // event could ever belong to. Retrying would never succeed — drop it.
+      context.log(`[Worker] Unregistered domain for ${env.eventType} — dropping`, {
+        domain: env.domain,
+        eventType: env.eventType,
+      });
+      return;
+    }
 
-    let sessionInfo = await lookupByFp();
+    let sessionInfo = await findSessionByFingerprint(tenantId, fp);
 
     if (!sessionInfo) {
-      // Race condition: session_start may still be in-flight through the queue.
-      // Poll in-process for up to 3s before giving up — avoids noisy Azure
-      // error logs and dead-letter queue buildup from retry exhaustion.
+      // session_start may still be in-flight through the queue. Poll briefly
+      // in-process to catch the common case cheaply.
       for (let attempt = 0; attempt < 6; attempt++) {
         await new Promise(r => setTimeout(r, 500));
-        sessionInfo = await lookupByFp();
+        sessionInfo = await findSessionByFingerprint(tenantId, fp);
         if (sessionInfo) break;
       }
       if (!sessionInfo) {
-        // session_start was legitimately dropped (domain mismatch, unregistered
-        // campaign, ineligible tenant) — drop follow-on events silently too.
+        // Throw rather than return: the session may simply not have committed
+        // yet (session_start transactions have been observed taking 6s+ during
+        // cold starts, longer than this poll). Throwing lets Azure redeliver
+        // the message so a slow commit becomes a delayed write instead of
+        // permanent loss. If it truly can never be placed, it lands in the
+        // poison queue where it is visible — unlike the silent drop this
+        // replaces, which lost data on ~14% of sessions with no error anywhere.
         context.warn(
-          `[Worker] Orphan ${env.eventType} — no session after 3s, dropping`,
-          { domain: env.domain, eventType: env.eventType }
+          `[Worker] Orphan ${env.eventType} — no session yet, will retry`,
+          { domain: env.domain, eventType: env.eventType, fp: fp.substring(0, 24) }
         );
-        return;
+        throw new Error(`Orphan ${env.eventType} — session not found`);
       }
     }
 
@@ -516,20 +616,18 @@ export async function queueWorkerHandler(
       let sessionExists = false;
       for (let attempt = 0; attempt <= 6; attempt++) {
         if (attempt > 0) await new Promise(r => setTimeout(r, 500));
-        const exists = await withAdminDb(async (request) => {
-          const result = await request
-            .input("fp", mssql.NVarChar, fp.substring(0, 64))
-            .query(`SELECT TOP 1 1 FROM Sessions WHERE session_fingerprint = @fp`);
-          return result.recordset.length > 0;
-        });
-        if (exists) { sessionExists = true; break; }
+        // campaign.tenantId is known by this point (either from the campaign
+        // lookup above or from the session lookup), so the context can be set
+        // directly — no domain resolution needed here.
+        const found = await findSessionByFingerprint(campaign.tenantId, fp);
+        if (found) { sessionExists = true; break; }
       }
       if (!sessionExists) {
         context.warn(
-          `[Worker] Orphan ${env.eventType} — no session after 3s, dropping`,
-          { domain: env.domain, eventType: env.eventType }
+          `[Worker] Orphan ${env.eventType} — no session yet, will retry`,
+          { domain: env.domain, eventType: env.eventType, fp: fp.substring(0, 24) }
         );
-        return;
+        throw new Error(`Orphan ${env.eventType} — session not found`);
       }
     }
   }

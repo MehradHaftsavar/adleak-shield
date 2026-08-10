@@ -485,10 +485,13 @@
         ts: Date.now(),
       });
 
+      // sendBeacon returns false when the browser refuses to queue the request
+      // (its beacon queue is full, or the payload is over the ~64KB limit).
+      // Ignoring that return value silently drops the event, so fall through
+      // to fetch when it fails rather than assuming it was delivered.
       if (navigator.sendBeacon) {
         var blob = new Blob([body], { type: "text/plain" });
-        navigator.sendBeacon(INGEST_URL, blob);
-        return;
+        if (navigator.sendBeacon(INGEST_URL, blob)) return;
       }
 
       fetch(INGEST_URL, {
