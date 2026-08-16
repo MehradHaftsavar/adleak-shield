@@ -184,6 +184,20 @@
     return Math.max(0, Date.now() - pageStart - totalHiddenMs - currentHidden);
   }
 
+  // Time on this page the server has NOT already banked. Every dwell figure we
+  // send means this, so the server can apply one consistent rule.
+  //
+  // It matters after a page_end. The server permanently banks that page_end
+  // into completed_pages_duration_ms, then adds each later dwell figure on top
+  // of that banked base. A bfcache-restored page keeps running this same script
+  // instance (pageStart never resets), so activeDwellMs() still counts from the
+  // original load — sending it raw would add the already-banked stretch a
+  // second time and inflate a 20s visit to 35s. Until the first page_end,
+  // reportedDwellMs is 0 and this is simply activeDwellMs().
+  function unbankedDwellMs() {
+    return Math.max(0, activeDwellMs() - reportedDwellMs);
+  }
+
   // ===========================================================================
   // SCROLL DEPTH
   // Track the deepest scroll percentage on this page.
@@ -256,13 +270,28 @@
         }
       }
 
-      send(isSuccess ? "success_event" : "click", {
+      var payload = {
         referrer: referrer,
         pagePath: window.location.pathname,
         elementTag: tag,
         elementHref: href.substring(0, 500),
         elementText: text.substring(0, 100),
-      });
+      };
+
+      // A conversion is the last thing many visits ever do, so bank the dwell
+      // time with it rather than hoping a later beacon gets out. A WhatsApp or
+      // tel: link hands off to another app: with target="_blank" the page never
+      // unloads at all so pagehide never fires, and even on a same-tab
+      // navigation the beacon is racing the handoff. Waiting for page_end lost
+      // a real 15-second converted visit on 16 Aug — it displayed as "< 1s".
+      // Same cumulative-for-this-page semantics as a heartbeat, so the server's
+      // monotonic guard makes a duplicate harmless.
+      if (isSuccess) {
+        payload.dwellMs = unbankedDwellMs();
+        payload.scrollPct = maxScrollPct;
+      }
+
+      send(isSuccess ? "success_event" : "click", payload);
 
       // For success events on <a> links: delay navigation by 150ms so the
       // beacon has time to be queued before pagehide fires.
@@ -293,6 +322,8 @@
         pagePath: window.location.pathname,
         elementTag: "form",
         elementText: formLabel.substring(0, 100),
+        dwellMs: unbankedDwellMs(), // see the click handler — banked at conversion
+        scrollPct: maxScrollPct,
       });
     },
     true
@@ -382,12 +413,16 @@
   // ===========================================================================
   var heartbeatInterval = null;
 
-  function sendHeartbeat() {
-    if (document.hidden) return;
+  // force=true sends even while the page is hidden. That is only ever used by
+  // the visibilitychange handler below, which needs to flush the dwell clock at
+  // the exact moment the page goes away — by then document.hidden is already
+  // true, so the normal guard would suppress the one send that matters most.
+  function sendHeartbeat(force) {
+    if (document.hidden && force !== true) return;
     send("heartbeat", {
       referrer: referrer,
       pagePath: window.location.pathname,
-      dwellMs: activeDwellMs(),
+      dwellMs: unbankedDwellMs(),
       scrollPct: maxScrollPct,
     });
   }
@@ -408,6 +443,16 @@
 
   document.addEventListener("visibilitychange", function () {
     if (document.hidden) {
+      // Flush before banking the hidden clock, so activeDwellMs() still
+      // reports the time actually spent looking at the page.
+      //
+      // On mobile this is the ONLY reliable "the page is going away" signal:
+      // tapping a WhatsApp/tel: link, switching apps, opening a target="_blank"
+      // link or hitting the home button all fire visibilitychange, while
+      // pagehide may never fire at all (the page is backgrounded, not
+      // unloaded). Without this, everything since the last heartbeat — up to
+      // 15 seconds — was simply lost.
+      sendHeartbeat(true);
       hiddenAt = Date.now();
       stopHeartbeat();
     } else {
@@ -428,9 +473,8 @@
   // ===========================================================================
   window.addEventListener("pagehide", function () {
     clearTimeout(earlyHeartbeat); // no point sending both
-    var totalDwell = activeDwellMs();
-    var newDwell = Math.max(0, totalDwell - reportedDwellMs);
-    reportedDwellMs = totalDwell;
+    var newDwell = unbankedDwellMs();
+    reportedDwellMs += newDwell; // this stretch is now banked server-side
     send("page_end", {
       referrer: referrer,
       pagePath: window.location.pathname,

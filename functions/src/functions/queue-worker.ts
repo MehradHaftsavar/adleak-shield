@@ -155,11 +155,24 @@ function gclidFromReferrer(referrer: string | null | undefined): string | null {
   }
 }
 
-/** Path portion of a URL, for comparing a referrer against a session's last page. */
-function pathFromUrl(url: string | null | undefined): string | null {
+/**
+ * Path portion of a referrer, but ONLY when the referrer is same-site.
+ *
+ * The host check is essential. A visitor arriving from a Google ad carries
+ * `document.referrer = "https://www.google.com/"`, whose path is "/" — and
+ * matching that against sessions sitting on "/" would attach one visitor's
+ * events to a different visitor's journey. The referrer is only evidence of
+ * continuity when it points at a page on the SAME site.
+ */
+function samSitePathFromUrl(
+  url: string | null | undefined,
+  domain: string
+): string | null {
   if (!url) return null;
   try {
-    return new URL(url).pathname.substring(0, 500);
+    const parsed = new URL(url);
+    if (normaliseDomain(parsed.host) !== normaliseDomain(domain)) return null;
+    return parsed.pathname.substring(0, 500);
   } catch {
     return null;
   }
@@ -181,7 +194,7 @@ async function matchSession(
   visitorHash: string | null | undefined
 ): Promise<SessionMatch | null> {
   const referrerGclid = gclidFromReferrer(referrer);
-  const referrerPath = pathFromUrl(referrer);
+  const referrerPath = samSitePathFromUrl(referrer, domain);
   const cutoff = new Date(Date.now() - ACTIVE_WINDOW_MS);
 
   return withAdminDb(async (request) => {
@@ -244,7 +257,16 @@ async function matchSession(
   });
 }
 
-/** Does this domain have any visit open right now? Cheap organic-traffic guard. */
+/**
+ * Does this domain have any visit open right now? Cheap organic-traffic guard.
+ *
+ * Both columns are checked deliberately. last_event_at is only written by
+ * touchSession, so it is NULL on a session that has just been created and on
+ * every session predating that column — and NULL >= @cutoff is never true, so
+ * checking it alone would call a live ad visit "idle". Erring wide here is
+ * free: the worst case is that an organic event gets parked and the reconciler
+ * discards it a few minutes later. Erring narrow loses a real event forever.
+ */
 async function domainHasActiveSession(tenantId: string): Promise<boolean> {
   const cutoff = new Date(Date.now() - ACTIVE_WINDOW_MS);
   return withAdminDb(async (request) => {
@@ -255,7 +277,8 @@ async function domainHasActiveSession(tenantId: string): Promise<boolean> {
         SET NOCOUNT ON;
         DECLARE @t VARBINARY(128) = CAST(@tid AS VARBINARY(128));
         EXEC sp_set_session_context N'TenantId', @t, @read_only = 0;
-        SELECT TOP 1 1 FROM Sessions WHERE last_event_at >= @cutoff;
+        SELECT TOP 1 1 FROM Sessions
+         WHERE last_event_at >= @cutoff OR started_at >= @cutoff;
       `);
     return result.recordset.length > 0;
   });
@@ -566,7 +589,17 @@ async function insertJourneyEvent(
     .input("elementHref", mssql.NVarChar, env.payload.elementHref ?? null)
     .input("elementText", mssql.NVarChar(100), env.payload.elementText ?? null)
     .input("scrollPct", mssql.TinyInt, env.payload.scrollPct ?? null)
-    .input("dwellMs", mssql.Int, env.payload.dwellMs ?? null)
+    // Only heartbeat/page_end rows describe a span of time, and the timeline
+    // renders a "… dwell" label off this column. success_event now carries
+    // dwellMs too, but purely so the session total can be banked at the moment
+    // of conversion — writing it onto the click row would put a stray dwell
+    // label on that step. Behaviour is unchanged for every pre-existing type:
+    // none of pageview/bfpv/click/form_interact ever sends dwellMs.
+    .input(
+      "dwellMs",
+      mssql.Int,
+      dbEventType === "heartbeat" ? env.payload.dwellMs ?? null : null
+    )
     .input("occurredAt", mssql.DateTime2, new Date(msg.receivedAt))
     // Ordering key — captured client-side (browser Date.now()) at the moment
     // send() was called, so it reflects the visitor's true action order even
@@ -811,17 +844,6 @@ async function processMessage(
       return true;
     }
 
-    // The tracker now fires on every page for every visitor, because without
-    // device storage it cannot know whether this visit came from an ad. If the
-    // domain has no visit open at all and there is no gclid in sight, this is
-    // ordinary organic traffic — discard it here rather than filling
-    // PendingEvents with noise.
-    const hasGclidSignal =
-      !!env.payload.session?.gclid || !!gclidFromReferrer(env.payload.referrer);
-    if (!hasGclidSignal && !(await domainHasActiveSession(tenantId))) {
-      return true;
-    }
-
     let match = await matchSession(
       tenantId,
       env.domain,
@@ -850,6 +872,24 @@ async function processMessage(
       // sessions before. When the reconciler itself is the caller, report the
       // miss instead so the row stays pending for the next pass.
       if (!allowPark) return false;
+
+      // The tracker now fires on every page for every visitor, because without
+      // device storage it cannot know whether this visit came from an ad. If
+      // the domain has no visit open at all and there is no gclid in sight,
+      // this is ordinary organic traffic — discard it rather than filling
+      // PendingEvents with noise.
+      //
+      // This runs only after both match attempts have failed. Checking it any
+      // earlier is a race: workers run 16-at-a-time, so a heartbeat can reach
+      // this code before the session_start beside it in the same batch has
+      // committed. The domain then looks idle and a real ad visitor's event is
+      // thrown away. That is exactly how a live 5s heartbeat was lost on
+      // 16 Aug, leaving a converted session showing "< 1s".
+      const hasGclidSignal =
+        !!env.payload.session?.gclid || !!gclidFromReferrer(env.payload.referrer);
+      if (!hasGclidSignal && !(await domainHasActiveSession(tenantId))) {
+        return true;
+      }
 
       await parkPendingEvent(msg, visitorHash);
       context.log(`[Worker] ${env.eventType} parked for reconciliation`, {
@@ -965,12 +1005,21 @@ async function processMessage(
               .input("sessionId", mssql.UniqueIdentifier, sessionId)
               .query(`UPDATE Sessions SET is_bounce = 0 WHERE session_id = @sessionId AND is_bounce = 1`);
           }
-          if (env.eventType === "heartbeat" && env.payload.dwellMs) {
+          // success_event carries dwell for the same reason a heartbeat does:
+          // it is a live, cumulative-for-this-page number. Treating it as a
+          // heartbeat (isPageEnd false) means it never touches
+          // completed_pages_duration_ms, so a page_end arriving afterwards
+          // still banks the page exactly once. The monotonic guard inside
+          // updateSessionDwell makes any overlap a no-op.
+          if (
+            (env.eventType === "heartbeat" || env.eventType === "success_event") &&
+            env.payload.dwellMs != null
+          ) {
             await updateSessionDwell(tx, sessionId, env.payload.dwellMs, env.payload.scrollPct, false);
           }
           break;
         case "page_end":
-          if (env.payload.dwellMs) {
+          if (env.payload.dwellMs != null) {
             await updateSessionDwell(tx, sessionId, env.payload.dwellMs, env.payload.scrollPct, true);
           }
           break;
