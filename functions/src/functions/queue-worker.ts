@@ -617,12 +617,55 @@ async function insertJourneyEvent(
     );
 }
 
+/**
+ * Close out the page the visitor just left, and record which page they are on.
+ *
+ * Heartbeats only ever raise total_duration_ms; nothing lands in
+ * completed_pages_duration_ms until that page's page_end arrives. So when a
+ * page_end goes missing — and they do, that is the whole reason the monotonic
+ * guard exists — the next page starts counting from a base of zero, and every
+ * second it accumulates is invisible until it passes the previous page's
+ * high-water mark. A real visit of 65s + 19s across two pages displayed as
+ * 59s: page one's heartbeats had reached 60s, and page two never beat it.
+ *
+ * Arriving on a new page proves the previous one is finished, so whatever
+ * total_duration_ms had reached is now settled — bank it. If that page's
+ * page_end does turn up later it adds nothing new, because
+ * current_page_ts has moved past it (see updateSessionDwell).
+ *
+ * The WHERE clause makes this a no-op for a duplicate or out-of-order pageview:
+ * only a beacon newer than the page we are already tracking can advance it.
+ */
+async function bankPreviousPage(
+  tx: mssql.Transaction,
+  sessionId: string,
+  clientTs: number | null
+): Promise<void> {
+  if (clientTs == null) return;
+
+  await new mssql.Request(tx)
+    .input("sessionId", mssql.UniqueIdentifier, sessionId)
+    .input("clientTs", mssql.BigInt, clientTs)
+    .query(
+      `UPDATE Sessions
+          SET completed_pages_duration_ms = CASE
+                WHEN ISNULL(total_duration_ms, 0) > ISNULL(completed_pages_duration_ms, 0)
+                  THEN ISNULL(total_duration_ms, 0)
+                ELSE ISNULL(completed_pages_duration_ms, 0)
+              END,
+              current_page_ts = @clientTs
+        WHERE session_id = @sessionId
+          AND @clientTs > ISNULL(current_page_ts, 0)`
+    );
+}
+
 async function updateSessionDwell(
   tx: mssql.Transaction,
   sessionId: string,
   dwellMs: number,
   scrollPct?: number | null,
-  isPageEnd?: boolean
+  isPageEnd?: boolean,
+  clientTs?: number | null
 ): Promise<void> {
   const dwellClamped = Math.min(dwellMs, 86_400_000);
 
@@ -630,6 +673,7 @@ async function updateSessionDwell(
     .input("sessionId", mssql.UniqueIdentifier, sessionId)
     .input("dwellMs", mssql.Int, dwellClamped)
     .input("scrollPct", mssql.TinyInt, scrollPct ?? null)
+    .input("clientTs", mssql.BigInt, clientTs ?? null)
     .query(
       isPageEnd
         ? // page_end: this page is genuinely over — its dwell is final, so
@@ -650,18 +694,27 @@ async function updateSessionDwell(
           // revisits the same/another page more than once (each stretch
           // individually under 5s) would incorrectly stay flagged as a bounce
           // even when their combined time on site is well past that threshold.
-          `UPDATE Sessions
-             SET completed_pages_duration_ms = completed_pages_duration_ms + @dwellMs,
+          //
+          // The dwell is only added when this page_end still belongs to the
+          // page the session is on. bankPreviousPage has already settled this
+          // page's time if the visitor moved on first, and the queue delivers
+          // these two concurrently — without the guard, whichever order they
+          // land in would count the same stretch twice. Comparing client
+          // clocks is what makes it order-independent: a page_end always
+          // predates the next page's load, so a page_end older than
+          // current_page_ts is one whose page is already banked.
+          `UPDATE s
+             SET completed_pages_duration_ms = x.newCompleted,
                  total_duration_ms = CASE
-                   WHEN (completed_pages_duration_ms + @dwellMs) > ISNULL(total_duration_ms, 0)
-                     THEN completed_pages_duration_ms + @dwellMs
-                   ELSE total_duration_ms
+                   WHEN x.newCompleted > ISNULL(s.total_duration_ms, 0)
+                     THEN x.newCompleted
+                   ELSE s.total_duration_ms
                  END,
                  is_bounce = CASE
                    WHEN (CASE
-                           WHEN (completed_pages_duration_ms + @dwellMs) > ISNULL(total_duration_ms, 0)
-                             THEN completed_pages_duration_ms + @dwellMs
-                           ELSE total_duration_ms
+                           WHEN x.newCompleted > ISNULL(s.total_duration_ms, 0)
+                             THEN x.newCompleted
+                           ELSE s.total_duration_ms
                          END) < 5000 AND NOT EXISTS (
                      SELECT 1 FROM JourneyEvents
                      WHERE session_id = @sessionId
@@ -670,28 +723,46 @@ async function updateSessionDwell(
                    ELSE 0
                  END,
                  max_scroll_pct = CASE
-                   WHEN @scrollPct IS NOT NULL AND (max_scroll_pct IS NULL OR @scrollPct > max_scroll_pct)
+                   WHEN @scrollPct IS NOT NULL AND (s.max_scroll_pct IS NULL OR @scrollPct > s.max_scroll_pct)
                      THEN @scrollPct
-                   ELSE max_scroll_pct
+                   ELSE s.max_scroll_pct
+                 END,
+                 -- Moving the marker to this page_end is what makes the write
+                 -- idempotent. Azure Storage Queues are at-least-once: if the
+                 -- DB commit succeeds but the message is not deleted (host
+                 -- restart, visibility timeout), it comes back and is processed
+                 -- again. A redelivered page_end would otherwise add its dwell
+                 -- a second time — 84s of real activity became 149s.
+                 current_page_ts = CASE
+                   WHEN @clientTs IS NOT NULL AND @clientTs > ISNULL(s.current_page_ts, 0)
+                     THEN @clientTs
+                   ELSE s.current_page_ts
                  END
-           WHERE session_id = @sessionId`
+             FROM Sessions s
+             CROSS APPLY (
+               SELECT newCompleted = ISNULL(s.completed_pages_duration_ms, 0) +
+                 CASE
+                   WHEN @clientTs IS NULL OR @clientTs > ISNULL(s.current_page_ts, 0)
+                     THEN @dwellMs
+                   ELSE 0
+                 END
+             ) x
+            WHERE s.session_id = @sessionId`
         : // heartbeat: the page is still open — this is a live, not-yet-final
           // number, so it's recomputed on top of the locked-in base without
           // touching completed_pages_duration_ms itself. Same monotonic guard
           // and same cumulative-total bounce check as page_end, for the same
           // reasons described above.
-          `UPDATE Sessions
-             SET total_duration_ms = CASE
-                   WHEN (ISNULL(completed_pages_duration_ms, 0) + @dwellMs) > ISNULL(total_duration_ms, 0)
-                     THEN ISNULL(completed_pages_duration_ms, 0) + @dwellMs
-                   ELSE total_duration_ms
-                 END,
+          //
+          // Stale beacons are ignored for the same reason page_end guards
+          // itself. dwellMs is measured from ITS OWN page's load, so once that
+          // page has been banked into completed_pages_duration_ms, adding it to
+          // that base again counts the same stretch twice. A heartbeat older
+          // than current_page_ts belongs to a page that is already settled.
+          `UPDATE s
+             SET total_duration_ms = x.newTotal,
                  is_bounce = CASE
-                   WHEN (CASE
-                           WHEN (ISNULL(completed_pages_duration_ms, 0) + @dwellMs) > ISNULL(total_duration_ms, 0)
-                             THEN ISNULL(completed_pages_duration_ms, 0) + @dwellMs
-                           ELSE total_duration_ms
-                         END) < 5000 AND NOT EXISTS (
+                   WHEN x.newTotal < 5000 AND NOT EXISTS (
                      SELECT 1 FROM JourneyEvents
                      WHERE session_id = @sessionId
                        AND event_type IN ('click', 'success_event')
@@ -699,11 +770,20 @@ async function updateSessionDwell(
                    ELSE 0
                  END,
                  max_scroll_pct = CASE
-                   WHEN @scrollPct IS NOT NULL AND (max_scroll_pct IS NULL OR @scrollPct > max_scroll_pct)
+                   WHEN @scrollPct IS NOT NULL AND (s.max_scroll_pct IS NULL OR @scrollPct > s.max_scroll_pct)
                      THEN @scrollPct
-                   ELSE max_scroll_pct
+                   ELSE s.max_scroll_pct
                  END
-           WHERE session_id = @sessionId`
+             FROM Sessions s
+             CROSS APPLY (
+               SELECT newTotal = CASE
+                 WHEN (@clientTs IS NULL OR @clientTs > ISNULL(s.current_page_ts, 0))
+                      AND (ISNULL(s.completed_pages_duration_ms, 0) + @dwellMs) > ISNULL(s.total_duration_ms, 0)
+                   THEN ISNULL(s.completed_pages_duration_ms, 0) + @dwellMs
+                 ELSE s.total_duration_ms
+               END
+             ) x
+            WHERE s.session_id = @sessionId`
     );
 }
 
@@ -934,6 +1014,17 @@ async function processMessage(
       // changes mid-visit (phone moving from WiFi to mobile data).
       await touchSession(tx, sessionId, env.payload.pagePath);
 
+      // Landing on a page means the previous one is finished — settle its time
+      // before this page starts adding to the total, so a lost page_end costs
+      // us a few seconds rather than the whole of the next page.
+      if (
+        env.eventType === "session_start" ||
+        env.eventType === "pageview" ||
+        env.eventType === "bfpv"
+      ) {
+        await bankPreviousPage(tx, sessionId, env.ts ?? null);
+      }
+
       switch (env.eventType) {
         case "session_start":
           await insertClickLog(
@@ -980,10 +1071,23 @@ async function processMessage(
             const existingPageview = await new mssql.Request(tx)
               .input("sessionId", mssql.UniqueIdentifier, sessionId)
               .input("pagePath", mssql.NVarChar, env.payload.pagePath ?? null)
+              .input("clientTs", mssql.BigInt, env.ts ?? null)
+              .input("occurredAt", mssql.DateTime2, new Date(msg.receivedAt))
               .query(
+                // Scoped to the twin beacons, NOT to the whole session. The two
+                // are sent microseconds apart, so a few seconds is a generous
+                // window. Matching on path alone — as this did — also swallows
+                // every genuine RE-visit to a page: a visitor going
+                // home -> contact -> back -> contact had that second /contact
+                // silently discarded, leaving back-navigations in the timeline
+                // with nothing to have navigated back from.
                 `SELECT TOP 1 1 FROM JourneyEvents
                  WHERE session_id = @sessionId AND event_type = 'pageview'
-                   AND page_path = @pagePath`
+                   AND page_path = @pagePath
+                   AND ABS(
+                         COALESCE(client_ts, DATEDIFF_BIG(MILLISECOND, '19700101', occurred_at))
+                         - COALESCE(@clientTs, DATEDIFF_BIG(MILLISECOND, '19700101', @occurredAt))
+                       ) <= 3000`
               );
             if (existingPageview.recordset.length > 0) break;
           }
@@ -1015,12 +1119,16 @@ async function processMessage(
             (env.eventType === "heartbeat" || env.eventType === "success_event") &&
             env.payload.dwellMs != null
           ) {
-            await updateSessionDwell(tx, sessionId, env.payload.dwellMs, env.payload.scrollPct, false);
+            await updateSessionDwell(
+              tx, sessionId, env.payload.dwellMs, env.payload.scrollPct, false, env.ts ?? null
+            );
           }
           break;
         case "page_end":
           if (env.payload.dwellMs != null) {
-            await updateSessionDwell(tx, sessionId, env.payload.dwellMs, env.payload.scrollPct, true);
+            await updateSessionDwell(
+              tx, sessionId, env.payload.dwellMs, env.payload.scrollPct, true, env.ts ?? null
+            );
           }
           break;
       }

@@ -4,6 +4,7 @@ import { withTenantDb } from '@/lib/db/client';
 import * as mssql from 'mssql';
 import { isPaywalled } from '@/lib/paywallCheck';
 import { getEffectiveTenantId, buildDomainFilter } from '@/lib/adminAuth';
+import { SESSION_DURATION_MS } from '@/lib/db/sessionDuration';
 
 // Uses auth()/headers() — always request-time. Declaring this stops Next from
 // attempting a build-time prerender probe (which threw DYNAMIC_SERVER_USAGE).
@@ -58,7 +59,7 @@ export async function GET(request: NextRequest) {
       campaign:     'c.google_campaign_id',
       campaignName: 'c.name',
       device:    's.device',
-      duration:  's.total_duration_ms',
+      duration:  SESSION_DURATION_MS,
       adGroup:   's.ad_group_id',
       adId:      's.ad_id',
       position:  's.ad_position',
@@ -164,7 +165,7 @@ export async function GET(request: NextRequest) {
           s.match_type,
           s.device,
           s.started_at,
-          s.total_duration_ms,
+          ${SESSION_DURATION_MS} AS total_duration_ms,
           s.is_bounce,
           s.ad_group_id,
           s.ad_id,

@@ -4,6 +4,7 @@ import { withTenantDb } from '@/lib/db/client';
 import * as mssql from 'mssql';
 import { isPaywalled } from '@/lib/paywallCheck';
 import { getEffectiveTenantId, buildDomainFilter } from '@/lib/adminAuth';
+import { SESSION_DURATION_MS } from '@/lib/db/sessionDuration';
 
 export async function GET(
   request: NextRequest,
@@ -36,7 +37,7 @@ export async function GET(
           s.match_type,
           s.device,
           s.started_at,
-          s.total_duration_ms,
+          ${SESSION_DURATION_MS} AS total_duration_ms,
           s.is_bounce,
           s.max_scroll_pct,
           CASE WHEN EXISTS (
