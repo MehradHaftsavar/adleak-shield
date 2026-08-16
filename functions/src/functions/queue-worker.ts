@@ -14,6 +14,8 @@ import {
   type EventType,
 } from "../lib/schemas.js";
 import { withTenantDb, withAdminDb } from "../lib/db.js";
+import { hashVisitor } from "../lib/ip-mask.js";
+import { getTodaySalt } from "../lib/salt.js";
 
 const THANK_YOU_PATHS = [
   // Order / purchase confirmations
@@ -122,23 +124,193 @@ async function lookupTenantByDomain(domainName: string): Promise<string | null> 
   });
 }
 
-async function findSessionByFingerprint(
+// A visit is considered still open for this long after its last event. Used by
+// every referrer/hash match so a stale session from hours ago can never absorb
+// a new visitor's events.
+const ACTIVE_WINDOW_MS = 30 * 60 * 1000;
+
+interface SessionMatch {
+  sessionId: string;
+  tenantId: string;
+  campaignId: string;
+}
+
+/**
+ * Pull a gclid out of a referrer URL.
+ *
+ * This is what carries attribution past the landing page. When someone clicks
+ * from the ad landing page to a second page, the browser passes the full
+ * previous URL — including ?gclid=... — as the referrer. Same-origin
+ * navigation preserves the query string in every major browser (Safari
+ * included; ITP only downgrades CROSS-site referrers), so this is a reliable
+ * link back to the click, and unlike the IP it does not change mid-visit.
+ */
+function gclidFromReferrer(referrer: string | null | undefined): string | null {
+  if (!referrer) return null;
+  try {
+    const value = new URL(referrer).searchParams.get("gclid");
+    return value ? value.substring(0, 100) : null;
+  } catch {
+    return null;
+  }
+}
+
+/** Path portion of a URL, for comparing a referrer against a session's last page. */
+function pathFromUrl(url: string | null | undefined): string | null {
+  if (!url) return null;
+  try {
+    return new URL(url).pathname.substring(0, 500);
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Find the session an event belongs to.
+ *
+ * Ordered most-certain first. Each step is independent of the others, which is
+ * the point: gclid survives an IP change, the referrer survives an IP change,
+ * and the hash survives a missing referrer. A visit has to lose all of them
+ * before it becomes unattributable.
+ */
+async function matchSession(
   tenantId: string,
-  fingerprint: string
-): Promise<{ tenant_id: string; campaign_id: string } | null> {
+  domain: string,
+  gclid: string | null,
+  referrer: string | null | undefined,
+  visitorHash: string | null | undefined
+): Promise<SessionMatch | null> {
+  const referrerGclid = gclidFromReferrer(referrer);
+  const referrerPath = pathFromUrl(referrer);
+  const cutoff = new Date(Date.now() - ACTIVE_WINDOW_MS);
+
   return withAdminDb(async (request) => {
     const result = await request
       .input("tid", mssql.UniqueIdentifier, tenantId)
-      .input("fp", mssql.NVarChar, fingerprint.substring(0, 64))
-      .query(
-        `SET NOCOUNT ON;
-         DECLARE @t VARBINARY(128) = CAST(@tid AS VARBINARY(128));
-         EXEC sp_set_session_context N'TenantId', @t, @read_only = 0;
-         SELECT TOP 1 tenant_id, campaign_id
-         FROM Sessions WHERE session_fingerprint = @fp;`
-      );
-    return result.recordset[0] ?? null;
+      .input("gclid", mssql.NVarChar(100), gclid ?? referrerGclid ?? null)
+      .input("refPath", mssql.NVarChar(500), referrerPath)
+      .input("vhash", mssql.NVarChar(64), visitorHash ?? null)
+      .input("cutoff", mssql.DateTime2, cutoff)
+      .query(`
+        SET NOCOUNT ON;
+        DECLARE @t VARBINARY(128) = CAST(@tid AS VARBINARY(128));
+        EXEC sp_set_session_context N'TenantId', @t, @read_only = 0;
+
+        -- Deliberately ONE select rather than three sequential ones. node-mssql
+        -- exposes result.recordset as the FIRST result set, so a query that
+        -- returned an empty set followed by a populated one would look like a
+        -- miss. Priority is expressed in the ORDER BY instead.
+        SELECT TOP 1 session_id, tenant_id, campaign_id
+        FROM (
+          -- 1. gclid, from the current URL or recovered from the referrer.
+          --    Unique per ad click, so this is exact.
+          SELECT session_id, tenant_id, campaign_id,
+                 1 AS priority, started_at AS recency
+          FROM Sessions
+          WHERE @gclid IS NOT NULL AND gclid = @gclid
+
+          UNION ALL
+
+          -- 2. The referrer names the page a session is currently sitting on.
+          --    Survives an IP change: it describes the page, not the network.
+          SELECT session_id, tenant_id, campaign_id,
+                 2 AS priority, last_event_at AS recency
+          FROM Sessions
+          WHERE @refPath IS NOT NULL
+            AND last_page_path = @refPath
+            AND last_event_at >= @cutoff
+
+          UNION ALL
+
+          -- 3. Server-derived visitor hash. Most recent wins, so a second ad
+          --    click from the same person attaches to their newer session.
+          SELECT session_id, tenant_id, campaign_id,
+                 3 AS priority, last_event_at AS recency
+          FROM Sessions
+          WHERE @vhash IS NOT NULL
+            AND session_fingerprint = @vhash
+            AND last_event_at >= @cutoff
+        ) candidates
+        ORDER BY priority ASC, recency DESC;
+      `);
+
+    const row = result.recordset?.[0];
+    if (!row) return null;
+    return {
+      sessionId: row.session_id,
+      tenantId: row.tenant_id,
+      campaignId: row.campaign_id,
+    };
   });
+}
+
+/** Does this domain have any visit open right now? Cheap organic-traffic guard. */
+async function domainHasActiveSession(tenantId: string): Promise<boolean> {
+  const cutoff = new Date(Date.now() - ACTIVE_WINDOW_MS);
+  return withAdminDb(async (request) => {
+    const result = await request
+      .input("tid", mssql.UniqueIdentifier, tenantId)
+      .input("cutoff", mssql.DateTime2, cutoff)
+      .query(`
+        SET NOCOUNT ON;
+        DECLARE @t VARBINARY(128) = CAST(@tid AS VARBINARY(128));
+        EXEC sp_set_session_context N'TenantId', @t, @read_only = 0;
+        SELECT TOP 1 1 FROM Sessions WHERE last_event_at >= @cutoff;
+      `);
+    return result.recordset.length > 0;
+  });
+}
+
+/**
+ * Park an event we could not place yet.
+ *
+ * Almost always this is a queue-ordering race — with batchSize 16 the worker
+ * processes messages concurrently, so page 2 can genuinely arrive before page
+ * 1 has committed. The reconciler retries a few minutes later with the full
+ * picture. Nothing is ever discarded here; that silent drop is exactly what
+ * cost us data before.
+ */
+async function parkPendingEvent(
+  msg: QueueMessage,
+  visitorHash: string | null | undefined
+): Promise<void> {
+  const env = msg.envelope;
+  await withAdminDb(async (request) => {
+    await request
+      .input("domain", mssql.NVarChar(253), env.domain.substring(0, 253))
+      .input("vhash", mssql.NVarChar(64), visitorHash ?? null)
+      .input("referrer", mssql.NVarChar(500), env.payload.referrer ?? null)
+      .input("pagePath", mssql.NVarChar(500), env.payload.pagePath ?? null)
+      .input("eventType", mssql.NVarChar(30), env.eventType)
+      .input("payload", mssql.NVarChar(mssql.MAX), JSON.stringify(msg))
+      .input("clientTs", mssql.BigInt, env.ts ?? null)
+      .input("occurredAt", mssql.DateTime2, new Date(msg.receivedAt))
+      .query(`
+        INSERT INTO PendingEvents
+          (domain, visitor_hash, referrer, page_path, event_type,
+           payload_json, client_ts, occurred_at)
+        VALUES
+          (@domain, @vhash, @referrer, @pagePath, @eventType,
+           @payload, @clientTs, @occurredAt)
+      `);
+  });
+}
+
+/** Record where a session currently is, so the next page's referrer can find it. */
+async function touchSession(
+  tx: mssql.Transaction,
+  sessionId: string,
+  pagePath: string | null | undefined
+): Promise<void> {
+  await new mssql.Request(tx)
+    .input("sessionId", mssql.UniqueIdentifier, sessionId)
+    .input("pagePath", mssql.NVarChar(500), pagePath ?? null)
+    .query(`
+      UPDATE Sessions
+         SET last_event_at  = SYSUTCDATETIME(),
+             last_page_path = COALESCE(@pagePath, last_page_path)
+       WHERE session_id = @sessionId
+    `);
 }
 
 async function lookupCampaign(
@@ -252,32 +424,52 @@ async function ensureSession(
   msg: QueueMessage,
   tenantId: string,
   campaignId: string,
-  googleCampaignId: string
+  googleCampaignId: string,
+  matchedSessionId: string | null
 ): Promise<string | null> {
   const env = msg.envelope;
-  const sessionFingerprint =
-    env.payload.sessionFingerprint ?? env.payload.session?.sessionFingerprint;
-  if (!sessionFingerprint) return null;
 
-  const findResult = await new mssql.Request(tx)
-    .input("fpFind", mssql.NVarChar, sessionFingerprint.substring(0, 64))
-    .query(
-      `SELECT TOP 1 session_id FROM Sessions
-       WHERE session_fingerprint = @fpFind`
-    );
-
-  if (findResult.recordset.length > 0) {
-    return findResult.recordset[0].session_id;
-  }
+  // The match ladder already identified the session for every event except a
+  // brand-new landing. Use its answer rather than looking up again.
+  if (matchedSessionId) return matchedSessionId;
 
   if (env.eventType !== "session_start") return null;
   const session = env.payload.session;
   if (!session) return null;
 
+  // Sessions are keyed by gclid, NOT by the visitor hash.
+  //
+  // The hash is derived from IP + User-Agent, so a person who clicks the same
+  // ad twice produces the identical hash both times. Keying on it would fold
+  // their second click into the first session — two billed clicks showing as
+  // one visit, and broken refund evidence. gclid is unique per click, so this
+  // both separates genuine repeat clicks AND makes redelivery of the same
+  // session_start idempotent.
+  if (session.gclid) {
+    const existing = await new mssql.Request(tx)
+      .input("gclidFind", mssql.NVarChar(100), session.gclid.substring(0, 100))
+      .query(
+        `SELECT TOP 1 session_id FROM Sessions WHERE gclid = @gclidFind`
+      );
+    if (existing.recordset.length > 0) {
+      return existing.recordset[0].session_id;
+    }
+  }
+
+  // session_fingerprint now stores the SERVER-derived visitor hash. Falls back
+  // to the client value only for events from browsers still running a cached
+  // copy of the old tracker.
+  const visitorKey =
+    msg.visitorHash ??
+    env.payload.sessionFingerprint ??
+    session.sessionFingerprint ??
+    null;
+  if (!visitorKey) return null;
+
   const created = await new mssql.Request(tx)
     .input("tenantId", mssql.UniqueIdentifier, tenantId)
     .input("campaignId", mssql.UniqueIdentifier, campaignId)
-    .input("fp", mssql.NVarChar, sessionFingerprint.substring(0, 64))
+    .input("fp", mssql.NVarChar, visitorKey.substring(0, 64))
     .input("keyword", mssql.NVarChar, session.keyword ?? null)
     .input("matchType", mssql.NVarChar, normaliseMatchType(session.matchType))
     .input("device", mssql.NVarChar, session.device ?? null)
@@ -494,15 +686,62 @@ export async function queueWorkerHandler(
     return;
   }
 
-  const msg = validation.data;
+  await processMessage(validation.data, context, true);
+}
+
+/**
+ * Second attempt at an event the worker had to park.
+ *
+ * Same code path as live processing — the only difference is that a miss here
+ * returns false instead of parking the event again. Returns true once the
+ * event has been written.
+ */
+export async function attachPendingEvent(
+  msg: QueueMessage,
+  context: InvocationContext
+): Promise<boolean> {
+  return processMessage(msg, context, false);
+}
+
+/**
+ * Handle one event end to end. Returns true if it was written (or deliberately
+ * discarded as organic/ineligible), false if it could not be placed and the
+ * caller should decide what to do next.
+ */
+async function processMessage(
+  msg: QueueMessage,
+  context: InvocationContext,
+  allowPark: boolean
+): Promise<boolean> {
   const env = msg.envelope;
   const googleCampaignId = env.payload.session?.campaignId ?? "";
+
+  // Normally ingest has already hashed the visitor, so the raw IP never left
+  // that function. It only sends ipRaw when the salt table was unreachable —
+  // in that case we finish the job here rather than lose the event.
+  let visitorHash: string | undefined = msg.visitorHash;
+  if (!visitorHash && msg.ipRaw) {
+    try {
+      const salt = await getTodaySalt();
+      visitorHash = hashVisitor(salt, env.domain, msg.ipRaw, msg.userAgent);
+    } catch (err) {
+      context.warn("[Worker] Could not derive visitor hash", {
+        error: err instanceof Error ? err.message : String(err),
+      });
+    }
+  }
+  // Cached copies of the old tracker still send a client-generated fingerprint.
+  // Remove this fallback once they have aged out (~2 weeks after deploy).
+  if (!visitorHash) {
+    visitorHash =
+      env.payload.sessionFingerprint ?? env.payload.session?.sessionFingerprint;
+  }
 
   if (!googleCampaignId && env.eventType === "session_start") {
     context.log("[Worker] No campaign ID in session_start — discarding", {
       domain: env.domain,
     });
-    return;
+    return true;
   }
 
   let campaign: CampaignLookup | null = null;
@@ -522,7 +761,7 @@ export async function queueWorkerHandler(
           err: err instanceof Error ? err.message : String(err),
         });
       }
-      return;
+      return true;
     }
 
     if (normaliseDomain(env.domain) !== normaliseDomain(campaign.domainName)) {
@@ -539,7 +778,7 @@ export async function queueWorkerHandler(
           err: err instanceof Error ? err.message : String(err),
         });
       }
-      return;
+      return true;
     }
 
     // Gate: only write data for tenants on an active subscription or within
@@ -551,85 +790,82 @@ export async function queueWorkerHandler(
         tenantId: campaign.tenantId,
         eventType: env.eventType,
       });
-      return;
+      return true;
     }
   }
 
-  if (!campaign) {
-    const fp =
-      env.payload.sessionFingerprint ??
-      env.payload.session?.sessionFingerprint;
-    if (!fp) return;
+  let matchedSessionId: string | null = null;
 
-    // Resolve the tenant from the domain first — without it the Sessions read
-    // below is filtered to zero rows by RLS (see helper comments above).
+  if (!campaign) {
+    // Every event after the landing page arrives without a campaign ID, so the
+    // tenant has to come from the domain first — a Sessions read with no tenant
+    // context is filtered to zero rows by RLS (see the helper comments above).
     const tenantId = await lookupTenantByDomain(env.domain);
     if (!tenantId) {
-      // No registered campaign owns this domain, so there is no tenant this
-      // event could ever belong to. Retrying would never succeed — drop it.
+      // No registered campaign owns this domain, so no tenant could ever own
+      // this event. Retrying would never succeed.
       context.log(`[Worker] Unregistered domain for ${env.eventType} — dropping`, {
         domain: env.domain,
         eventType: env.eventType,
       });
-      return;
+      return true;
     }
 
-    let sessionInfo = await findSessionByFingerprint(tenantId, fp);
-
-    if (!sessionInfo) {
-      // session_start may still be in-flight through the queue. Poll briefly
-      // in-process to catch the common case cheaply.
-      for (let attempt = 0; attempt < 6; attempt++) {
-        await new Promise(r => setTimeout(r, 500));
-        sessionInfo = await findSessionByFingerprint(tenantId, fp);
-        if (sessionInfo) break;
-      }
-      if (!sessionInfo) {
-        // Throw rather than return: the session may simply not have committed
-        // yet (session_start transactions have been observed taking 6s+ during
-        // cold starts, longer than this poll). Throwing lets Azure redeliver
-        // the message so a slow commit becomes a delayed write instead of
-        // permanent loss. If it truly can never be placed, it lands in the
-        // poison queue where it is visible — unlike the silent drop this
-        // replaces, which lost data on ~14% of sessions with no error anywhere.
-        context.warn(
-          `[Worker] Orphan ${env.eventType} — no session yet, will retry`,
-          { domain: env.domain, eventType: env.eventType, fp: fp.substring(0, 24) }
-        );
-        throw new Error(`Orphan ${env.eventType} — session not found`);
-      }
+    // The tracker now fires on every page for every visitor, because without
+    // device storage it cannot know whether this visit came from an ad. If the
+    // domain has no visit open at all and there is no gclid in sight, this is
+    // ordinary organic traffic — discard it here rather than filling
+    // PendingEvents with noise.
+    const hasGclidSignal =
+      !!env.payload.session?.gclid || !!gclidFromReferrer(env.payload.referrer);
+    if (!hasGclidSignal && !(await domainHasActiveSession(tenantId))) {
+      return true;
     }
 
+    let match = await matchSession(
+      tenantId,
+      env.domain,
+      env.payload.session?.gclid ?? null,
+      env.payload.referrer,
+      visitorHash
+    );
+
+    // One short retry absorbs the common queue-ordering race (batchSize is 16,
+    // so page 2 can genuinely be processed before page 1 has committed) without
+    // the 3-second stall the old poll imposed on every event.
+    if (!match) {
+      await new Promise(r => setTimeout(r, 750));
+      match = await matchSession(
+        tenantId,
+        env.domain,
+        env.payload.session?.gclid ?? null,
+        env.payload.referrer,
+        visitorHash
+      );
+    }
+
+    if (!match) {
+      // Live processing parks it for the reconciler to retry. Nothing is
+      // discarded — silently dropping these is what cost us data on ~14% of
+      // sessions before. When the reconciler itself is the caller, report the
+      // miss instead so the row stays pending for the next pass.
+      if (!allowPark) return false;
+
+      await parkPendingEvent(msg, visitorHash);
+      context.log(`[Worker] ${env.eventType} parked for reconciliation`, {
+        domain: env.domain,
+        eventType: env.eventType,
+      });
+      return true;
+    }
+
+    matchedSessionId = match.sessionId;
     campaign = {
-      tenantId: sessionInfo.tenant_id,
-      campaignId: sessionInfo.campaign_id,
+      tenantId: match.tenantId,
+      campaignId: match.campaignId,
       domainName: env.domain,
       googleCampaignId: googleCampaignId,
     };
-  }
-
-  // For non-session_start events, poll outside the transaction to avoid holding
-  // an open DB connection for up to 3s while waiting for session_start to commit.
-  if (env.eventType !== "session_start") {
-    const fp = env.payload.sessionFingerprint ?? env.payload.session?.sessionFingerprint;
-    if (fp) {
-      let sessionExists = false;
-      for (let attempt = 0; attempt <= 6; attempt++) {
-        if (attempt > 0) await new Promise(r => setTimeout(r, 500));
-        // campaign.tenantId is known by this point (either from the campaign
-        // lookup above or from the session lookup), so the context can be set
-        // directly — no domain resolution needed here.
-        const found = await findSessionByFingerprint(campaign.tenantId, fp);
-        if (found) { sessionExists = true; break; }
-      }
-      if (!sessionExists) {
-        context.warn(
-          `[Worker] Orphan ${env.eventType} — no session yet, will retry`,
-          { domain: env.domain, eventType: env.eventType, fp: fp.substring(0, 24) }
-        );
-        throw new Error(`Orphan ${env.eventType} — session not found`);
-      }
-    }
   }
 
   try {
@@ -639,7 +875,8 @@ export async function queueWorkerHandler(
         msg,
         campaign!.tenantId,
         campaign!.campaignId,
-        campaign!.googleCampaignId
+        campaign!.googleCampaignId,
+        matchedSessionId
       );
       if (!sessionId) {
         if (env.eventType === "session_start") {
@@ -651,6 +888,11 @@ export async function queueWorkerHandler(
         context.warn(`[Worker] ensureSession returned null for ${env.eventType} despite pre-check — skipping`);
         return;
       }
+
+      // Record where this visitor now is. The NEXT page's referrer is matched
+      // against this, which is what keeps a journey intact when their IP
+      // changes mid-visit (phone moving from WiFi to mobile data).
+      await touchSession(tx, sessionId, env.payload.pagePath);
 
       switch (env.eventType) {
         case "session_start":
@@ -741,6 +983,8 @@ export async function queueWorkerHandler(
     });
     throw err;
   }
+
+  return true;
 }
 
 app.storageQueue("queue-worker", {

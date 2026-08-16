@@ -121,6 +121,38 @@ app.timer("janitor", {
       }
     }
 
+    // 3. Housekeeping for the visitor-identification tables. Global rather than
+    //    per-tenant, so it sits outside the loop above in its own try/catch —
+    //    a failure here must never affect the retention sweep.
+    try {
+      await withAdminDb(async (req) => {
+        // Salts older than 48h. Deleting them is what makes the identifier
+        // genuinely short-lived: once a salt is gone, the hashes it produced
+        // can no longer be linked to a visit by anyone, including us. Two days
+        // are kept so a visit spanning midnight can still be matched.
+        await req.query(`
+          DELETE FROM HashSalts
+          WHERE salt_date < CAST(DATEADD(DAY, -2, GETUTCDATE()) AS DATE)
+        `);
+
+        // Events that were attached (status 1) or given up on (status 2). Rows
+        // still pending (status 0) are never deleted here — the reconciler owns
+        // those, and dropping them would reintroduce the silent data loss this
+        // whole design exists to prevent.
+        await req.query(`
+          DELETE FROM PendingEvents
+          WHERE status IN (1, 2)
+            AND created_at < DATEADD(DAY, -7, GETUTCDATE())
+        `);
+      });
+      context.log("[Janitor] Salt and pending-event housekeeping complete");
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      context.error("[Janitor] Housekeeping failed:", msg);
+      errorCount++;
+      errorMessages.push(`housekeeping: ${msg}`);
+    }
+
     context.log(
       `[Janitor] Complete — purged: ${tenantsPurged}, warned: ${tenantsWarned}, errors: ${errorCount}`
     );

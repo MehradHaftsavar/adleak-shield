@@ -166,10 +166,19 @@ export default function CookiesPage() {
             <section>
               <h2 className="text-lg font-semibold text-gray-900 mb-3">5. Note for AdLeak Shield Users — Your Own Website</h2>
               <p>
-                The AdLeak Shield tracking snippet you install on your website <strong>does not set any
-                cookies</strong> on your visitors' browsers. It reads URL parameters (keyword, campaign ID,
-                device type) and may use browser sessionStorage to maintain session continuity. It does not
-                write to localStorage or set any first-party or third-party cookies.
+                The AdLeak Shield tracking snippet you install on your website <strong>stores nothing on your
+                visitors' devices and reads nothing from them</strong> — no cookies, no sessionStorage, no
+                localStorage, and no device fingerprinting. It reads the URL parameters Google adds to ad
+                clicks (keyword, campaign ID) and records which pages were viewed and how they were used.
+              </p>
+              <p className="mt-2">
+                To tell one visit apart from another, we derive a one-way hash from a rotating daily salt, the
+                website domain, the visitor's IP address and their browser's User-Agent. Both the IP address
+                and User-Agent are transmitted by the browser as a normal part of every web request; neither
+                is read from the device. IP addresses are used only at the moment of the request to derive
+                this identifier and are not retained for analytics purposes. The daily salt is deleted after
+                48 hours, after which the hashes it produced can no longer be linked to any visit by anyone,
+                including us.
               </p>
               <p className="mt-2">
                 However, as the website operator, you are still the data controller for data collected about

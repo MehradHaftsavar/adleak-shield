@@ -28,7 +28,8 @@ import {
 } from "@azure/functions";
 import { IngestEnvelopeSchema, type QueueMessage } from "../lib/schemas.js";
 import { enqueueMessage } from "../lib/queue.js";
-import { extractClientIp, maskIp } from "../lib/ip-mask.js";
+import { extractClientIp, maskIp, hashVisitor } from "../lib/ip-mask.js";
+import { getTodaySalt } from "../lib/salt.js";
 import { lookupGeo } from "../lib/geo.js";
  
 // CORS headers — applied to all responses including OPTIONS preflight
@@ -130,9 +131,30 @@ export async function ingestHandler(
   // ---------- Build queue message ----------
   const userAgent = (request.headers.get("user-agent") ?? "").substring(0, 500);
 
+  // Derive the visitor identifier here so the raw IP never leaves this
+  // function's memory — that is what keeps "IPs are not retained" true.
+  //
+  // If the salt table is unreachable we fall back to passing the raw IP on the
+  // queue for the worker to hash. That is a deliberate trade: a brief database
+  // problem should degrade privacy for a few seconds, not drop a visitor's
+  // events or fail the request.
+  let visitorHash: string | undefined;
+  let ipRaw: string | undefined;
+  try {
+    const salt = await getTodaySalt();
+    visitorHash = hashVisitor(salt, envelope.domain, rawIp, userAgent);
+  } catch (err) {
+    context.warn("[Ingest] Salt unavailable — deferring hash to worker", {
+      error: err instanceof Error ? err.message : String(err),
+    });
+    ipRaw = rawIp;
+  }
+
   const message: QueueMessage = {
     envelope,
     ipMasked,
+    visitorHash,
+    ipRaw,
     receivedAt: new Date().toISOString(),
     userAgent,
     city: geo.city,

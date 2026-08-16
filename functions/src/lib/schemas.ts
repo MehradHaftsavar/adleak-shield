@@ -29,7 +29,9 @@ const EVENT_TYPES = [
 
 // Session payload (sent on session_start only)
 const SessionSchema = z.object({
-  sessionFingerprint: z.string().min(8).max(200),
+  // Optional since the identifier moved server-side. Still accepted so events
+  // from browsers running a cached copy of the old tracker keep validating.
+  sessionFingerprint: z.string().min(8).max(200).optional(),
   keyword: z.string().max(255).optional().nullable(),
   matchType: z.string().max(20).optional().nullable(),
   campaignId: z.string().max(20).optional().nullable(),
@@ -47,7 +49,18 @@ const SessionSchema = z.object({
 const EventPayloadSchema = z
   .object({
     session: SessionSchema.optional(),
+    // Legacy: the tracker used to generate this client-side and keep it in
+    // sessionStorage. That is gone — the visitor hash is now derived server
+    // side. Kept optional purely so events from browsers still running a
+    // cached copy of the old script continue to validate during the
+    // changeover. Safe to delete once those have aged out (~2 weeks).
     sessionFingerprint: z.string().min(8).max(200).optional(),
+    // document.referrer, sent with EVERY event (not just the first). This is
+    // what lets the server stitch pages together: page 2's referrer still
+    // carries the landing URL including its gclid, and it does not change
+    // when the visitor's IP does — which is why a mid-visit network switch no
+    // longer breaks a journey.
+    referrer: z.string().max(500).optional().nullable(),
     pagePath: z.string().max(500).optional().nullable(),
     elementTag: z.string().max(20).optional().nullable(),
     elementHref: z.string().max(500).optional().nullable(),
@@ -83,6 +96,13 @@ export type EventType = (typeof EVENT_TYPES)[number];
 export const QueueMessageSchema = z.object({
   envelope: IngestEnvelopeSchema,
   ipMasked: z.string().max(45),     // e.g. "82.12.34.xxx" or IPv6 equivalent
+  // Server-derived visitor identifier — HMAC(daily salt, domain|ip|userAgent).
+  // Computed in ingest so the raw IP never leaves that function's memory.
+  visitorHash: z.string().max(64).optional(),
+  // Only populated if ingest could not reach the salt table. The worker then
+  // does the hashing instead, so a database blip degrades privacy for a few
+  // seconds rather than dropping events. Never persisted.
+  ipRaw: z.string().max(45).optional(),
   receivedAt: z.string().datetime(), // ISO 8601 timestamp from server
   userAgent: z.string().max(500),
   city: z.string().max(100).nullable(),    // from geoip-lite, looked up before masking

@@ -7,18 +7,24 @@
 // on their site after clicking a Google Ad, this code:
 //
 //   1. Reads the URL parameters Google adds to ad clicks (keyword, gclid, etc.)
-//   2. If the parameters are missing, it does NOTHING — saves database space
-//   3. Generates a unique fingerprint for the visitor (no cookies)
-//   4. Records every page they visit, how long they stayed, how far they scrolled
-//   5. Records every link/button click for the Journey Timeline
-//   6. Marks "success events" — phone calls, emails, WhatsApp, form submits
-//   7. Sends all of this to AdLeak Shield's ingestion endpoint
-//   8. Uses the Beacon API so data sends even if the user closes the tab
+//   2. Records every page they visit, how long they stayed, how far they scrolled
+//   3. Records every link/button click for the Journey Timeline
+//   4. Marks "success events" — phone calls, emails, WhatsApp, form submits
+//   5. Sends all of this to AdLeak Shield's ingestion endpoint
+//   6. Uses the Beacon API so data sends even if the user closes the tab
+//
+// WHAT IT DELIBERATELY DOES NOT DO:
+// It stores nothing on the visitor's device and reads nothing from it — no
+// cookies, no sessionStorage, no localStorage, no device fingerprinting. The
+// visitor identifier is derived on the server from the IP and User-Agent the
+// browser already sends with every request. That keeps the whole tracker
+// outside ePrivacy Article 5(3), so no consent banner is required and no
+// visitor (or bot) can opt out of being counted.
 //
 // CRITICAL CONSTRAINTS:
 // - Must be under 6KB after minification (PRD requirement, Core Web Vitals)
 // - Vanilla JS only — no jQuery, no React, no dependencies
-// - Zero persistent cookies — sessionStorage only
+// - Nothing may ever be written to or read from the visitor's device
 // - Fails silently if anything goes wrong — never break the customer's site
 // =============================================================================
 
@@ -32,7 +38,6 @@
   // ===========================================================================
   var INGEST_URL = "__INGEST_URL__"; // e.g. https://adleak-functions.azurewebsites.net/api/ingest
   var HEARTBEAT_MS = 15000;          // Send heartbeat every 15 seconds
-  var STORAGE_KEY = "_als_session";   // sessionStorage key for our data
   var SUCCESS_HOSTS = ["wa.link", "wa.me", "api.whatsapp.com", "web.whatsapp.com"]; // WhatsApp link patterns
 
   // Tier 1 — safe to match ANYWHERE on the page, no form required. These are
@@ -73,46 +78,51 @@
   } catch (e) { /* silently ignore */ }
 
   // ===========================================================================
-  // EARLY EXIT — drop silently if no Google Ads parameters present
-  // This is critical: only sessions from real ad clicks should be tracked.
-  // Saves database space and respects organic traffic privacy.
+  // WHO IS THIS VISITOR? — deliberately, we do not know and do not ask.
+  //
+  // This script used to build an identifier from screen size, language and
+  // user agent, then keep it in sessionStorage. Both of those touch the
+  // visitor's device, which puts the whole tracker inside ePrivacy Article
+  // 5(3) and requires a consent banner — and a bot that never clicks "accept"
+  // would simply never be recorded.
+  //
+  // The identifier is now derived on the server from the IP and User-Agent
+  // that the browser already sends with every request. Nothing is stored on
+  // or read from the device, so no consent is needed and every visit is seen.
+  //
+  // The consequence here: this script has no memory. It cannot tell whether
+  // this visit came from an ad, so it reports every page and lets the server
+  // decide what is relevant. That is why there is no early exit any more.
   // ===========================================================================
   var params = new URLSearchParams(window.location.search);
-  var session = loadSession();
 
-  // First-time landing on this domain in this session
-  if (!session) {
-    var keyword = params.get("keyword");
-    var gclid = params.get("gclid");
+  // Sent with EVERY event, not just the first. document.referrer is fixed for
+  // the life of a page load, so on the page after the ad click it still holds
+  // the landing URL including its gclid — which is how a journey survives the
+  // visitor's IP changing mid-visit (phone moving from WiFi to mobile data).
+  var referrer = "";
+  try { referrer = (document.referrer || "").substring(0, 500); } catch (e) {}
 
-    // No ad context = not a tracked session. Silently exit.
-    if (!gclid || !keyword) return;
+  // Read fresh from the URL on every page. Present on the landing page only.
+  var gclid = (params.get("gclid") || "").substring(0, 100);
+  var keyword = (params.get("keyword") || "").substring(0, 255);
 
-    // Build the new session record
-    session = {
-      sessionFingerprint: generateFingerprint(),
-      keyword: keyword.substring(0, 255),
-      matchType: (params.get("matchtype") || "").substring(0, 20),
-      campaignId: (params.get("campaignid") || "").substring(0, 20),
-      adgroupId: (params.get("adgroupid") || "").substring(0, 20),
-      adId: (params.get("adid") || "").substring(0, 50),         // {creative}
-      adPosition: (params.get("adposition") || "").substring(0, 20), // {adposition}
-      gclid: gclid.substring(0, 100),
-      device: detectDevice(),
-      landedAt: Date.now(),
-      landingPath: window.location.pathname,
-    };
-    saveSession(session);
-
-    // Send the initial "landing" event — this creates the Session in our DB
-    var referrerHost = "";
-    try {
-      if (document.referrer) referrerHost = new URL(document.referrer).hostname.substring(0, 253);
-    } catch (e) {}
+  if (gclid && keyword) {
     send("session_start", {
-      session: session,
+      session: {
+        keyword: keyword,
+        matchType: (params.get("matchtype") || "").substring(0, 20),
+        campaignId: (params.get("campaignid") || "").substring(0, 20),
+        adgroupId: (params.get("adgroupid") || "").substring(0, 20),
+        adId: (params.get("adid") || "").substring(0, 50),         // {creative}
+        adPosition: (params.get("adposition") || "").substring(0, 20), // {adposition}
+        gclid: gclid,
+        device: detectDevice(),
+        landedAt: Date.now(),
+        landingPath: window.location.pathname,
+      },
       pagePath: window.location.pathname,
-      referrerHost: referrerHost,
+      referrer: referrer,
     });
   }
 
@@ -130,7 +140,7 @@
   try { cameFromBack = performance.getEntriesByType("navigation")[0].type === "back_forward"; } catch (e) {}
 
   send(cameFromBack ? "bfpv" : "pageview", {
-    sessionFingerprint: session.sessionFingerprint,
+    referrer: referrer,
     pagePath: window.location.pathname,
   });
 
@@ -146,7 +156,7 @@
   window.addEventListener("pageshow", function (e) {
     if (e.persisted) {
       send("bfpv", {
-        sessionFingerprint: session.sessionFingerprint,
+        referrer: referrer,
         pagePath: window.location.pathname,
       });
     }
@@ -247,7 +257,7 @@
       }
 
       send(isSuccess ? "success_event" : "click", {
-        sessionFingerprint: session.sessionFingerprint,
+        referrer: referrer,
         pagePath: window.location.pathname,
         elementTag: tag,
         elementHref: href.substring(0, 500),
@@ -279,7 +289,7 @@
       var formLabel =
         (form && (form.id || form.getAttribute("name") || form.getAttribute("action"))) || "";
       send("success_event", {
-        sessionFingerprint: session.sessionFingerprint,
+        referrer: referrer,
         pagePath: window.location.pathname,
         elementTag: "form",
         elementText: formLabel.substring(0, 100),
@@ -353,7 +363,7 @@
 
       var message = fieldVerb(tag, type) + " " + fieldLabel(target, tag, type);
       send("form_interact", {
-        sessionFingerprint: session.sessionFingerprint,
+        referrer: referrer,
         pagePath: window.location.pathname,
         elementText: message.substring(0, 100),
       });
@@ -375,7 +385,7 @@
   function sendHeartbeat() {
     if (document.hidden) return;
     send("heartbeat", {
-      sessionFingerprint: session.sessionFingerprint,
+      referrer: referrer,
       pagePath: window.location.pathname,
       dwellMs: activeDwellMs(),
       scrollPct: maxScrollPct,
@@ -422,7 +432,7 @@
     var newDwell = Math.max(0, totalDwell - reportedDwellMs);
     reportedDwellMs = totalDwell;
     send("page_end", {
-      sessionFingerprint: session.sessionFingerprint,
+      referrer: referrer,
       pagePath: window.location.pathname,
       dwellMs: newDwell,
       scrollPct: maxScrollPct,
@@ -432,37 +442,6 @@
   // ===========================================================================
   // HELPERS
   // ===========================================================================
-
-  function loadSession() {
-    try {
-      var raw = sessionStorage.getItem(STORAGE_KEY);
-      return raw ? JSON.parse(raw) : null;
-    } catch (e) {
-      return null;
-    }
-  }
-
-  function saveSession(s) {
-    try {
-      sessionStorage.setItem(STORAGE_KEY, JSON.stringify(s));
-    } catch (e) {}
-  }
-
-  function generateFingerprint() {
-    var sig =
-      navigator.userAgent.length +
-      "|" +
-      screen.width +
-      "x" +
-      screen.height +
-      "|" +
-      (navigator.language || "") +
-      "|" +
-      Date.now() +
-      "|" +
-      Math.random().toString(36).slice(2, 10);
-    return sig.substring(0, 200);
-  }
 
   function detectDevice() {
     var w = window.innerWidth;

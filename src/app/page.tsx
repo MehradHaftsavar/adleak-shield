@@ -144,7 +144,7 @@ const FEATURES = [
   {
     icon: '🔒',
     title: 'Privacy-First by Design',
-    desc: 'Zero cookies. IPs are masked before storage. Session fingerprinting only. Fully compliant with GDPR — no consent banner needed for tracking.',
+    desc: 'Zero cookies, and nothing stored on or read from your visitors’ devices. Visits are told apart by a server-side hash that becomes permanently unlinkable after 48 hours. GDPR compliant — no consent banner needed for tracking.',
   },
   {
     icon: '🛡️',
@@ -363,7 +363,7 @@ const FAQS = [
   },
   {
     q: "Is AdLeak Shield GDPR compliant?",
-    a: "Yes, and by design. We don't use cookies. IP addresses are masked before storage (last octet removed). No personally identifiable information about your visitors is collected or stored. You don't need a consent banner to run the tracking snippet. AdLeak Shield is registered with the UK Information Commissioner's Office (ICO) under registration number C1953337.",
+    a: "Yes, and by design. The snippet stores nothing on your visitors' devices and reads nothing from them — no cookies, no local storage, no device fingerprinting. Visits are told apart using a one-way hash derived from a daily-rotating secret plus information the browser already sends with every request. That secret is deleted after 48 hours, so the hash can no longer be linked to any visit. Because nothing is stored on or read from the device, the rules that require a consent banner don't apply. AdLeak Shield is registered with the UK Information Commissioner's Office (ICO) under registration number C1953337.",
   },
   {
     q: "How much does it cost and is there a free trial?",

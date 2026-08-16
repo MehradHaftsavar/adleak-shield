@@ -12,6 +12,8 @@
 // That's the point.
 // =============================================================================
 
+import { createHmac } from "node:crypto";
+
 /**
  * Strip transport noise (port suffix, leading/trailing whitespace) from a raw
  * X-Forwarded-For style IP string so it's safe to pass to maskIp() or a geoip
@@ -56,6 +58,35 @@ export function maskIp(ip: string | null | undefined): string {
 
   // Unparseable — return safe default
   return "0.0.0.xxx";
+}
+
+/**
+ * Derive the per-visit identifier.
+ *
+ * WHY THIS REPLACED THE CLIENT-SIDE FINGERPRINT:
+ * The tracker used to build an identifier in the browser and keep it in
+ * sessionStorage. Both of those touch the visitor's device, which puts us
+ * inside ePrivacy Article 5(3) and means a consent banner is required.
+ *
+ * Computing it here instead uses only information the browser already sends
+ * with every HTTP request — the IP (assigned by their ISP) and the User-Agent
+ * (sent by the browser). Neither is read from, nor stored on, the device, so
+ * Article 5(3) never applies. This is the same approach Plausible and Fathom
+ * use to operate without a consent banner.
+ *
+ * The salt rotates daily and is deleted after 48h, so yesterday's hashes can
+ * no longer be linked to anything — by us or anyone else.
+ */
+export function hashVisitor(
+  salt: string,
+  domain: string,
+  ip: string,
+  userAgent: string
+): string {
+  return createHmac("sha256", salt)
+    .update(`${domain}|${cleanIp(ip)}|${userAgent}`)
+    .digest("hex")
+    .substring(0, 64);
 }
 
 /**
