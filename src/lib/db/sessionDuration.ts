@@ -36,6 +36,29 @@
 const EVENT_MS = `COALESCE(je.client_ts, DATEDIFF_BIG(MILLISECOND, '19700101', je.occurred_at))`;
 
 /**
+ * Epoch-ms of the session's first visible event — what the list and the journey
+ * header both show as the session's time.
+ *
+ * Exists so the sessions table can ORDER BY the value it actually displays. It
+ * used to sort on Sessions.started_at (when the row was inserted) while showing
+ * the first event's timestamp, which are seconds apart on a healthy session and
+ * hours apart on a session that had an older event wrongly attached to it — so
+ * the list rendered visibly out of chronological order.
+ *
+ * The rendered time additionally adds min_lag_ms to correct a skewed device
+ * clock; that is a per-session constant of well under a second, so ordering on
+ * the uncorrected value is indistinguishable in practice and avoids repeating
+ * two correlated subqueries inside ORDER BY.
+ */
+export const SESSION_FIRST_EVENT_MS = `(
+  SELECT TOP 1 ${EVENT_MS}
+    FROM JourneyEvents je
+   WHERE je.session_id = s.session_id
+     AND je.event_type <> 'heartbeat'
+   ORDER BY ${EVENT_MS} ASC
+)`;
+
+/**
  * Wall-clock span of every recorded event in the session, in ms.
  *
  * Clamped to 24h and cast to INT deliberately. client_ts is BIGINT, so the

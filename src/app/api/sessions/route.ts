@@ -4,7 +4,7 @@ import { withTenantDb } from '@/lib/db/client';
 import * as mssql from 'mssql';
 import { isPaywalled } from '@/lib/paywallCheck';
 import { getEffectiveTenantId, buildDomainFilter } from '@/lib/adminAuth';
-import { SESSION_DURATION_MS } from '@/lib/db/sessionDuration';
+import { SESSION_DURATION_MS, SESSION_FIRST_EVENT_MS } from '@/lib/db/sessionDuration';
 
 // Uses auth()/headers() — always request-time. Declaring this stops Next from
 // attempting a build-time prerender probe (which threw DYNAMIC_SERVER_USAGE).
@@ -55,7 +55,8 @@ export async function GET(request: NextRequest) {
     const SORT_COLUMNS: Record<string, string> = {
       keyword:   's.keyword',
       matchType: 's.match_type',
-      date:      's.started_at',
+      // Sorts on the same value the row displays. See SESSION_FIRST_EVENT_MS.
+      date:      `COALESCE(${SESSION_FIRST_EVENT_MS}, DATEDIFF_BIG(MILLISECOND, '19700101', s.started_at))`,
       campaign:     'c.google_campaign_id',
       campaignName: 'c.name',
       device:    's.device',
