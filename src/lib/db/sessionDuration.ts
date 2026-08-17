@@ -35,11 +35,33 @@
 /** Epoch-ms for an event, preferring the browser clock over our receive time. */
 const EVENT_MS = `COALESCE(je.client_ts, DATEDIFF_BIG(MILLISECOND, '19700101', je.occurred_at))`;
 
-/** Wall-clock span of every recorded event in the session, in ms. */
+/**
+ * Wall-clock span of every recorded event in the session, in ms.
+ *
+ * Clamped to 24h and cast to INT deliberately. client_ts is BIGINT, so the
+ * subtraction is BIGINT, and node-mssql returns BIGINT as a STRING to avoid
+ * losing precision — which silently broke the UI formatter: `!ms` is false for
+ * the string "0", so a zero-length session rendered as "0ms" instead of
+ * "< 1s". total_duration_ms was always INT, so this only started happening
+ * when the duration moved to a computed expression.
+ */
 const SPAN_MS = `(
-    SELECT ISNULL(MAX(${EVENT_MS}) - MIN(${EVENT_MS}), 0)
+    SELECT CAST(
+             CASE WHEN ISNULL(MAX(${EVENT_MS}) - MIN(${EVENT_MS}), 0) > 86400000
+                    THEN 86400000
+                  ELSE ISNULL(MAX(${EVENT_MS}) - MIN(${EVENT_MS}), 0)
+             END AS INT)
       FROM JourneyEvents je
      WHERE je.session_id = s.session_id
+       -- Heartbeats excluded, matching exactly what the journey timeline
+       -- renders. They fire while a page sits open but idle, so including them
+       -- made the header disagree with the steps beneath it: a visit with 25
+       -- seconds of visible activity read "35m 31s" because one heartbeat fired
+       -- after the tab had been hidden for half an hour. The displayed total now
+       -- measures the journey you can actually see. page_end is stored as a
+       -- heartbeat row too, so the tail of the final page is covered by the
+       -- active-time floor below rather than by this span.
+       AND je.event_type <> 'heartbeat'
   )`;
 
 // Written as a bare correlated subquery repeated inside a CASE rather than

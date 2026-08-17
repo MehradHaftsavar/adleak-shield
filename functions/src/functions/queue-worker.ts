@@ -133,6 +133,8 @@ interface SessionMatch {
   sessionId: string;
   tenantId: string;
   campaignId: string;
+  /** Only used to measure how late a session was created. See probeGraceMiss. */
+  startedAt: Date;
 }
 
 /**
@@ -186,16 +188,49 @@ function samSitePathFromUrl(
  * and the hash survives a missing referrer. A visit has to lose all of them
  * before it becomes unattributable.
  */
+/**
+ * How far after an event arrived a session may still have been created and
+ * legitimately own it.
+ *
+ * The only reason this is not zero is the queue-ordering race: a page's beacons
+ * can be processed before the session_start beside them commits, and if that
+ * session_start is itself retried (30s visibility timeout, up to 5 attempts)
+ * the Sessions row can appear a couple of minutes after the events that belong
+ * to it. Five minutes covers that comfortably.
+ *
+ * It is deliberately not larger. Every millisecond of slack here is a window in
+ * which one visitor's parked events can be adopted by a different visitor's
+ * later session, which is exactly the corruption this guard exists to stop.
+ */
+const SESSION_CREATION_GRACE_MS = 5 * 60 * 1000;
+
 async function matchSession(
   tenantId: string,
   domain: string,
   gclid: string | null,
   referrer: string | null | undefined,
-  visitorHash: string | null | undefined
+  visitorHash: string | null | undefined,
+  eventAt: Date,
+  graceMs: number = SESSION_CREATION_GRACE_MS
 ): Promise<SessionMatch | null> {
   const referrerGclid = gclidFromReferrer(referrer);
   const referrerPath = samSitePathFromUrl(referrer, domain);
-  const cutoff = new Date(Date.now() - ACTIVE_WINDOW_MS);
+
+  // Both bounds are anchored to WHEN THE EVENT ARRIVED, not to now.
+  //
+  // These used to be derived from Date.now(), which is the same thing for a
+  // live event and catastrophically wrong for a parked one: the reconciler
+  // retries for 24 hours, so an event from 08:42 was being compared against a
+  // window centred on 10:48 and cheerfully adopted by whichever session was
+  // active then. Three sessions on 17 Aug each ended up owning a slice of one
+  // 08:42 burst, producing 70-minute and 2-hour "visits" with a single gap in
+  // the middle, and journeys whose first step predated their own landing.
+  //
+  // msg.receivedAt is the server clock at ingest and is preserved when an event
+  // is parked, so it stays correct across reconciliation — and it is directly
+  // comparable to started_at / last_event_at without any browser-clock skew.
+  const cutoff = new Date(eventAt.getTime() - ACTIVE_WINDOW_MS);
+  const maxStart = new Date(eventAt.getTime() + graceMs);
 
   return withAdminDb(async (request) => {
     const result = await request
@@ -204,6 +239,7 @@ async function matchSession(
       .input("refPath", mssql.NVarChar(500), referrerPath)
       .input("vhash", mssql.NVarChar(64), visitorHash ?? null)
       .input("cutoff", mssql.DateTime2, cutoff)
+      .input("maxStart", mssql.DateTime2, maxStart)
       .query(`
         SET NOCOUNT ON;
         DECLARE @t VARBINARY(128) = CAST(@tid AS VARBINARY(128));
@@ -213,36 +249,47 @@ async function matchSession(
         -- exposes result.recordset as the FIRST result set, so a query that
         -- returned an empty set followed by a populated one would look like a
         -- miss. Priority is expressed in the ORDER BY instead.
-        SELECT TOP 1 session_id, tenant_id, campaign_id
+        SELECT TOP 1 session_id, tenant_id, campaign_id, started_at
         FROM (
           -- 1. gclid, from the current URL or recovered from the referrer.
           --    Unique per ad click, so this is exact.
-          SELECT session_id, tenant_id, campaign_id,
+          --    Bounded by the same 30-minute inactivity window as the other
+          --    two branches. It previously had none, and a gclid persists in
+          --    the referrer chain for as long as the visitor stays on the site,
+          --    so a visit that went quiet for an hour and resumed was folded
+          --    back into the original session — one journey with a 61-minute
+          --    hole in the middle reading "103m 40s total". Thirty minutes of
+          --    silence ends a visit by any normal definition.
+          SELECT session_id, tenant_id, campaign_id, started_at,
                  1 AS priority, started_at AS recency
           FROM Sessions
           WHERE @gclid IS NOT NULL AND gclid = @gclid
+            AND started_at <= @maxStart
+            AND (last_event_at IS NULL OR last_event_at >= @cutoff)
 
           UNION ALL
 
           -- 2. The referrer names the page a session is currently sitting on.
           --    Survives an IP change: it describes the page, not the network.
-          SELECT session_id, tenant_id, campaign_id,
+          SELECT session_id, tenant_id, campaign_id, started_at,
                  2 AS priority, last_event_at AS recency
           FROM Sessions
           WHERE @refPath IS NOT NULL
             AND last_page_path = @refPath
             AND last_event_at >= @cutoff
+            AND started_at <= @maxStart
 
           UNION ALL
 
           -- 3. Server-derived visitor hash. Most recent wins, so a second ad
           --    click from the same person attaches to their newer session.
-          SELECT session_id, tenant_id, campaign_id,
+          SELECT session_id, tenant_id, campaign_id, started_at,
                  3 AS priority, last_event_at AS recency
           FROM Sessions
           WHERE @vhash IS NOT NULL
             AND session_fingerprint = @vhash
             AND last_event_at >= @cutoff
+            AND started_at <= @maxStart
         ) candidates
         ORDER BY priority ASC, recency DESC;
       `);
@@ -253,8 +300,55 @@ async function matchSession(
       sessionId: row.session_id,
       tenantId: row.tenant_id,
       campaignId: row.campaign_id,
+      startedAt: new Date(row.started_at),
     };
   });
+}
+
+/**
+ * Instrumentation only — never changes what we store.
+ *
+ * SESSION_CREATION_GRACE_MS is the one threshold in this file picked by
+ * reasoning rather than measurement, and getting it wrong in the tight
+ * direction silently orphans a page's events. This re-runs the match with a
+ * deliberately wide grace on the rare path where a real ad-visitor event could
+ * not be placed, so the logs tell us whether the grace was the only thing in
+ * the way — and by how much it missed.
+ *
+ * Deliberately NOT called for organic traffic (that path returns earlier), so
+ * this costs one extra query on a low-volume path only. If these lines appear
+ * in volume with deltas above five minutes, the grace is too tight and should
+ * be raised to whatever the observed distribution demands. If they never
+ * appear, five minutes is comfortably right and this can be deleted.
+ */
+async function probeGraceMiss(
+  context: InvocationContext,
+  tenantId: string,
+  env: QueueMessage["envelope"],
+  visitorHash: string | null | undefined,
+  eventAt: Date
+): Promise<void> {
+  try {
+    const relaxed = await matchSession(
+      tenantId,
+      env.domain,
+      env.payload.session?.gclid ?? null,
+      env.payload.referrer,
+      visitorHash,
+      eventAt,
+      60 * 60 * 1000 // an hour — wide enough to reveal the real distribution
+    );
+    if (!relaxed) return;
+
+    context.warn("[Worker] GRACE-MISS — matched only with a wider creation grace", {
+      eventType: env.eventType,
+      sessionCreatedAfterEventMs: relaxed.startedAt.getTime() - eventAt.getTime(),
+      currentGraceMs: SESSION_CREATION_GRACE_MS,
+      sessionId: relaxed.sessionId,
+    });
+  } catch {
+    // Diagnostics must never affect ingestion.
+  }
 }
 
 /**
@@ -929,7 +1023,8 @@ async function processMessage(
       env.domain,
       env.payload.session?.gclid ?? null,
       env.payload.referrer,
-      visitorHash
+      visitorHash,
+      new Date(msg.receivedAt)
     );
 
     // One short retry absorbs the common queue-ordering race (batchSize is 16,
@@ -942,7 +1037,8 @@ async function processMessage(
         env.domain,
         env.payload.session?.gclid ?? null,
         env.payload.referrer,
-        visitorHash
+        visitorHash,
+        new Date(msg.receivedAt)
       );
     }
 
@@ -970,6 +1066,8 @@ async function processMessage(
       if (!hasGclidSignal && !(await domainHasActiveSession(tenantId))) {
         return true;
       }
+
+      await probeGraceMiss(context, tenantId, env, visitorHash, new Date(msg.receivedAt));
 
       await parkPendingEvent(msg, visitorHash);
       context.log(`[Worker] ${env.eventType} parked for reconciliation`, {
