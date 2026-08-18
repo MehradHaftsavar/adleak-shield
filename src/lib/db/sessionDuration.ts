@@ -87,14 +87,24 @@ const SPAN_MS = `(
        AND je.event_type <> 'heartbeat'
   )`;
 
-// Written as a bare correlated subquery repeated inside a CASE rather than
-// computed once into a derived table: T-SQL will not let a derived table
-// reference a column from an outer query, so the tidier `FROM (SELECT ...) x`
-// form fails to bind. GREATEST() would avoid the repetition but needs
-// compatibility level 130+, which is not worth depending on here.
+// total_duration_ms wins whenever it exists; the span is only a fallback.
+//
+// This was the other way round — whichever was LARGER — and that was wrong.
+// total_duration_ms is active time: the tracker stops its clock the instant a
+// tab is hidden and restarts it on return, so it already excludes time the
+// visitor was away. The span cannot, because all it sees is a first and a last
+// timestamp. A converted visit on 18 Aug measured 102,080ms of real presence
+// and 1,719,022ms of span — the visitor filled half a form, disappeared for 27
+// minutes, came back and finished. Taking the larger reported 28m 39s for what
+// was 1m 42s of attention.
+//
+// The span still matters when total_duration_ms is NULL or zero, which happens
+// when every dwell-carrying beacon was lost. That case is why the span exists
+// at all: it is what turned a converted 15-second visit reading "< 1s" into
+// something truthful.
 export const SESSION_DURATION_MS = `(
   CASE
-    WHEN ${SPAN_MS} > ISNULL(s.total_duration_ms, 0) THEN ${SPAN_MS}
-    ELSE ISNULL(s.total_duration_ms, 0)
+    WHEN ISNULL(s.total_duration_ms, 0) > 0 THEN s.total_duration_ms
+    ELSE ${SPAN_MS}
   END
 )`;

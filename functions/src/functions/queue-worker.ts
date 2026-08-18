@@ -340,9 +340,18 @@ async function probeGraceMiss(
     );
     if (!relaxed) return;
 
+    // Only report a genuine grace miss. A relaxed match also succeeds when the
+    // session simply committed between the earlier attempts and this one — a
+    // race that resolves itself, where the event is parked and the reconciler
+    // attaches it minutes later with nothing lost. Observed 18 Aug: a session
+    // created 3.6s after its event tripped this and looked alarming, when the
+    // 5-minute grace had not been the obstacle at all.
+    const createdAfterMs = relaxed.startedAt.getTime() - eventAt.getTime();
+    if (createdAfterMs <= SESSION_CREATION_GRACE_MS) return;
+
     context.warn("[Worker] GRACE-MISS — matched only with a wider creation grace", {
       eventType: env.eventType,
-      sessionCreatedAfterEventMs: relaxed.startedAt.getTime() - eventAt.getTime(),
+      sessionCreatedAfterEventMs: createdAfterMs,
       currentGraceMs: SESSION_CREATION_GRACE_MS,
       sessionId: relaxed.sessionId,
     });
