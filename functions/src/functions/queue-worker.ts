@@ -804,6 +804,19 @@ async function updateSessionDwell(
           // individually under 5s) would incorrectly stay flagged as a bounce
           // even when their combined time on site is well past that threshold.
           //
+          // "Did anything happen" here must match has_interaction in the
+          // dashboard (src/app/api/sessions/route.ts and the journey route),
+          // including the 25% scroll floor from MEANINGFUL_SCROLL_PCT in
+          // src/lib/sessionRules.ts. They are separate deploy units so the
+          // number cannot be shared; keep them equal by hand.
+          //
+          // form_interact used to be missing from this list. Its own case in
+          // the switch clears is_bounce when it arrives, but this recomputation
+          // ran on the next heartbeat and set the flag straight back — so a
+          // visitor who typed into a form and left inside five seconds was
+          // filed as a bounce, with the record of their typing sitting right
+          // there in the same session.
+          //
           // The dwell is only added when this page_end still belongs to the
           // page the session is on. bankPreviousPage has already settled this
           // page's time if the visitor moved on first, and the queue delivers
@@ -827,8 +840,11 @@ async function updateSessionDwell(
                          END) < 5000 AND NOT EXISTS (
                      SELECT 1 FROM JourneyEvents
                      WHERE session_id = @sessionId
-                       AND event_type IN ('click', 'success_event')
-                   ) THEN 1
+                       AND event_type IN ('click', 'success_event', 'form_interact')
+                   )
+                   AND ISNULL(s.max_scroll_pct, 0) < 25
+                   AND ISNULL(@scrollPct, 0) < 25
+                     THEN 1
                    ELSE 0
                  END,
                  max_scroll_pct = CASE
@@ -874,8 +890,11 @@ async function updateSessionDwell(
                    WHEN x.newTotal < 5000 AND NOT EXISTS (
                      SELECT 1 FROM JourneyEvents
                      WHERE session_id = @sessionId
-                       AND event_type IN ('click', 'success_event')
-                   ) THEN 1
+                       AND event_type IN ('click', 'success_event', 'form_interact')
+                   )
+                   AND ISNULL(s.max_scroll_pct, 0) < 25
+                   AND ISNULL(@scrollPct, 0) < 25
+                     THEN 1
                    ELSE 0
                  END,
                  max_scroll_pct = CASE
