@@ -4,8 +4,7 @@ import { withTenantDb } from '@/lib/db/client';
 import * as mssql from 'mssql';
 import { isPaywalled } from '@/lib/paywallCheck';
 import { getEffectiveTenantId, buildDomainFilter } from '@/lib/adminAuth';
-import { SESSION_DURATION_MS } from '@/lib/db/sessionDuration';
-import { MEANINGFUL_SCROLL_PCT } from '@/lib/sessionRules';
+import { SESSION_DURATION_MS, SESSION_HAS_INTERACTION } from '@/lib/db/sessionDuration';
 
 export async function GET(
   request: NextRequest,
@@ -51,12 +50,7 @@ export async function GET(
           -- the CSV export, both admin routes and the weekly email, so its
           -- meaning cannot be changed without moving a customer-facing money
           -- figure.
-          CASE WHEN EXISTS (
-                 SELECT 1 FROM JourneyEvents je
-                 WHERE je.session_id = s.session_id
-                   AND je.event_type IN ('click', 'success_event', 'form_interact')
-               ) OR ISNULL(s.max_scroll_pct, 0) >= ${MEANINGFUL_SCROLL_PCT}
-            THEN 1 ELSE 0 END AS has_interaction,
+          CASE WHEN ${SESSION_HAS_INTERACTION} THEN 1 ELSE 0 END AS has_interaction,
           -- The last thing we heard, of any kind — heartbeats included, which
           -- the events query below filters out. Without this the closing line
           -- could not know when the visit actually stopped, only when the last

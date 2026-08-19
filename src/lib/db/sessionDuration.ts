@@ -32,8 +32,33 @@
 // The alias `s` must refer to Sessions in the surrounding query.
 // =============================================================================
 
+import { MEANINGFUL_SCROLL_PCT } from '@/lib/sessionRules';
+
 /** Epoch-ms for an event, preferring the browser clock over our receive time. */
 const EVENT_MS = `COALESCE(je.client_ts, DATEDIFF_BIG(MILLISECOND, '19700101', je.occurred_at))`;
+
+/**
+ * Did the visitor actually DO anything, as opposed to merely being present?
+ *
+ * Defined once because five places need it — the sessions list (both as a
+ * column and as a filter), the journey detail, the journey's own session list,
+ * and the CSV export. Any two of those disagreeing means a session shows one
+ * badge in the table and another in its journey, or appears under a filter
+ * whose label contradicts its own badge.
+ *
+ * Must also match the is_bounce check in functions/src/functions/queue-worker.ts
+ * — separate deploy unit, so keep them equal by hand.
+ *
+ * The alias `s` must refer to Sessions in the surrounding query.
+ */
+export const SESSION_HAS_INTERACTION = `(
+  EXISTS (
+    SELECT 1 FROM JourneyEvents je
+     WHERE je.session_id = s.session_id
+       AND je.event_type IN ('click', 'success_event', 'form_interact')
+  )
+  OR ISNULL(s.max_scroll_pct, 0) >= ${MEANINGFUL_SCROLL_PCT}
+)`;
 
 /**
  * Epoch-ms of the session's first visible event — what the list and the journey

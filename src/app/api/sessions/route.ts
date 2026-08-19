@@ -4,8 +4,7 @@ import { withTenantDb } from '@/lib/db/client';
 import * as mssql from 'mssql';
 import { isPaywalled } from '@/lib/paywallCheck';
 import { getEffectiveTenantId, buildDomainFilter } from '@/lib/adminAuth';
-import { SESSION_DURATION_MS, SESSION_FIRST_EVENT_MS } from '@/lib/db/sessionDuration';
-import { MEANINGFUL_SCROLL_PCT } from '@/lib/sessionRules';
+import { SESSION_DURATION_MS, SESSION_FIRST_EVENT_MS, SESSION_HAS_INTERACTION } from '@/lib/db/sessionDuration';
 
 // Uses auth()/headers() — always request-time. Declaring this stops Next from
 // attempting a build-time prerender probe (which threw DYNAMIC_SERVER_USAGE).
@@ -67,7 +66,16 @@ export async function GET(request: NextRequest) {
       position:  's.ad_position',
       location:  's.city',
       country:   's.country',
-      outcome:   `CASE WHEN EXISTS (SELECT 1 FROM JourneyEvents je WHERE je.session_id = s.session_id AND je.event_type = 'success_event') THEN 2 WHEN s.is_bounce = 1 THEN 0 ELSE 1 END`,
+      // Ranked worst to best so the four badges group properly when sorted:
+      // Bounce, No interaction, Engaged, Converted.
+      outcome:   `CASE
+                    WHEN EXISTS (SELECT 1 FROM JourneyEvents je
+                                  WHERE je.session_id = s.session_id
+                                    AND je.event_type = 'success_event') THEN 3
+                    WHEN s.is_bounce = 1 THEN 0
+                    WHEN NOT ${SESSION_HAS_INTERACTION} THEN 1
+                    ELSE 2
+                  END`,
     };
     const sortKeyParam = searchParams.get('sortKey') || 'date';
     const sortColumn   = SORT_COLUMNS[sortKeyParam] || SORT_COLUMNS.date;
@@ -120,7 +128,18 @@ export async function GET(request: NextRequest) {
           WHERE je.session_id = s.session_id AND je.event_type = 'success_event'
         )`);
       } else if (outcome === 'engaged') {
+        // Narrowed to sessions that actually did something. Without this the
+        // Engaged filter still returned the no-interaction ones, so a row could
+        // sit under "Engaged" wearing a "No interaction" badge.
         conditions.push('s.is_bounce = 0');
+        conditions.push(SESSION_HAS_INTERACTION);
+        conditions.push(`NOT EXISTS (
+          SELECT 1 FROM JourneyEvents je
+          WHERE je.session_id = s.session_id AND je.event_type = 'success_event'
+        )`);
+      } else if (outcome === 'no_interaction') {
+        conditions.push('s.is_bounce = 0');
+        conditions.push(`NOT ${SESSION_HAS_INTERACTION}`);
         conditions.push(`NOT EXISTS (
           SELECT 1 FROM JourneyEvents je
           WHERE je.session_id = s.session_id AND je.event_type = 'success_event'
@@ -189,12 +208,7 @@ export async function GET(request: NextRequest) {
           -- badge. Derived rather than stored on purpose — is_bounce feeds the
           -- leaks report, the export, both admin routes and the weekly email,
           -- so its meaning must not move.
-          CASE WHEN EXISTS (
-                 SELECT 1 FROM JourneyEvents je
-                 WHERE je.session_id = s.session_id
-                   AND je.event_type IN ('click', 'success_event', 'form_interact')
-               ) OR ISNULL(s.max_scroll_pct, 0) >= ${MEANINGFUL_SCROLL_PCT}
-            THEN 1 ELSE 0 END AS has_interaction,
+          CASE WHEN ${SESSION_HAS_INTERACTION} THEN 1 ELSE 0 END AS has_interaction,
           (
             SELECT TOP 1 je.occurred_at FROM JourneyEvents je
             WHERE je.session_id = s.session_id AND je.event_type <> 'heartbeat'

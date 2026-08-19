@@ -395,18 +395,6 @@ export function SessionsTable({ campaigns, dateRange, refreshTrigger }: Sessions
       <div className="bg-white rounded-b-lg border border-gray-200">
         {/* Header */}
         <div className="p-6 border-b border-gray-200">
-          {/* Dated note: the badge change is retroactive, so a customer looking
-              back at last month will see labels they don't recognise. Better to
-              explain it here than to let them wonder. */}
-          <div className="mb-4 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2">
-            <p className="text-xs text-amber-900">
-              <span className="font-semibold">19 Aug 2026 —</span>{' '}
-              A new <span className="font-semibold">No interaction</span> outcome now separates visitors
-              who stayed on the page but never clicked, typed or scrolled from those who genuinely
-              engaged. These previously showed as Engaged. Bounce and Converted are unchanged.
-            </p>
-          </div>
-
           <div className="flex flex-wrap items-center justify-between gap-3 mb-5">
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center flex-shrink-0">
@@ -541,6 +529,7 @@ export function SessionsTable({ campaigns, dateRange, refreshTrigger }: Sessions
               <option value="converted">Converted</option>
               <option value="bounce">Bounced</option>
               <option value="engaged">Engaged</option>
+              <option value="no_interaction">No interaction</option>
             </select>
 
             {/* Country */}

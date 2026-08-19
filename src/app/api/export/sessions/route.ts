@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@/lib/auth';
 import { withTenantDb } from '@/lib/db/client';
 import { getEffectiveTenantId, buildDomainFilter } from '@/lib/adminAuth';
+import { SESSION_HAS_INTERACTION } from '@/lib/db/sessionDuration';
 import * as mssql from 'mssql';
 
 export const dynamic = 'force-dynamic';
@@ -79,6 +80,9 @@ export async function GET(request: NextRequest) {
               WHERE je.session_id = s.session_id AND je.event_type = 'success_event'
             ) THEN 'Converted'
             WHEN s.is_bounce = 1 THEN 'Bounce'
+            -- Same order as the badge in the dashboard, so an exported CSV
+            -- can't label a session differently from the screen it came from.
+            WHEN NOT ${SESSION_HAS_INTERACTION} THEN 'No interaction'
             ELSE 'Engaged'
           END AS outcome
         FROM Sessions s
@@ -103,7 +107,10 @@ export async function GET(request: NextRequest) {
             OR (@outcome = 'bounce' AND s.is_bounce = 1 AND NOT EXISTS (
                 SELECT 1 FROM JourneyEvents je
                 WHERE je.session_id = s.session_id AND je.event_type = 'success_event'))
-            OR (@outcome = 'engaged' AND s.is_bounce = 0 AND NOT EXISTS (
+            OR (@outcome = 'engaged' AND s.is_bounce = 0 AND ${SESSION_HAS_INTERACTION} AND NOT EXISTS (
+                SELECT 1 FROM JourneyEvents je
+                WHERE je.session_id = s.session_id AND je.event_type = 'success_event'))
+            OR (@outcome = 'no_interaction' AND s.is_bounce = 0 AND NOT ${SESSION_HAS_INTERACTION} AND NOT EXISTS (
                 SELECT 1 FROM JourneyEvents je
                 WHERE je.session_id = s.session_id AND je.event_type = 'success_event'))
           )

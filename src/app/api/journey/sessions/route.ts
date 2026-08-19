@@ -3,8 +3,7 @@ import { auth } from '@/lib/auth';
 import { withTenantDb } from '@/lib/db/client';
 import * as mssql from 'mssql';
 import { getEffectiveTenantId, buildDomainFilter } from '@/lib/adminAuth';
-import { SESSION_DURATION_MS } from '@/lib/db/sessionDuration';
-import { MEANINGFUL_SCROLL_PCT } from '@/lib/sessionRules';
+import { SESSION_DURATION_MS, SESSION_HAS_INTERACTION } from '@/lib/db/sessionDuration';
 
 // Uses auth()/headers() — always request-time. Declaring this stops Next from
 // attempting a build-time prerender probe (which threw DYNAMIC_SERVER_USAGE).
@@ -52,12 +51,7 @@ export async function GET(request: NextRequest) {
           -- duration here and another there.
           ${SESSION_DURATION_MS} AS total_duration_ms,
           s.is_bounce,
-          CASE WHEN EXISTS (
-                 SELECT 1 FROM JourneyEvents je
-                 WHERE je.session_id = s.session_id
-                   AND je.event_type IN ('click', 'success_event', 'form_interact')
-               ) OR ISNULL(s.max_scroll_pct, 0) >= ${MEANINGFUL_SCROLL_PCT}
-            THEN 1 ELSE 0 END AS has_interaction,
+          CASE WHEN ${SESSION_HAS_INTERACTION} THEN 1 ELSE 0 END AS has_interaction,
           (
             SELECT COUNT(*)
             FROM JourneyEvents je

@@ -349,12 +349,20 @@ function VisitEndedRow({ endedAt, lastPageMs }: { endedAt?: string | null; lastP
       <div className="flex-1 min-w-0 rounded-lg border border-dashed border-gray-200 bg-gray-50 p-3">
         <p className="text-sm font-medium text-gray-500">Visit ended</p>
         <div className="flex items-center gap-3 mt-1.5 flex-wrap">
-          {/* Second line of defence against a leftover flush value: below a
-              second there is nothing worth telling the customer, so show the
-              ending on its own rather than "0s on this page". */}
+          {/* "active" matters. This figure excludes time the tab was hidden,
+              while the timestamp beside it is the last thing we heard — so a
+              visitor who read for 1.4s, locked their phone and had the tab
+              discarded 69s later shows "1s active" next to a time 71s after
+              they arrived. Without the word the line reads as a contradiction.
+              Explaining the gap itself needs the tab-return events (Item 4).
+
+              Below a second there is nothing worth saying, so the ending shows
+              on its own rather than "0s active on this page" — that guards
+              against the leftover flush heartbeat, which reports 1–4ms after
+              page_end has already banked the real total. */}
           {lastPageMs != null && lastPageMs >= 1000 && (
             <span className="text-xs text-gray-500">
-              {formatDuration(lastPageMs)} on this page
+              {formatDuration(lastPageMs)} active on this page
             </span>
           )}
           <span className="text-xs text-gray-400 ml-auto">{formatTime(endedAt)}</span>
