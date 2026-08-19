@@ -5,6 +5,7 @@ import * as mssql from 'mssql';
 import { isPaywalled } from '@/lib/paywallCheck';
 import { getEffectiveTenantId, buildDomainFilter } from '@/lib/adminAuth';
 import { SESSION_DURATION_MS } from '@/lib/db/sessionDuration';
+import { MEANINGFUL_SCROLL_PCT } from '@/lib/sessionRules';
 
 export async function GET(
   request: NextRequest,
@@ -44,6 +45,61 @@ export async function GET(
             SELECT 1 FROM JourneyEvents je
             WHERE je.session_id = s.session_id AND je.event_type = 'success_event'
           ) THEN 1 ELSE 0 END AS has_success_event,
+          -- Did the visitor actually DO anything, as opposed to merely being
+          -- present? Drives the "No interaction" badge. Deliberately derived
+          -- here rather than stored: is_bounce is read by the leaks report,
+          -- the CSV export, both admin routes and the weekly email, so its
+          -- meaning cannot be changed without moving a customer-facing money
+          -- figure.
+          CASE WHEN EXISTS (
+                 SELECT 1 FROM JourneyEvents je
+                 WHERE je.session_id = s.session_id
+                   AND je.event_type IN ('click', 'success_event', 'form_interact')
+               ) OR ISNULL(s.max_scroll_pct, 0) >= ${MEANINGFUL_SCROLL_PCT}
+            THEN 1 ELSE 0 END AS has_interaction,
+          -- The last thing we heard, of any kind — heartbeats included, which
+          -- the events query below filters out. Without this the closing line
+          -- could not know when the visit actually stopped, only when the last
+          -- CLICKABLE step happened, which is often minutes earlier.
+          (
+            SELECT TOP 1 je.occurred_at FROM JourneyEvents je
+            WHERE je.session_id = s.session_id
+            ORDER BY COALESCE(je.client_ts, DATEDIFF_BIG(MILLISECOND, '19700101', je.occurred_at)) DESC
+          ) AS last_event_at,
+          (
+            SELECT TOP 1 je.client_ts FROM JourneyEvents je
+            WHERE je.session_id = s.session_id
+            ORDER BY COALESCE(je.client_ts, DATEDIFF_BIG(MILLISECOND, '19700101', je.occurred_at)) DESC
+          ) AS last_event_client_ts,
+          -- Time spent on the final page: the LARGEST dwell recorded on it, not
+          -- the most recent one.
+          --
+          -- The newest heartbeat is usually worthless. When a page ends, the
+          -- tracker banks its time via page_end and then a final visibility
+          -- flush lands a moment later reporting whatever is left over — dwell
+          -- of 1, 3, 4ms. Taking the newest row gave "1ms on this page" on
+          -- almost every session. dwell_time_ms is cumulative for its own page,
+          -- so the peak is that page's real total.
+          -- Bounded to heartbeats since the visitor's MOST RECENT arrival on
+          -- that page, not every heartbeat it ever had. A journey that goes
+          -- / -> /contact -> back to / has two separate stretches on "/", and
+          -- without this bound a 60-second first visit would be reported as the
+          -- time spent during a 5-second return.
+          (
+            SELECT MAX(je.dwell_time_ms) FROM JourneyEvents je
+            WHERE je.session_id = s.session_id AND je.event_type = 'heartbeat'
+              AND je.page_path = (
+                SELECT TOP 1 je2.page_path FROM JourneyEvents je2
+                WHERE je2.session_id = s.session_id AND je2.event_type = 'heartbeat'
+                ORDER BY COALESCE(je2.client_ts, DATEDIFF_BIG(MILLISECOND, '19700101', je2.occurred_at)) DESC
+              )
+              AND COALESCE(je.client_ts, DATEDIFF_BIG(MILLISECOND, '19700101', je.occurred_at))
+                  >= ISNULL((
+                       SELECT MAX(COALESCE(je3.client_ts, DATEDIFF_BIG(MILLISECOND, '19700101', je3.occurred_at)))
+                       FROM JourneyEvents je3
+                       WHERE je3.session_id = s.session_id AND je3.event_type = 'pageview'
+                     ), 0)
+          ) AS last_page_ms,
           -- Smallest gap between the browser's clock and ours across this
           -- session. The least-delayed event is the most trustworthy reference:
           -- occurred_at is stamped when the Function handler runs, which a cold
@@ -113,7 +169,14 @@ export async function GET(
           totalDurationMs: sessionRow.total_duration_ms,
           isBounce:        sessionRow.is_bounce === true || sessionRow.is_bounce === 1,
           hasSuccessEvent: sessionRow.has_success_event === true || sessionRow.has_success_event === 1,
+          hasInteraction:  sessionRow.has_interaction === true || sessionRow.has_interaction === 1,
           maxScrollPct:    sessionRow.max_scroll_pct ?? null,
+          // Same browser-clock correction as every other time on this screen,
+          // so the closing line can't drift from the steps above it.
+          endedAt:         sessionRow.last_event_at
+            ? displayTime(sessionRow.last_event_at, sessionRow.last_event_client_ts)
+            : null,
+          lastPageMs:      sessionRow.last_page_ms ?? null,
         },
         events: eventsResult.recordset.map(row => ({
           eventId:        row.event_id,

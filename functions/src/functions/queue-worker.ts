@@ -127,6 +127,12 @@ async function lookupTenantByDomain(domainName: string): Promise<string | null> 
 // A visit is considered still open for this long after its last event. Used by
 // every referrer/hash match so a stale session from hours ago can never absorb
 // a new visitor's events.
+// MUST STAY EQUAL TO INACTIVITY_WINDOW_MS in src/lib/sessionRules.ts.
+// This decides whether an arriving event may still join a session; the
+// dashboard uses the same number to decide whether a journey may still gain
+// steps. If they disagree the UI contradicts itself — "Visit ended" with a
+// later step printed underneath it. Separate deploy units, so no shared
+// import is possible; this comment is the link.
 const ACTIVE_WINDOW_MS = 30 * 60 * 1000;
 
 interface SessionMatch {

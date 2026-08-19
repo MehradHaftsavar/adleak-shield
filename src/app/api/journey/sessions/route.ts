@@ -3,6 +3,8 @@ import { auth } from '@/lib/auth';
 import { withTenantDb } from '@/lib/db/client';
 import * as mssql from 'mssql';
 import { getEffectiveTenantId, buildDomainFilter } from '@/lib/adminAuth';
+import { SESSION_DURATION_MS } from '@/lib/db/sessionDuration';
+import { MEANINGFUL_SCROLL_PCT } from '@/lib/sessionRules';
 
 // Uses auth()/headers() — always request-time. Declaring this stops Next from
 // attempting a build-time prerender probe (which threw DYNAMIC_SERVER_USAGE).
@@ -46,8 +48,16 @@ export async function GET(request: NextRequest) {
           s.match_type,
           s.device,
           s.started_at,
-          s.total_duration_ms,
+          -- Same expression as the sessions table, so a session can't show one
+          -- duration here and another there.
+          ${SESSION_DURATION_MS} AS total_duration_ms,
           s.is_bounce,
+          CASE WHEN EXISTS (
+                 SELECT 1 FROM JourneyEvents je
+                 WHERE je.session_id = s.session_id
+                   AND je.event_type IN ('click', 'success_event', 'form_interact')
+               ) OR ISNULL(s.max_scroll_pct, 0) >= ${MEANINGFUL_SCROLL_PCT}
+            THEN 1 ELSE 0 END AS has_interaction,
           (
             SELECT COUNT(*)
             FROM JourneyEvents je
@@ -79,6 +89,8 @@ export async function GET(request: NextRequest) {
         isBounce:        row.is_bounce === true || row.is_bounce === 1,
         eventCount:      row.event_count,
         hasSuccessEvent: row.success_count > 0,
+        hasInteraction:  row.has_interaction === true || row.has_interaction === 1,
+        maxScrollPct:    null,
       }));
     });
 

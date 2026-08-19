@@ -12,6 +12,7 @@ import {
   AlertCircle,
   ChevronRight,
 } from 'lucide-react';
+import { INACTIVITY_WINDOW_MS } from '@/lib/sessionRules';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -25,7 +26,12 @@ interface SessionSummary {
   isBounce:        boolean;
   eventCount:      number;
   hasSuccessEvent: boolean;
+  hasInteraction:  boolean;
   maxScrollPct:    number | null;
+  /** Last thing we heard, heartbeats included. Null on the sessions list. */
+  endedAt?:        string | null;
+  /** Time on the final page — the stretch the timeline has no step for. */
+  lastPageMs?:     number | null;
 }
 
 interface JourneyEvent {
@@ -63,6 +69,55 @@ function formatDuration(ms: number | null): string {
   const mins = Math.floor(secs / 60);
   const rem  = secs % 60;
   return rem > 0 ? `${mins}m ${rem}s` : `${mins}m`;
+}
+
+/**
+ * Converted / Bounce / No interaction / Engaged, in that order of precedence.
+ *
+ * "No interaction" is the new one: a visitor who stayed past the bounce
+ * threshold but never clicked, typed or scrolled. Previously these showed as
+ * Engaged, which flattered them — the page was merely open. Bounce keeps its
+ * existing meaning (left almost immediately) because is_bounce is read by the
+ * leaks report and the weekly email, and moving it would move a money figure.
+ */
+function OutcomeBadge({
+  hasSuccessEvent, isBounce, hasInteraction, size = 'sm',
+}: {
+  hasSuccessEvent: boolean; isBounce: boolean; hasInteraction: boolean; size?: 'sm' | 'md';
+}) {
+  const base = 'inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium';
+  const icon = size === 'md' ? 'w-3 h-3' : 'w-3 h-3';
+
+  if (hasSuccessEvent) {
+    return (
+      <span className={`${base} bg-green-100 text-green-800`}>
+        <CheckCircle className={icon} />
+        Converted
+      </span>
+    );
+  }
+  if (isBounce) {
+    return (
+      <span className={`${base} bg-red-100 text-red-800`}>
+        <AlertCircle className={icon} />
+        Bounce
+      </span>
+    );
+  }
+  if (!hasInteraction) {
+    return (
+      <span className={`${base} bg-amber-100 text-amber-800`} title="Stayed on the page but never clicked, typed or scrolled">
+        <AlertCircle className={icon} />
+        No interaction
+      </span>
+    );
+  }
+  return (
+    <span className={`${base} bg-blue-100 text-blue-800`}>
+      <CheckCircle className={icon} />
+      Engaged
+    </span>
+  );
 }
 
 function formatTime(iso: string): string {
@@ -143,21 +198,11 @@ function SessionsList({
             </p>
 
             <div className="flex items-center gap-2 flex-wrap">
-              {s.hasSuccessEvent ? (
-                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
-                  <CheckCircle className="w-3 h-3" />
-                  Converted
-                </span>
-              ) : s.isBounce ? (
-                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">
-                  <AlertCircle className="w-3 h-3" />
-                  Bounce
-                </span>
-              ) : (
-                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-600">
-                  Engaged
-                </span>
-              )}
+              <OutcomeBadge
+                hasSuccessEvent={s.hasSuccessEvent}
+                isBounce={s.isBounce}
+                hasInteraction={s.hasInteraction}
+              />
 
               <span className="inline-flex items-center gap-1 text-xs text-gray-500">
                 <DeviceIcon device={s.device} />
@@ -225,22 +270,12 @@ function TimelineView({
       {/* Session summary bar */}
       <div className="px-4 py-3 bg-gray-50 border-b border-gray-200 shrink-0">
         <div className="flex items-center gap-2 flex-wrap">
-          {session.hasSuccessEvent ? (
-            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
-              <CheckCircle className="w-3 h-3" />
-              Converted
-            </span>
-          ) : session.isBounce ? (
-            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">
-              <AlertCircle className="w-3 h-3" />
-              Bounce
-            </span>
-          ) : (
-            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
-              <CheckCircle className="w-3 h-3" />
-              Engaged
-            </span>
-          )}
+          <OutcomeBadge
+            hasSuccessEvent={session.hasSuccessEvent}
+            isBounce={session.isBounce}
+            hasInteraction={session.hasInteraction}
+            size="md"
+          />
           <span className="inline-flex items-center gap-1 text-xs text-gray-600">
             <DeviceIcon device={session.device} />
             {session.device || 'Desktop'}
@@ -276,10 +311,55 @@ function TimelineView({
               {events.map((event, idx) => (
                 <TimelineEventRow key={event.eventId} event={event} index={idx} domain={domain} />
               ))}
+              <VisitEndedRow endedAt={session.endedAt} lastPageMs={session.lastPageMs} />
             </div>
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+/**
+ * Closing line on a finished visit.
+ *
+ * The timeline's last step is whatever the visitor last CLICKED, but they
+ * usually carry on reading afterwards — three minutes on a contact page leaves
+ * no step at all, so the header total looked inflated against the steps with no
+ * way to tell why. This is that missing stretch, made visible.
+ *
+ * Hidden until the visit is genuinely over. Inside the inactivity window they
+ * may still come back and add steps, and printing "ended" over a live visit
+ * would be wrong. Timed from the last event of ANY kind, heartbeats included,
+ * so it is accurate to the 15-second beat rather than to the last click.
+ *
+ * Deliberately "Visit ended" and not "Closed the tab": closing a tab, typing a
+ * new address, returning to Google and the phone killing the page all look
+ * identical from here, and this is a product people use as evidence.
+ */
+function VisitEndedRow({ endedAt, lastPageMs }: { endedAt?: string | null; lastPageMs?: number | null }) {
+  if (!endedAt) return null;
+  const endedMs = new Date(endedAt).getTime();
+  if (!Number.isFinite(endedMs)) return null;
+  if (Date.now() - endedMs < INACTIVITY_WINDOW_MS) return null;
+
+  return (
+    <div className="relative flex items-start gap-3 pl-6">
+      <div className="absolute left-0 mt-1 w-3.5 h-3.5 rounded-full border-2 border-white shrink-0 ring-2 bg-gray-300 ring-gray-100" />
+      <div className="flex-1 min-w-0 rounded-lg border border-dashed border-gray-200 bg-gray-50 p-3">
+        <p className="text-sm font-medium text-gray-500">Visit ended</p>
+        <div className="flex items-center gap-3 mt-1.5 flex-wrap">
+          {/* Second line of defence against a leftover flush value: below a
+              second there is nothing worth telling the customer, so show the
+              ending on its own rather than "0s on this page". */}
+          {lastPageMs != null && lastPageMs >= 1000 && (
+            <span className="text-xs text-gray-500">
+              {formatDuration(lastPageMs)} on this page
+            </span>
+          )}
+          <span className="text-xs text-gray-400 ml-auto">{formatTime(endedAt)}</span>
+        </div>
+      </div>
     </div>
   );
 }

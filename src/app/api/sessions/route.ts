@@ -5,6 +5,7 @@ import * as mssql from 'mssql';
 import { isPaywalled } from '@/lib/paywallCheck';
 import { getEffectiveTenantId, buildDomainFilter } from '@/lib/adminAuth';
 import { SESSION_DURATION_MS, SESSION_FIRST_EVENT_MS } from '@/lib/db/sessionDuration';
+import { MEANINGFUL_SCROLL_PCT } from '@/lib/sessionRules';
 
 // Uses auth()/headers() — always request-time. Declaring this stops Next from
 // attempting a build-time prerender probe (which threw DYNAMIC_SERVER_USAGE).
@@ -184,6 +185,16 @@ export async function GET(request: NextRequest) {
             SELECT COUNT(*) FROM JourneyEvents je
             WHERE je.session_id = s.session_id AND je.event_type = 'success_event'
           ) AS success_count,
+          -- Did the visitor actually DO anything? Drives the "No interaction"
+          -- badge. Derived rather than stored on purpose — is_bounce feeds the
+          -- leaks report, the export, both admin routes and the weekly email,
+          -- so its meaning must not move.
+          CASE WHEN EXISTS (
+                 SELECT 1 FROM JourneyEvents je
+                 WHERE je.session_id = s.session_id
+                   AND je.event_type IN ('click', 'success_event', 'form_interact')
+               ) OR ISNULL(s.max_scroll_pct, 0) >= ${MEANINGFUL_SCROLL_PCT}
+            THEN 1 ELSE 0 END AS has_interaction,
           (
             SELECT TOP 1 je.occurred_at FROM JourneyEvents je
             WHERE je.session_id = s.session_id AND je.event_type <> 'heartbeat'
@@ -231,6 +242,7 @@ export async function GET(request: NextRequest) {
           campaignId:        row.campaign_uuid,
           eventCount:        row.event_count,
           hasSuccessEvent:   row.success_count > 0,
+          hasInteraction:    row.has_interaction === true || row.has_interaction === 1,
         })),
       };
     });
