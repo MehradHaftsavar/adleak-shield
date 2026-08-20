@@ -63,8 +63,9 @@ interface Leak {
   googleCampaignId: string;
   avgCpc: number;
   totalClicks: number;
-  bounceClicks: number;
-  bounceRate: number;
+  campaignName: string | null;
+  wastedClicks: number;
+  wastedRate: number;
   estimatedWaste: number;
 }
 
@@ -72,7 +73,7 @@ interface LeakTableData {
   leaks: Leak[];
   summary: {
     totalWaste: number;
-    totalBounceClicks: number;
+    totalWastedClicks: number;
     totalLeaks: number;
     dateRange: { start: string; end: string };
   };
@@ -83,7 +84,7 @@ interface LeakTableProps {
   refreshTrigger: number;
 }
 
-type SortKey = 'keyword' | 'matchType' | 'googleCampaignId' | 'totalClicks' | 'bounceClicks' | 'bounceRate' | 'estimatedWaste';
+type SortKey = 'keyword' | 'matchType' | 'campaignName' | 'totalClicks' | 'wastedClicks' | 'wastedRate' | 'estimatedWaste';
 type SortDir = 'asc' | 'desc';
 
 function SortIcon({ col, sortKey, sortDir }: { col: SortKey; sortKey: SortKey; sortDir: SortDir }) {
@@ -146,7 +147,7 @@ export function LeakTable({ dateRange, refreshTrigger }: LeakTableProps) {
       setSortDir(d => d === 'asc' ? 'desc' : 'asc');
     } else {
       setSortKey(col);
-      setSortDir(col === 'keyword' || col === 'matchType' || col === 'googleCampaignId' ? 'asc' : 'desc');
+      setSortDir(col === 'keyword' || col === 'matchType' || col === 'campaignName' ? 'asc' : 'desc');
     }
     setPage(1);
   };
@@ -156,7 +157,7 @@ export function LeakTable({ dateRange, refreshTrigger }: LeakTableProps) {
 
   // Derived filter options
   const matchTypes = useMemo(() => [...new Set(data?.leaks.map(l => l.matchType) ?? [])].sort(), [data]);
-  const campaigns = useMemo(() => [...new Map(data?.leaks.map(l => [l.campaignId, l.googleCampaignId]) ?? []).entries()], [data]);
+  const campaigns = useMemo(() => [...new Map(data?.leaks.map(l => [l.campaignId, l.campaignName || l.googleCampaignId]) ?? []).entries()], [data]);
 
   // Filtered + sorted rows
   const rows = useMemo(() => {
@@ -205,7 +206,7 @@ export function LeakTable({ dateRange, refreshTrigger }: LeakTableProps) {
   }
 
   if (!data || data.leaks.length === 0) {
-    const hasAnySessions = data && data.summary.totalBounceClicks > 0;
+    const hasAnySessions = data && data.summary.totalWastedClicks > 0;
     return (
       <div className="bg-white rounded-b-lg border border-gray-200">
         {/* Header — always visible so export buttons are reachable even before data arrives */}
@@ -243,7 +244,7 @@ export function LeakTable({ dateRange, refreshTrigger }: LeakTableProps) {
           {hasAnySessions ? (
             <>
               <p className="text-gray-600 mb-4">
-                Your campaigns look clean for this date range — no keywords with high bounce rates found.
+                Your campaigns look clean for this date range — no keywords with high wasted rates found.
               </p>
               <p className="text-sm text-gray-400">
                 Try widening the date range if you were expecting to see results here.
@@ -305,8 +306,8 @@ export function LeakTable({ dateRange, refreshTrigger }: LeakTableProps) {
             <span className="ml-2 font-bold text-red-600">£{data.summary.totalWaste.toFixed(2)}</span>
           </div>
           <div>
-            <span className="text-gray-600">Bounce Clicks:</span>
-            <span className="ml-2 font-semibold text-gray-900">{data.summary.totalBounceClicks}</span>
+            <span className="text-gray-600">Wasted Clicks:</span>
+            <span className="ml-2 font-semibold text-gray-900">{data.summary.totalWastedClicks}</span>
           </div>
         </div>
 
@@ -356,23 +357,23 @@ export function LeakTable({ dateRange, refreshTrigger }: LeakTableProps) {
               <th className={`${thClass} text-left`} onClick={() => handleSort('matchType')}>
                 Match Type <SortIcon col="matchType" sortKey={sortKey} sortDir={sortDir} />
               </th>
-              <th className={`${thClass} text-left`} onClick={() => handleSort('googleCampaignId')}>
-                Campaign <SortIcon col="googleCampaignId" sortKey={sortKey} sortDir={sortDir} />
+              <th className={`${thClass} text-left`} onClick={() => handleSort('campaignName')}>
+                Campaign Name <SortIcon col="campaignName" sortKey={sortKey} sortDir={sortDir} />
               </th>
               <th className={`${thClass} text-right`} onClick={() => handleSort('totalClicks')}>
                 Total Clicks <SortIcon col="totalClicks" sortKey={sortKey} sortDir={sortDir} />
               </th>
-              <th className={`${thClass} text-right`} onClick={() => handleSort('bounceClicks')}>
-                Bounce Clicks <SortIcon col="bounceClicks" sortKey={sortKey} sortDir={sortDir} />
+              <th className={`${thClass} text-right`} onClick={() => handleSort('wastedClicks')}>
+                Wasted Clicks <SortIcon col="wastedClicks" sortKey={sortKey} sortDir={sortDir} />
               </th>
-              <th className={`${thClass} text-right`} onClick={() => handleSort('bounceRate')}>
-                Bounce Rate
-                <Tooltip placement="down-left" text="% of clicks on this keyword where the visitor left within 5 seconds without taking any action. Any scroll, click, or interaction within 5 seconds marks the session as engaged, not a bounce. Above 70% is a strong signal to add as a negative keyword." />
-                {' '}<SortIcon col="bounceRate" sortKey={sortKey} sortDir={sortDir} />
+              <th className={`${thClass} text-right`} onClick={() => handleSort('wastedRate')}>
+                Wasted Rate
+                <Tooltip placement="down-left" text="% of clicks on this keyword that produced nothing — the visitor either left within 5 seconds, or stayed on the page without ever clicking, typing or scrolling. Any of those actions marks the session as engaged instead. Above 70% is a strong signal to add as a negative keyword." />
+                {' '}<SortIcon col="wastedRate" sortKey={sortKey} sortDir={sortDir} />
               </th>
               <th className={`${thClass} text-right`} onClick={() => handleSort('estimatedWaste')}>
                 Est. Wasted Spend
-                <Tooltip placement="down-left" text="Bounce Clicks × your average CPC for this keyword. This is the minimum you've already lost — the actual figure may be higher if those visitors also triggered retargeting." />
+                <Tooltip placement="down-left" text="Wasted Clicks × your average CPC for this keyword. This is the minimum you've already lost — the actual figure may be higher if those visitors also triggered retargeting." />
                 {' '}<SortIcon col="estimatedWaste" sortKey={sortKey} sortDir={sortDir} />
               </th>
             </tr>
@@ -396,17 +397,17 @@ export function LeakTable({ dateRange, refreshTrigger }: LeakTableProps) {
                   </span>
                 </td>
                 <td className="px-2.5 sm:px-3.5 py-2 whitespace-nowrap text-sm text-gray-700">
-                  {leak.googleCampaignId}
+                  {leak.campaignName || '—'}
                 </td>
                 <td className="px-2.5 sm:px-3.5 py-2 whitespace-nowrap text-right text-sm text-gray-900">
                   {leak.totalClicks}
                 </td>
                 <td className="px-2.5 sm:px-3.5 py-2 whitespace-nowrap text-right text-sm text-gray-900">
-                  {leak.bounceClicks}
+                  {leak.wastedClicks}
                 </td>
                 <td className="px-2.5 sm:px-3.5 py-2 whitespace-nowrap text-right text-sm">
-                  <span className={`font-semibold ${leak.bounceRate > 80 ? 'text-red-600' : leak.bounceRate > 50 ? 'text-orange-600' : 'text-gray-900'}`}>
-                    {leak.bounceRate.toFixed(1)}%
+                  <span className={`font-semibold ${leak.wastedRate > 80 ? 'text-red-600' : leak.wastedRate > 50 ? 'text-orange-600' : 'text-gray-900'}`}>
+                    {leak.wastedRate.toFixed(1)}%
                   </span>
                 </td>
                 <td className="px-2.5 sm:px-3.5 py-2 whitespace-nowrap text-right text-sm font-bold text-red-600">

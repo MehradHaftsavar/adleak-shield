@@ -390,7 +390,7 @@ export function DashboardContent() {
           <div className="flex items-start gap-2.5 bg-blue-50 border border-blue-200 border-b-0 rounded-t-lg p-4">
             <Info className="w-4 h-4 text-blue-600 flex-shrink-0 mt-0.5" />
             <p className="text-sm text-blue-900 leading-relaxed">
-              Keywords that are burning your budget. A &quot;leak&quot; is any keyword where visitors click your ad but leave immediately without engaging — you paid for that click and got nothing back.
+              Keywords that are burning your budget. A &quot;leak&quot; is any keyword where visitors click your ad and then do nothing — they either leave within seconds, or stay on the page without ever clicking, typing or scrolling. Either way you paid for that click and got nothing back.
             </p>
           </div>
 

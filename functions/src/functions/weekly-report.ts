@@ -44,21 +44,46 @@ async function getTenantWeeklyLeaks(tenantId: string): Promise<LeakRow[]> {
     const result = await new mssql.Request(tx)
       .input("startDate", mssql.DateTime, since)
       .input("endDate", mssql.DateTime, now)
+      // A click is wasted if the visitor left within seconds OR stayed and did
+      // nothing at all — same definition as the Leak Table in the dashboard
+      // (src/app/api/leaks/route.ts, via SESSION_HAS_INTERACTION). Separate
+      // deploy unit, so the rule is repeated here rather than imported; if one
+      // changes, change both, or this email will quote a different figure from
+      // the screen the customer opens straight afterwards.
+      //
+      // Waste is summed PER SESSION rather than multiplied at the end, so a
+      // keyword that ran at two different CPCs is priced correctly. The old
+      // shape had to carry the CPC in the GROUP BY to make the multiplication
+      // work, which silently split such a keyword across two rows.
       .query(`
+        WITH sess AS (
+          SELECT
+            s.keyword,
+            s.match_type,
+            COALESCE(s.session_cpc, c.avg_cpc) AS effective_cpc,
+            CASE WHEN s.is_bounce = 1 OR NOT (
+                   EXISTS (
+                     SELECT 1 FROM JourneyEvents je
+                      WHERE je.session_id = s.session_id
+                        AND je.event_type IN ('click', 'success_event', 'form_interact')
+                   )
+                   OR ISNULL(s.max_scroll_pct, 0) >= 25
+                 ) THEN 1 ELSE 0 END AS is_wasted
+          FROM Sessions s
+          INNER JOIN Campaigns c ON s.campaign_id = c.campaign_id
+          WHERE s.started_at >= @startDate
+            AND s.started_at <= @endDate
+            AND s.keyword IS NOT NULL
+            AND s.keyword <> 'adleak_test'
+        )
         SELECT TOP 5
-          s.keyword,
-          s.match_type,
-          SUM(CASE WHEN s.is_bounce = 1 THEN 1 ELSE 0 END) AS bounce_clicks,
-          SUM(CASE WHEN s.is_bounce = 1 THEN 1 ELSE 0 END)
-            * COALESCE(s.session_cpc, c.avg_cpc) AS estimated_waste
-        FROM Sessions s
-        INNER JOIN Campaigns c ON s.campaign_id = c.campaign_id
-        WHERE s.started_at >= @startDate
-          AND s.started_at <= @endDate
-          AND s.keyword IS NOT NULL
-          AND s.keyword <> 'adleak_test'
-        GROUP BY s.keyword, s.match_type, COALESCE(s.session_cpc, c.avg_cpc)
-        HAVING SUM(CASE WHEN s.is_bounce = 1 THEN 1 ELSE 0 END) > 0
+          keyword,
+          match_type,
+          SUM(is_wasted) AS bounce_clicks,
+          SUM(is_wasted * ISNULL(effective_cpc, 0)) AS estimated_waste
+        FROM sess
+        GROUP BY keyword, match_type
+        HAVING SUM(is_wasted) > 0
         ORDER BY estimated_waste DESC
       `);
 

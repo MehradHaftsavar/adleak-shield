@@ -23,7 +23,18 @@ import { withAdminDb } from "../lib/db.js";
 import { QueueMessageSchema } from "../lib/schemas.js";
 import { attachPendingEvent } from "./queue-worker.js";
 
-const GIVE_UP_AFTER_MS = 24 * 60 * 60 * 1000;
+// One hour, not twenty-four.
+//
+// An event can only ever attach to a session that was active within 30 minutes
+// of the event arriving, and that window is anchored to the event's own
+// receivedAt — so it does not widen as time passes. Once ~35 minutes have gone
+// by, no future retry can change the answer.
+//
+// Measured on 19 Aug: of 64 parked events that reached a terminal state, 2
+// attached and 62 never could. Each of those 62 was retried every 5 minutes for
+// a full day — roughly 288 pointless match queries apiece, ~19,000 a day
+// against SQL to reach a foregone conclusion.
+const GIVE_UP_AFTER_MS = 60 * 60 * 1000;
 const BATCH_SIZE = 200;
 
 // Above this many unresolved rows, something is systematically failing to
