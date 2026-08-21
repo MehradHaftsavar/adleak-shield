@@ -479,7 +479,11 @@
       // pagehide may never fire at all (the page is backgrounded, not
       // unloaded). Without this, everything since the last heartbeat — up to
       // 15 seconds — was simply lost.
-      sendHeartbeat(true);
+      // Only flush when there is something left to report. On a navigation,
+      // pagehide fires first and banks the page's time, so this would otherwise
+      // send a heartbeat carrying 0-4ms — a row that says nothing, one per page
+      // change. Six of the 41 events in one real session on 21 Aug were these.
+      if (unbankedDwellMs() >= 1000) sendHeartbeat(true);
       hiddenAt = Date.now();
       stopHeartbeat();
     } else {

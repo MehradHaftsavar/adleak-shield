@@ -1215,27 +1215,46 @@ async function processMessage(
           // session_start's pageview row already exists, so this would create
           // a duplicate "Visited <page>" entry with a misleading later
           // timestamp. Skip the insert if that row is already there.
-          if (env.eventType === "pageview") {
+          // bfpv is checked too, not just pageview. Both store as 'pageview',
+          // so a pair arriving within the window is a duplicate regardless of
+          // which beacon produced each half — and guarding only one of them let
+          // every such pair through. Seen live on 17, 18 and 21 Aug as the same
+          // page listed twice at the same second.
+          if (env.eventType === "pageview" || env.eventType === "bfpv") {
             const existingPageview = await new mssql.Request(tx)
               .input("sessionId", mssql.UniqueIdentifier, sessionId)
               .input("pagePath", mssql.NVarChar, env.payload.pagePath ?? null)
               .input("clientTs", mssql.BigInt, env.ts ?? null)
               .input("occurredAt", mssql.DateTime2, new Date(msg.receivedAt))
               .query(
-                // Scoped to the twin beacons, NOT to the whole session. The two
-                // are sent microseconds apart, so a few seconds is a generous
-                // window. Matching on path alone — as this did — also swallows
-                // every genuine RE-visit to a page: a visitor going
-                // home -> contact -> back -> contact had that second /contact
-                // silently discarded, leaving back-navigations in the timeline
-                // with nothing to have navigated back from.
+                // Scoped to the twin beacons, NOT to the whole session. Matching
+                // on path alone — as this once did — swallowed every genuine
+                // RE-visit to a page: a visitor going home -> contact -> back
+                // -> contact had that second /contact silently discarded,
+                // leaving back-navigations in the timeline with nothing to have
+                // navigated back from.
+                //
+                // WHY THE TWINS EXIST: the tracker re-reads the gclid from the
+                // URL on every page load, so returning to the landing page —
+                // whose URL still carries ?gclid= — fires session_start again
+                // alongside the ordinary pageview. Both store as 'pageview'.
+                // Harmless otherwise; ensureSession finds the existing session
+                // by gclid rather than making a second one.
+                //
+                // 100ms IS FROM MEASUREMENT, NOT TASTE. Every duplicate pair in
+                // production sat between 1ms and 36ms apart; the next-closest
+                // pair of same-path views was 1,077ms, and the rest were 3–4
+                // seconds. Those larger gaps are real returns — a back button
+                // or a refresh — and must survive. An earlier 3-second window
+                // would have eaten them, which is exactly the back-button
+                // behaviour this tracker exists to record.
                 `SELECT TOP 1 1 FROM JourneyEvents
                  WHERE session_id = @sessionId AND event_type = 'pageview'
                    AND page_path = @pagePath
                    AND ABS(
                          COALESCE(client_ts, DATEDIFF_BIG(MILLISECOND, '19700101', occurred_at))
                          - COALESCE(@clientTs, DATEDIFF_BIG(MILLISECOND, '19700101', @occurredAt))
-                       ) <= 3000`
+                       ) <= 100`
               );
             if (existingPageview.recordset.length > 0) break;
           }
