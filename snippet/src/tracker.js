@@ -159,6 +159,22 @@
         referrer: referrer,
         pagePath: window.location.pathname,
       });
+      // Restored from bfcache. The stretch since this page was hidden was spent
+      // on ANOTHER page, not away from the browser — so consume it here rather
+      // than leaving it for the visibilitychange that follows.
+      //
+      // Clearing didHide alone is not enough: pageshow fires BEFORE
+      // visibilitychange, so the guard would already be down by the time the
+      // visible handler ran, and a 90-second detour to another page was
+      // reported as "left the tab for 90 seconds".
+      //
+      // Banking it into totalHiddenMs matters just as much — drop it and that
+      // same stretch silently becomes time on this page.
+      if (hiddenAt > 0) {
+        totalHiddenMs += Date.now() - hiddenAt;
+        hiddenAt = 0;
+      }
+      didHide = false;
     }
   });
 
@@ -413,6 +429,17 @@
   // ===========================================================================
   var heartbeatInterval = null;
 
+  // ===========================================================================
+  // TAB SWITCHING
+  // didHide records that the page actually went away (navigated or unloaded),
+  // as opposed to merely being hidden. Without it, every internal link click
+  // would be reported as the visitor leaving and returning: the browser fires
+  // "hidden" on navigation too, and a back-button restore then fires "visible"
+  // with the whole time spent on the other page looking like an absence.
+  // ===========================================================================
+  var didHide = false;
+  var tabReturns = 0;
+
   // force=true sends even while the page is hidden. That is only ever used by
   // the visibilitychange handler below, which needs to flush the dwell clock at
   // the exact moment the page goes away — by then document.hidden is already
@@ -457,8 +484,20 @@
       stopHeartbeat();
     } else {
       if (hiddenAt > 0) {
-        totalHiddenMs += Date.now() - hiddenAt;
+        var awayMs = Date.now() - hiddenAt;
+        totalHiddenMs += awayMs;
         hiddenAt = 0;
+        // Report a real tab switch, not a navigation (didHide) and not a
+        // momentary focus change like clicking the address bar (3s floor).
+        // Capped so a compulsive tab-switcher cannot flood the journey.
+        if (!didHide && awayMs >= 3000 && tabReturns < 20) {
+          tabReturns++;
+          send("tab_return", {
+            referrer: referrer,
+            pagePath: window.location.pathname,
+            awayMs: awayMs,
+          });
+        }
       }
       startHeartbeat();
     }
@@ -472,6 +511,7 @@
   // Beacon API guarantees the request is sent even as the page is closing.
   // ===========================================================================
   window.addEventListener("pagehide", function () {
+    didHide = true;
     clearTimeout(earlyHeartbeat); // no point sending both
     var newDwell = unbankedDwellMs();
     reportedDwellMs += newDwell; // this stretch is now banked server-side

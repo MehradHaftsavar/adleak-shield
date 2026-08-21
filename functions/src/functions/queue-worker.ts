@@ -704,10 +704,18 @@ async function insertJourneyEvent(
     // of conversion — writing it onto the click row would put a stray dwell
     // label on that step. Behaviour is unchanged for every pre-existing type:
     // none of pageview/bfpv/click/form_interact ever sends dwellMs.
+    //
+    // tab_return reuses this column for a different quantity: how long the
+    // visitor was AWAY. No schema change needed, and the timeline reads it by
+    // event type rather than assuming every value here means dwell.
     .input(
       "dwellMs",
       mssql.Int,
-      dbEventType === "heartbeat" ? env.payload.dwellMs ?? null : null
+      dbEventType === "heartbeat"
+        ? env.payload.dwellMs ?? null
+        : dbEventType === "tab_return"
+        ? env.payload.awayMs ?? null
+        : null
     )
     .input("occurredAt", mssql.DateTime2, new Date(msg.receivedAt))
     // Ordering key — captured client-side (browser Date.now()) at the moment
@@ -1187,6 +1195,14 @@ async function processMessage(
             .input("sessionId", mssql.UniqueIdentifier, sessionId)
             .query(`UPDATE Sessions SET is_bounce = 0 WHERE session_id = @sessionId AND is_bounce = 1`);
           break;
+        // tab_return sits here on purpose. It is recorded as a journey step and
+        // nothing more: it never reaches updateSessionDwell below (that branch
+        // names heartbeat and success_event explicitly), and it is absent from
+        // the page-start list that drives bankPreviousPage — a tab switch does
+        // not begin a new page. It is also deliberately NOT one of the event
+        // types that count as interaction for is_bounce or the outcome badge:
+        // switching away from a page is not engaging with it.
+        case "tab_return":
         case "pageview":
         case "bfpv":
         case "click":

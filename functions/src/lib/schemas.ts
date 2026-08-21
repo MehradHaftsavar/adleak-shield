@@ -25,6 +25,13 @@ const EVENT_TYPES = [
   // the journey would otherwise show a silent gap when a visitor uses the
   // back button to return to an earlier page in the same session.
   "bfpv",
+  // Fired when a visitor comes BACK to a tab they had switched away from,
+  // carrying how long they were gone. Sent only on return, never on leaving:
+  // a timer set in a hidden tab is throttled or frozen by browsers, so a
+  // "send on hide" design loses the very events it exists to record. It also
+  // means an ordinary page navigation can never produce one — the page unloads
+  // and nothing comes back — so internal clicks are naturally excluded.
+  "tab_return",
 ] as const;
 
 // Session payload (sent on session_start only)
@@ -67,6 +74,10 @@ const EventPayloadSchema = z
     elementText: z.string().max(100).optional().nullable(),
     dwellMs: z.number().int().min(0).max(86400000).optional(), // max 24h
     scrollPct: z.number().int().min(0).max(100).optional(),
+    // tab_return only: how long the visitor was away. Deliberately separate
+    // from dwellMs — dwellMs feeds the session duration, and time spent in
+    // another tab must never be counted as time on the page.
+    awayMs: z.number().int().min(0).max(86400000).optional(),
     referrerHost: z.string().max(253).optional().nullable(),
   })
   .strict(); // Reject any extra fields

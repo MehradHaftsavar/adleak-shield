@@ -36,7 +36,7 @@ interface SessionSummary {
 
 interface JourneyEvent {
   eventId:        string;
-  eventType:      'pageview' | 'click' | 'success_event' | 'form_interact';
+  eventType:      'pageview' | 'click' | 'success_event' | 'form_interact' | 'tab_return';
   pagePath:       string | null;
   elementTag:     string | null;
   elementHref:    string | null;
@@ -308,9 +308,11 @@ function TimelineView({
           <div className="relative px-4 py-4">
             <div className="absolute left-[1.85rem] top-4 bottom-4 w-0.5 bg-gray-200" />
             <div className="space-y-3">
-              {events.map((event, idx) => (
-                <TimelineEventRow key={event.eventId} event={event} index={idx} domain={domain} />
-              ))}
+              {events.map((event, idx) =>
+                event.eventType === 'tab_return'
+                  ? <TabReturnRows key={event.eventId} event={event} />
+                  : <TimelineEventRow key={event.eventId} event={event} index={idx} domain={domain} />
+              )}
               <VisitEndedRow endedAt={session.endedAt} lastPageMs={session.lastPageMs} />
             </div>
           </div>
@@ -369,6 +371,56 @@ function VisitEndedRow({ endedAt, lastPageMs }: { endedAt?: string | null; lastP
         </div>
       </div>
     </div>
+  );
+}
+
+/**
+ * One stored event, two steps on screen.
+ *
+ * The tracker only reports the RETURN, carrying how long the visitor was away
+ * — a timer started in a hidden tab gets throttled or frozen by browsers, so
+ * anything sent at the moment of leaving is unreliable. Subtracting awayMs from
+ * the return timestamp reconstructs when they left, which is what makes the gap
+ * in the timeline explain itself instead of looking like missing data.
+ *
+ * awayMs travels in dwell_time_ms — the same column heartbeats use for a very
+ * different quantity, which is why this is keyed off the event type rather than
+ * read blindly. That time is NOT part of the session duration and never should
+ * be; the tracker stops its clock the moment a tab hides.
+ */
+function TabReturnRows({ event }: { event: JourneyEvent }) {
+  const awayMs = event.dwellTimeMs ?? 0;
+  const backAt = new Date(event.occurredAt);
+  const leftAt = new Date(backAt.getTime() - awayMs);
+
+  const dot = 'absolute left-0 mt-1 w-3.5 h-3.5 rounded-full border-2 border-white shrink-0 ring-2 bg-gray-300 ring-gray-100';
+  const box = 'flex-1 min-w-0 rounded-lg border border-dashed border-gray-200 bg-gray-50 p-3';
+
+  return (
+    <>
+      <div className="relative flex items-start gap-3 pl-6">
+        <div className={dot} />
+        <div className={box}>
+          <p className="text-sm font-medium text-gray-500">Left the tab</p>
+          <div className="flex items-center gap-3 mt-1.5">
+            <span className="text-xs text-gray-400 ml-auto">{formatTime(leftAt.toISOString())}</span>
+          </div>
+        </div>
+      </div>
+
+      <div className="relative flex items-start gap-3 pl-6">
+        <div className={dot} />
+        <div className={box}>
+          <p className="text-sm font-medium text-gray-500">Came back</p>
+          <div className="flex items-center gap-3 mt-1.5 flex-wrap">
+            <span className="text-xs text-gray-500">
+              away {formatDuration(awayMs)} — not counted
+            </span>
+            <span className="text-xs text-gray-400 ml-auto">{formatTime(event.occurredAt)}</span>
+          </div>
+        </div>
+      </div>
+    </>
   );
 }
 
