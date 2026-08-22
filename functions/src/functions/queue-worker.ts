@@ -244,6 +244,10 @@ async function matchSession(
       .input("gclid", mssql.NVarChar(100), gclid ?? referrerGclid ?? null)
       .input("refPath", mssql.NVarChar(500), referrerPath)
       .input("vhash", mssql.NVarChar(64), visitorHash ?? null)
+      // Already stripped of "www." and lowercased — the same treatment the
+      // tenant lookup gives it, so the two can never disagree about what a
+      // domain is.
+      .input("domainName", mssql.NVarChar(253), normaliseDomain(domain).substring(0, 253))
       .input("cutoff", mssql.DateTime2, cutoff)
       .input("maxStart", mssql.DateTime2, maxStart)
       .query(`
@@ -275,27 +279,60 @@ async function matchSession(
 
           UNION ALL
 
-          -- 2. The referrer names the page a session is currently sitting on.
-          --    Survives an IP change: it describes the page, not the network.
+          -- 2. Server-derived visitor hash — WHO, not where.
+          --
+          --    This used to rank BELOW the referrer-path match, which meant
+          --    location beat identity: an event could be filed under whichever
+          --    stranger happened to be sitting on the same page. With 96 of 107
+          --    sessions overlapping another visitor, that was the normal case
+          --    rather than an edge one.
+          --
+          --    Safe to promote because the two only ever disagree when one of
+          --    them is wrong, and the hash is the stronger claim: it pins IP and
+          --    User-Agent exactly, where the path pins nothing about the person.
+          --    The domain is baked into the hash, so this can never cross
+          --    domains either.
+          --
+          --    Most recent wins, so a second ad click from the same person
+          --    attaches to their newer session.
           SELECT session_id, tenant_id, campaign_id, started_at,
                  2 AS priority, last_event_at AS recency
-          FROM Sessions
-          WHERE @refPath IS NOT NULL
-            AND last_page_path = @refPath
-            AND last_event_at >= @cutoff
-            AND started_at <= @maxStart
-
-          UNION ALL
-
-          -- 3. Server-derived visitor hash. Most recent wins, so a second ad
-          --    click from the same person attaches to their newer session.
-          SELECT session_id, tenant_id, campaign_id, started_at,
-                 3 AS priority, last_event_at AS recency
           FROM Sessions
           WHERE @vhash IS NOT NULL
             AND session_fingerprint = @vhash
             AND last_event_at >= @cutoff
             AND started_at <= @maxStart
+
+          UNION ALL
+
+          -- 3. The referrer names the page a session is currently sitting on.
+          --    A fallback, and only a fallback: it identifies no one. Its job is
+          --    the visitor whose IP changed mid-visit (phone moving from WiFi to
+          --    mobile data), where the hash no longer matches and this is all
+          --    that is left. Demoting it costs that case nothing — branch 2
+          --    simply finds nothing and this fires exactly as before.
+          --
+          --    Scoped to the domain the event came from. Sessions carry no
+          --    domain of their own, so it resolves through Campaigns -> Domains.
+          --    Without it, a tenant with more than one website (plans allow 5
+          --    and 15) could have one site's traffic filed under a session on
+          --    another. The www handling mirrors lookupTenantByDomain exactly:
+          --    the incoming domain arrives already stripped of "www.", and
+          --    stored domains may carry it either way.
+          SELECT session_id, tenant_id, campaign_id, started_at,
+                 3 AS priority, last_event_at AS recency
+          FROM Sessions
+          WHERE @refPath IS NOT NULL
+            AND last_page_path = @refPath
+            AND last_event_at >= @cutoff
+            AND started_at <= @maxStart
+            AND campaign_id IN (
+              SELECT c.campaign_id
+              FROM Campaigns c
+              INNER JOIN Domains d ON d.domain_id = c.domain_id
+              WHERE LOWER(d.domain_name) = @domainName
+                 OR LOWER(d.domain_name) = 'www.' + @domainName
+            )
         ) candidates
         ORDER BY priority ASC, recency DESC;
       `);
