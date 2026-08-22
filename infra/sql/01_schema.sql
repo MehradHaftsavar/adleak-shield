@@ -1,8 +1,23 @@
 -- =============================================================================
+-- ⚠ HISTORICAL BASELINE — NOT THE CURRENT SCHEMA. DO NOT READ AS TRUTH.
+--
+-- This is the ORIGINAL Phase 1.1 schema. Production has moved a long way past
+-- it, and the gap is wide enough to mislead: this file declares four allowed
+-- values for JourneyEvents.event_type where production allows six, and it is
+-- missing five Sessions columns plus three whole tables the worker depends on.
+--
+-- To rebuild a working database, run this file and then EVERY migration in
+-- migrations/ in numeric order. 008 in particular captures the objects that
+-- were created by hand against production and never written down —
+-- CampaignLookupCache, HashSalts, PendingEvents, the indexes, the trigger and
+-- the stored procedure. Without it the worker cannot resolve a domain to a
+-- tenant and silently drops every event.
+--
+-- When checking what a column or constraint actually looks like, query
+-- sys.columns / sys.check_constraints against production. Not this file.
+-- =============================================================================
 -- AdLeak Shield — Azure SQL Database Schema
 -- Phase 1.1 — Ironclad Foundation
--- Run this file once against your Azure SQL database using Azure Query Editor
--- or SQL Server Management Studio (SSMS).
 -- =============================================================================
 -- IMPORTANT: Transparent Data Encryption (TDE) is ON by default on Azure SQL.
 -- You do NOT need to run any TDE command — Microsoft enables it automatically.

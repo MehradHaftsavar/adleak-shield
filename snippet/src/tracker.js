@@ -139,9 +139,18 @@
   var cameFromBack;
   try { cameFromBack = performance.getEntriesByType("navigation")[0].type === "back_forward"; } catch (e) {}
 
+  // gclid is sent whenever this page load IS an ad landing — i.e. the click ID
+  // is still in the URL. Empty on every other page, which is exactly the point:
+  // it tells the server "this page view belongs to click X", instead of leaving
+  // it to guess from the visitor's identity.
+  //
+  // Without it, a visitor clicking the ad a SECOND time produced a landing page
+  // recorded against their previous visit as well as the new one, because the
+  // only beacon carrying the new click ID was session_start.
   send(cameFromBack ? "bfpv" : "pageview", {
     referrer: referrer,
     pagePath: window.location.pathname,
+    gclid: gclid || undefined,
   });
 
   // ===========================================================================

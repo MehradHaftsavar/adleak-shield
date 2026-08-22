@@ -241,7 +241,17 @@ async function matchSession(
   return withAdminDb(async (request) => {
     const result = await request
       .input("tid", mssql.UniqueIdentifier, tenantId)
-      .input("gclid", mssql.NVarChar(100), gclid ?? referrerGclid ?? null)
+      // Two gclid inputs, deliberately kept apart.
+      //
+      // @ownGclid is one this beacon carried itself — meaning it IS an ad
+      // landing. @anyGclid additionally accepts one recovered from the
+      // referrer, which merely means the visitor arrived from a page that had
+      // one and says nothing about where THIS event belongs.
+      //
+      // The distinction is what stops a second ad click landing in the previous
+      // visit. See the @ownGclid guards on branches 2 and 3.
+      .input("ownGclid", mssql.NVarChar(100), gclid ?? null)
+      .input("anyGclid", mssql.NVarChar(100), gclid ?? referrerGclid ?? null)
       .input("refPath", mssql.NVarChar(500), referrerPath)
       .input("vhash", mssql.NVarChar(64), visitorHash ?? null)
       // Already stripped of "www." and lowercased — the same treatment the
@@ -273,7 +283,7 @@ async function matchSession(
           SELECT session_id, tenant_id, campaign_id, started_at,
                  1 AS priority, started_at AS recency
           FROM Sessions
-          WHERE @gclid IS NOT NULL AND gclid = @gclid
+          WHERE @anyGclid IS NOT NULL AND gclid = @anyGclid
             AND started_at <= @maxStart
             AND (last_event_at IS NULL OR last_event_at >= @cutoff)
 
@@ -298,7 +308,8 @@ async function matchSession(
           SELECT session_id, tenant_id, campaign_id, started_at,
                  2 AS priority, last_event_at AS recency
           FROM Sessions
-          WHERE @vhash IS NOT NULL
+          WHERE @ownGclid IS NULL
+            AND @vhash IS NOT NULL
             AND session_fingerprint = @vhash
             AND last_event_at >= @cutoff
             AND started_at <= @maxStart
@@ -322,7 +333,8 @@ async function matchSession(
           SELECT session_id, tenant_id, campaign_id, started_at,
                  3 AS priority, last_event_at AS recency
           FROM Sessions
-          WHERE @refPath IS NOT NULL
+          WHERE @ownGclid IS NULL
+            AND @refPath IS NOT NULL
             AND last_page_path = @refPath
             AND last_event_at >= @cutoff
             AND started_at <= @maxStart
@@ -375,7 +387,7 @@ async function probeGraceMiss(
     const relaxed = await matchSession(
       tenantId,
       env.domain,
-      env.payload.session?.gclid ?? null,
+      env.payload.gclid ?? env.payload.session?.gclid ?? null,
       env.payload.referrer,
       visitorHash,
       eventAt,
@@ -1100,7 +1112,7 @@ async function processMessage(
     let match = await matchSession(
       tenantId,
       env.domain,
-      env.payload.session?.gclid ?? null,
+      env.payload.gclid ?? env.payload.session?.gclid ?? null,
       env.payload.referrer,
       visitorHash,
       new Date(msg.receivedAt)
@@ -1114,7 +1126,7 @@ async function processMessage(
       match = await matchSession(
         tenantId,
         env.domain,
-        env.payload.session?.gclid ?? null,
+        env.payload.gclid ?? env.payload.session?.gclid ?? null,
         env.payload.referrer,
         visitorHash,
         new Date(msg.receivedAt)

@@ -68,6 +68,13 @@ const EventPayloadSchema = z
     // when the visitor's IP does — which is why a mid-visit network switch no
     // longer breaks a journey.
     referrer: z.string().max(500).optional().nullable(),
+    // Present only on an ad landing, where the tracker reads it from the URL.
+    // Distinct from session.gclid, which rides on session_start alone: this one
+    // lets the ORDINARY pageview beacon say "I am the landing page of click X".
+    // Without it that beacon carries no click ID at all, so the matcher falls
+    // back to the visitor hash and can file a second ad click's landing page
+    // under the visitor's PREVIOUS visit.
+    gclid: z.string().max(100).optional().nullable(),
     pagePath: z.string().max(500).optional().nullable(),
     elementTag: z.string().max(20).optional().nullable(),
     elementHref: z.string().max(500).optional().nullable(),
