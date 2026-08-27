@@ -145,16 +145,35 @@ export function DashboardContent() {
     if (searchParams.get('payment') === 'success') {
       // Strip the query param cleanly without a page reload
       router.replace('/dashboard');
-      // Load fresh status from DB, then push the new subscription status into the
-      // JWT so the navbar Subscribe/Manage buttons update without a sign-out.
-      loadStatus().then(async (freshStatus) => {
+
+      (async () => {
+        // Reconcile against Stripe BEFORE reading the DB.
+        //
+        // This used to call loadStatus() alone, which only reads our own
+        // database — so if the webhook had not landed the row was still stale
+        // and the dashboard faithfully displayed the stale value. Upgrades and
+        // portal returns already reconciled via sync-plan; the first purchase,
+        // the one that matters most, had no such net.
+        //
+        // sync-plan reads the live subscription from Stripe and is safe here:
+        // when no active subscription exists it only corrects a DB that wrongly
+        // says 'active', and never touches a trialing tenant. The short delay
+        // gives the webhook the chance to win the race first.
+        try {
+          await new Promise(r => setTimeout(r, 2000));
+          await fetch('/api/stripe/sync-plan', { method: 'POST' });
+        } catch { /* non-fatal — loadStatus below still runs */ }
+
+        // Load fresh status from DB, then push the new subscription status into
+        // the JWT so the navbar Subscribe/Manage buttons update without a sign-out.
+        const freshStatus = await loadStatus();
         if (freshStatus?.subscriptionStatus) {
           await updateSession({
             subscriptionStatus: freshStatus.subscriptionStatus,
             ...(freshStatus.planType ? { planType: freshStatus.planType } : {}),
           });
         }
-      });
+      })();
     }
   }, [searchParams, router]);
 
