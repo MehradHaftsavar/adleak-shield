@@ -16,7 +16,9 @@ import {
   ChevronsUpDown,
   Columns,
   Download,
+  Info,
 } from 'lucide-react';
+import type { LucideIcon } from 'lucide-react';
 
 type ColKey = 'matchType' | 'date' | 'campaignName' | 'campaign' | 'device' | 'location' | 'duration' | 'adGroup' | 'adId';
 
@@ -155,50 +157,107 @@ function DeviceIcon({ device }: { device: string }) {
   return <Monitor className="w-3.5 h-3.5" />;
 }
 
+type OutcomeDef = {
+  label: string;
+  className: string;
+  Icon: LucideIcon | null;
+  title?: string;
+  meaning: string;
+};
+
 /**
- * Must stay in step with the badge in JourneyTimeline.tsx — a session showing
- * one label in the table and another in its journey is the kind of
- * inconsistency that erodes trust in the whole dashboard.
+ * The four outcomes, defined once.
  *
- * "No interaction" separates visitors who stayed but did nothing from those who
- * actually engaged. Bounce keeps its old meaning (gone almost immediately),
- * because is_bounce also drives the leaks report and the weekly email.
+ * The badge in this table, the badge in JourneyTimeline and the legend above
+ * the table all render from this list, so a colour or a wording cannot drift
+ * between them. Three hand-kept copies is exactly how the legend came to
+ * describe only three outcomes after a fourth was added.
+ *
+ * Ordered worst to best — the same order the Outcome column sorts in.
+ */
+export const OUTCOMES: OutcomeDef[] = [
+  {
+    label: 'Bounce',
+    className: 'bg-red-100 text-red-800',
+    Icon: AlertCircle,
+    meaning: 'Left within seconds.',
+  },
+  {
+    label: 'No interaction',
+    className: 'bg-amber-100 text-amber-800',
+    Icon: AlertCircle,
+    title: 'Stayed on the page but never clicked, typed or scrolled',
+    meaning: 'Stayed, but never scrolled, clicked or typed.',
+  },
+  {
+    label: 'Engaged',
+    className: 'bg-blue-100 text-blue-800',
+    Icon: null,
+    meaning: 'Stayed and did something — scrolled, clicked, or started filling a form.',
+  },
+  {
+    label: 'Converted',
+    className: 'bg-green-100 text-green-800',
+    Icon: CheckCircle,
+    meaning: 'Called, messaged, or submitted a form.',
+  },
+];
+
+const [BOUNCE, NO_INTERACTION, ENGAGED, CONVERTED] = OUTCOMES;
+
+export function OutcomeChip({ outcome }: { outcome: OutcomeDef }) {
+  const { label, className, Icon, title } = outcome;
+  return (
+    <span
+      className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${className}`}
+      title={title}
+    >
+      {Icon && <Icon className="w-3 h-3" />}
+      {label}
+    </span>
+  );
+}
+
+/**
+ * Sits directly above the table, joined to it (no bottom border, square
+ * bottom corners). Neutral ground rather than the old blue: an Engaged badge
+ * is bg-blue-100, which all but disappears on bg-blue-50.
+ */
+export function OutcomeLegend() {
+  return (
+    <div className="bg-slate-50 border border-slate-200 border-b-0 rounded-t-lg p-4">
+      <div className="flex items-start gap-2.5">
+        <Info className="w-4 h-4 text-slate-500 flex-shrink-0 mt-0.5" />
+        <p className="text-sm text-slate-700 leading-relaxed">
+          Every visit from your Google Ads campaigns, with what each visitor actually did.
+        </p>
+      </div>
+      <dl className="mt-3 grid gap-3 sm:grid-cols-2 sm:pl-[26px]">
+        {OUTCOMES.map((o) => (
+          <div key={o.label}>
+            <dt>
+              <OutcomeChip outcome={o} />
+            </dt>
+            <dd className="mt-1 text-sm text-slate-600 leading-snug">{o.meaning}</dd>
+          </div>
+        ))}
+      </dl>
+    </div>
+  );
+}
+
+/**
+ * Precedence: Converted beats Bounce beats No interaction. Must stay in step
+ * with the badge in JourneyTimeline.tsx — a session showing one label in the
+ * table and another in its journey erodes trust in the whole dashboard.
  */
 function OutcomeBadge({
   isBounce, hasSuccessEvent, hasInteraction,
 }: { isBounce: boolean; hasSuccessEvent: boolean; hasInteraction: boolean }) {
-  if (hasSuccessEvent) {
-    return (
-      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
-        <CheckCircle className="w-3 h-3" />
-        Converted
-      </span>
-    );
-  }
-  if (isBounce) {
-    return (
-      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">
-        <AlertCircle className="w-3 h-3" />
-        Bounce
-      </span>
-    );
-  }
-  if (!hasInteraction) {
-    return (
-      <span
-        className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-800"
-        title="Stayed on the page but never clicked, typed or scrolled"
-      >
-        <AlertCircle className="w-3 h-3" />
-        No interaction
-      </span>
-    );
-  }
-  return (
-    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
-      Engaged
-    </span>
-  );
+  if (hasSuccessEvent) return <OutcomeChip outcome={CONVERTED} />;
+  if (isBounce)        return <OutcomeChip outcome={BOUNCE} />;
+  if (!hasInteraction) return <OutcomeChip outcome={NO_INTERACTION} />;
+  return <OutcomeChip outcome={ENGAGED} />;
 }
 
 export function SessionsTable({ campaigns, dateRange, refreshTrigger }: SessionsTableProps) {
