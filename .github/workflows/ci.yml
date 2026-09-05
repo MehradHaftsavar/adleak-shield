@@ -1,0 +1,61 @@
+name: CI
+
+on:
+  push:
+  workflow_dispatch:
+
+jobs:
+  web:
+    name: Web app type-check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+
+      - run: npm ci
+
+      - run: npm run type-check
+
+  functions:
+    name: Functions build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+          cache-dependency-path: functions/package-lock.json
+
+      - run: npm ci
+        working-directory: functions
+
+      - run: npm run build
+        working-directory: functions
+
+  tracker:
+    name: Trackers match source and fit the budget
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+
+      - run: npm ci
+
+      - name: Rebuild both trackers from source
+        run: node snippet/scripts/build.mjs
+        env:
+          TRACKER_INGEST_URL: https://adleak-functions-ajbraxdhf4hwgudf.westeurope-01.azurewebsites.net/api/ingest
+          TRACKER_INGEST_URL_STAGING: https://adleak-functions-staging-auhmeda0bce7fnak.westeurope-01.azurewebsites.net/api/ingest
+
+      - name: Fail if any committed tracker differs from source
+        run: git diff --exit-code -- public/tracker.js public/tracker-staging.js public/tracker.integrity.txt
