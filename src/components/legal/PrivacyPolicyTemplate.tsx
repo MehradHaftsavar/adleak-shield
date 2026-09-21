@@ -21,6 +21,15 @@
 //
 // EVERY CLAIM HERE IS VERIFIED AGAINST THE CODE:
 //   no cookies / no device storage  → snippet/src/tracker.js (no storage APIs)
+//   script observes interactions    → tracker.js click/scroll/visibility
+//                                     handlers, detectDevice (screen size)
+//
+// That second line matters. An earlier version said the script "does not read
+// anything" from the device. It does: viewport width, scroll position, tab
+// visibility and clicked elements, all sent to our server. The ICO treats a
+// script sending device-generated information to an outside party as access
+// under PECR regulation 6, so claiming otherwise in a customer's own privacy
+// policy would have put an inaccurate statement in front of their visitors.
 //   IP + user-agent, one-way hash   → functions/src/lib/ip-mask.ts hashVisitor
 //   salt rotates, deleted at 48h    → functions/src/functions/janitor.ts
 //   IP shortened, never stored      → ip-mask.ts maskIp, called in ingest.ts
@@ -40,7 +49,7 @@ export const PRIVACY_POLICY_TEMPLATE = `Advertising performance measurement
 
 We use AdLeak Shield to measure what happens after someone clicks one of our Google Ads. It records which advert and search term brought you to our website, the pages you viewed, how long you stayed, how far you scrolled, the links and buttons you clicked, and whether you contacted us.
 
-AdLeak Shield does not use cookies. It does not store anything on your device and does not read anything from it.
+AdLeak Shield does not use cookies and does not store anything on your device. To take these measurements, a script on our pages observes how you interact with them while you are here, including whether you are using a mobile, tablet or desktop-sized screen.
 
 To tell one visit apart from another, it uses your IP address and your browser's user-agent string — information your browser sends with every request it makes. These are combined into a one-way code using a secret that changes every day and is deleted after 48 hours, after which the code can no longer be linked back to you. Your full IP address is never stored: it is shortened first (for example 82.12.34.xxx), and used once to work out your approximate town and country.
 

@@ -40,9 +40,10 @@ discarded before the body is read or the IP extracted.
 
 ## Question 1 — Is regulation 6 engaged at all?
 
-Given nothing is stored on or read from the device other than
-`window.innerWidth`, and the identifier is derived server-side from information
-the browser transmits anyway:
+Given nothing is stored on the device, the identifier is derived server-side
+from information the browser transmits anyway, and the script's only reads are
+page-interaction state while the page is open — viewport width bucketed to three
+values, scroll position, tab visibility and the elements the visitor clicks:
 
 **Does PECR regulation 6 apply to this design?**
 
@@ -58,18 +59,17 @@ analytics question as being about "how, not who". This single value is squarely
 *If the answer is no, the remaining questions are moot but still worth asking as
 a fallback.*
 
-## Question 2 — Does the statistical-purposes exception cover us?
+## Question 2 — Does the statistical-purposes exception cover us? — ANSWERED, no need to ask
 
-If regulation 6 **is** engaged, we would rely on the statistical-purposes
-exception introduced by the Data (Use and Access) Act 2025.
+**No.** The ICO's guidance on the exceptions states that the statistical-purposes
+exception does not apply to purposes related to online advertising, and lists
+recording whether users clicked an advert, in order to measure the advert's
+performance, as outside it. That is AdLeak Shield's purpose, so the exception is
+not available.
 
-**Does that exception cover a third-party analytics provider in our position** —
-acting solely on the site operator's instructions, using the data only to
-provide measurement to that operator, never for our own purposes, never combined
-across customers, never sold or shared?
-
-And: **is honouring Global Privacy Control sufficient as the "simple means of
-objecting, free of charge"**, or is a visible on-site control also expected?
+Consequence: if the answer to Question 1 is "yes, regulation 6 is engaged",
+there is no exception to fall back on and a UK site needs visitors' consent
+before loading the script.
 
 ## Question 3 — Is a `/24`-masked IP personal data?
 
@@ -99,7 +99,7 @@ those days, or non-personal data.
 | Q | Date asked | Who answered | Answer |
 |---|---|---|---|
 | 1 | | | |
-| 2 | | | |
+| 2 | n/a | ICO published guidance | No — exception excludes advertising purposes |
 | 3 | | | |
 | 4 | | | |
 

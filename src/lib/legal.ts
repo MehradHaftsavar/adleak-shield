@@ -26,7 +26,7 @@
 export const TERMS_VERSION = '2026-09-18';
 
 /** Version of the privacy wording we give customers for their own policy. */
-export const PRIVACY_TEMPLATE_VERSION = '2026-09-18';
+export const PRIVACY_TEMPLATE_VERSION = '2026-09-21';
 
 /**
  * Human-readable form of a version stamp, for display in the UI.

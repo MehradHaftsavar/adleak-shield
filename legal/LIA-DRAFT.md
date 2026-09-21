@@ -13,8 +13,18 @@ processing and are best placed to document it, and (b) we give customers the
 privacy wording, so we should be able to show our own reasoning. Provide it to
 customers as a starting point, not as their assessment.
 
-**Date:** 18 September 2026
+**Date:** 18 September 2026 (revised 21 September 2026)
 **Processing assessed:** measurement of visitor behaviour after a Google Ads click
+
+> **PECR scope note — read first.** This assessment covers the UK GDPR lawful
+> basis only. It does not settle PECR. The ICO treats a script sending
+> device-generated information (clicks, scroll position, screen size) to an
+> outside party as access under PECR regulation 6, and the statistical-purposes
+> exception excludes advertising measurement. Where a site obtains PECR consent
+> before loading the script, the ICO expects **consent** to be the UK GDPR basis
+> for the processing that follows, not legitimate interests. This LIA therefore
+> applies where PECR consent is not required — for example visitors outside the
+> UK and EU.
 
 ---
 
@@ -37,10 +47,14 @@ of their own advertising spend.
   misleading adverts are shown for searches they do not match.
 - Us — commercially, as the provider.
 
-**Is it a recognised interest?** Yes. Audience measurement and service
-improvement are expressly recognised in recital 47 territory and, since
-5 February 2026, in the PECR statistical-purposes exception introduced by the
-Data (Use and Access) Act 2025.
+**Is it a recognised interest?** Yes — direct marketing and the measurement of
+its effectiveness are recognised as capable of being legitimate interests
+(UK GDPR recital 47).
+
+Note what this does **not** rely on: the PECR statistical-purposes exception
+introduced by the Data (Use and Access) Act 2025. The ICO's guidance says that
+exception does not apply to advertising purposes at all, so it is not available
+for this processing.
 
 **How important is it?** Moderate but real. For a business spending a few hundred
 pounds a month on ads, wasted spend is material.
@@ -113,7 +127,8 @@ the absence of any full IP or user-agent to correlate against.
 
 ### Safeguards
 
-1. No cookies; nothing stored on or read from the device.
+1. No cookies; nothing stored on the device. (The script does read interaction
+   information while the page is open — see the PECR scope note above.)
 2. Full IP never persisted.
 3. Salt rotation and 48-hour deletion, making identifiers permanently unlinkable.
 4. 90-day deletion of all visitor records.
@@ -139,7 +154,8 @@ display it during setup and permanently at `/setup-guide#privacy-wording`.
 
 ## Outcome
 
-**Legitimate interests is an appropriate lawful basis**, on the basis that the
+**Subject to the PECR scope note at the top** — i.e. where PECR consent is not
+required — **legitimate interests is an appropriate lawful basis**, on the basis that the
 processing is first-party measurement, the data is minimised to the point of
 becoming unlinkable within 48 hours, nothing is stored on the visitor's device,
 and an effective opt-out is honoured before processing.

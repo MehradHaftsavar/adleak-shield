@@ -14,10 +14,19 @@
 //   6. Uses the Beacon API so data sends even if the user closes the tab
 //
 // WHAT IT DELIBERATELY DOES NOT DO:
-// It stores nothing on the visitor's device and reads nothing from it — no
-// cookies, no sessionStorage, no localStorage, no device fingerprinting. The
-// visitor identifier is derived on the server from the IP and User-Agent the
-// browser already sends with every request.
+// It stores nothing on the visitor's device — no cookies, no sessionStorage,
+// no localStorage — and does no device fingerprinting. The visitor identifier
+// is derived on the server from the IP and User-Agent the browser already
+// sends with every request.
+//
+// WHAT IT DOES READ — stated plainly, because an earlier version of this
+// comment said "reads nothing" and that was wrong: while the page is open it
+// reads the viewport width (bucketed to mobile/tablet/desktop), scroll
+// position, tab visibility and the elements the visitor clicks, and sends
+// them to the ingest endpoint. The ICO's April 2026 guidance treats a script
+// sending device-generated information to an outside party as "access" under
+// PECR regulation 6 — and its statistical-purposes exception expressly
+// excludes advertising measurement, which is this script's whole purpose.
 //
 // Those are statements of fact about this file, deliberately kept separate
 // from any conclusion about what a given site operator's legal obligations
@@ -31,7 +40,8 @@
 // CRITICAL CONSTRAINTS:
 // - Must be under 6KB after minification (PRD requirement, Core Web Vitals)
 // - Vanilla JS only — no jQuery, no React, no dependencies
-// - Nothing may ever be written to or read from the visitor's device
+// - Nothing may ever be written to the visitor's device (no cookies, no web
+//   storage); nothing may be read beyond what measuring the ad visit needs
 // - Fails silently if anything goes wrong — never break the customer's site
 // =============================================================================
 
@@ -93,8 +103,8 @@
   // gate would also mean a bot that never clicks "accept" is never recorded.
   //
   // The identifier is now derived on the server from the IP and User-Agent
-  // that the browser already sends with every request, so nothing is stored
-  // on or read from the device.
+  // that the browser already sends with every request, so the identifier
+  // needs nothing stored on, or read from, the device.
   //
   // The consequence here: this script has no memory. It cannot tell whether
   // this visit came from an ad, so it reports every page and lets the server

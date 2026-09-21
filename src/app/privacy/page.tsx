@@ -74,8 +74,10 @@ export default function PrivacyPage() {
                 2.3.1 How a Visitor Objects (Global Privacy Control)
               </h3>
               <p>
-                The snippet sets no cookies and neither stores nor reads anything on a visitor&apos;s device.
-                Visits are told apart using a one-way code derived from the visitor&apos;s IP address and
+                The snippet sets no cookies and stores nothing on a visitor&apos;s device. While a page is open
+                it records how the visitor interacts with it — pages viewed, links and buttons clicked, scroll
+                depth, time on page, and whether the screen is mobile, tablet or desktop sized — and sends this
+                to us to measure advertising performance. Visits are told apart using a one-way code derived from the visitor&apos;s IP address and
                 browser user-agent — information the browser sends with every request — combined with a
                 secret that changes daily and is deleted after 48 hours, after which the code can no longer
                 be linked to anyone. Full IP addresses are never stored.

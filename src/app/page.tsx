@@ -24,6 +24,14 @@ function Hero() {
   return (
     <section className="pt-28 pb-12 px-6 bg-gradient-to-b from-slate-50 to-white">
       <div className="max-w-4xl mx-auto text-center">
+        {/* Portfolio notice. The product is no longer taking customers, but the
+            site stays up so it can be seen. Placed inside the hero rather than
+            above the Navbar because the Navbar is fixed to the top of the
+            viewport and would sit on top of anything rendered before it. */}
+        <div className="max-w-2xl mx-auto mb-8 bg-blue-50 border border-blue-200 text-blue-900 text-sm rounded-lg px-4 py-3">
+          <strong>Portfolio project.</strong> AdLeak Shield isn&apos;t currently accepting new
+          customers.
+        </div>
         <span className="inline-block text-xs font-semibold uppercase tracking-widest text-blue-600 bg-blue-50 px-3 py-1 rounded-full mb-6">
           For small businesses
         </span>
@@ -51,7 +59,7 @@ function Hero() {
 
         <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
           <a
-            href="#pricing"
+            href="/"
             className="w-full sm:w-auto px-8 py-3.5 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg transition-colors text-base text-center"
           >
             Start your free 7-day trial
@@ -144,7 +152,7 @@ const FEATURES = [
   {
     icon: '🔒',
     title: 'Privacy-First by Design',
-    desc: 'Zero cookies, and nothing stored on or read from your visitors’ devices. Visits are told apart by a server-side hash that becomes permanently unlinkable after 48 hours. Visitors who send a Global Privacy Control signal are never recorded.',
+    desc: 'Zero cookies, and nothing stored on your visitors’ devices. Visits are told apart by a server-side hash that becomes permanently unlinkable after 48 hours, and full IP addresses are never stored. Visitors who send a Global Privacy Control signal are never recorded.',
   },
   {
     icon: '🛡️',
@@ -312,7 +320,7 @@ function Pricing() {
               </ul>
 
               <Link
-                href={`/auth/signup?plan=${plan.slug}`}
+                href="/"
                 className={`block w-full text-center px-6 py-3 font-semibold rounded-lg transition-colors text-sm ${
                   plan.highlight
                     ? 'bg-white text-blue-600 hover:bg-blue-50'
@@ -363,7 +371,7 @@ const FAQS = [
   },
   {
     q: "Is AdLeak Shield GDPR compliant?",
-    a: "Yes, and by design. The snippet stores nothing on your visitors' devices and reads nothing from them — no cookies, no local storage, no device fingerprinting. Visits are told apart using a one-way hash derived from a daily-rotating secret plus information the browser already sends with every request. That secret is deleted after 48 hours, so the hash can no longer be linked to any visit. Full IP addresses are never stored, and visitors whose browsers send a Global Privacy Control signal are not recorded at all. We give you ready-made wording for your privacy policy during setup. What a particular website needs beyond that depends on your business, so it's worth checking with your own adviser. AdLeak Shield is registered with the UK Information Commissioner's Office (ICO) under registration number C1953337.",
+    a: "It's built privacy-first. The snippet sets no cookies and stores nothing on your visitors' devices — no local storage, no device fingerprinting. While a visitor is on your site it records how they use your pages (pages viewed, clicks, scrolling, time spent and screen size) so you can see which ads lead to enquiries. Visits are told apart using a one-way hash derived from a daily-rotating secret plus information the browser already sends with every request. That secret is deleted after 48 hours, so the hash can no longer be linked to any visit. Full IP addresses are never stored, and visitors whose browsers send a Global Privacy Control signal are not recorded at all. We give you ready-made wording for your privacy policy during setup. Whether your website needs visitor consent for this depends on your business and where your visitors are, so check with your own adviser — if you already use a consent banner, you can set it to load AdLeak Shield only after visitors accept. AdLeak Shield is registered with the UK Information Commissioner's Office (ICO) under registration number C1953337.",
   },
   {
     q: "How much does it cost and is there a free trial?",
@@ -424,7 +432,7 @@ function Footer() {
         <div className="flex items-center gap-4 text-sm">
           <Link href="/auth/login" className="hover:text-white transition-colors">Log in</Link>
           <Link
-            href="/auth/signup"
+            href="/"
             className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-1.5 rounded-lg transition-colors font-medium"
           >
             Get started

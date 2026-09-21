@@ -166,9 +166,11 @@ export default function CookiesPage() {
               <h2 className="text-lg font-semibold text-gray-900 mb-3">5. Note for AdLeak Shield Users — Your Own Website</h2>
               <p>
                 The AdLeak Shield tracking snippet you install on your website <strong>stores nothing on your
-                visitors' devices and reads nothing from them</strong> — no cookies, no sessionStorage, no
-                localStorage, and no device fingerprinting. It reads the URL parameters Google adds to ad
-                clicks (keyword, campaign ID) and records which pages were viewed and how they were used.
+                visitors' devices</strong> — no cookies, no sessionStorage, no localStorage, and no device
+                fingerprinting. It reads the URL parameters Google adds to ad clicks (keyword, campaign ID) and,
+                while the page is open, records how it is used — pages viewed, links and buttons clicked,
+                scroll depth, time on page, and whether the screen is mobile, tablet or desktop sized — and
+                sends this to us to measure your advertising.
               </p>
               <p className="mt-2">
                 To tell one visit apart from another, we derive a one-way hash from a rotating daily salt, the

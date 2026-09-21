@@ -53,7 +53,16 @@ or share it for anyone else's purposes.
 | On-site behaviour | Page paths (query strings excluded), link and button targets (query strings excluded), text of clicked elements, form field *labels* (never values typed), scroll depth, dwell time. |
 
 **No special category data** is knowingly processed. **No cookies are set**, and
-nothing is stored on or read from a visitor's device.
+nothing is stored on a visitor's device. While a page is open, the script does
+read interaction information — viewport size category, scroll position, tab
+visibility and clicked elements — and sends it to us.
+
+**Consent under PECR.** The ICO treats a script sending device-generated
+information to an outside party as access under PECR regulation 6, and its
+statistical-purposes exception does not apply to advertising measurement.
+Whether you must obtain visitors' consent before the script loads is therefore
+a decision for you as controller; where you use a consent tool, you may
+configure it to load the script only after consent.
 
 ## 4. Our obligations (UK GDPR Article 28(3))
 

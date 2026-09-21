@@ -80,8 +80,13 @@ export async function ingestHandler(
   // "Sec-GPC: 1" is the visitor telling their browser, once, that they object
   // to their data being collected. It rides on every request they make and is
   // the recognised universal opt-out signal in twelve US states; in the UK it
-  // serves as the "simple means of objecting" that the PECR statistical-
-  // purposes exception requires, and as an Article 21 objection under UK GDPR.
+  // acts as an objection under UK GDPR Article 21.
+  //
+  // What it is NOT: a substitute for PECR consent. An earlier version of this
+  // comment said it satisfied the PECR statistical-purposes exception. It does
+  // not — the ICO's guidance says that exception does not apply to advertising
+  // measurement at all. Where PECR requires consent, the customer's own
+  // consent banner is what governs whether the tracker loads.
   //
   // Checked here, before the body is even read, so an objecting visitor's
   // payload is never parsed, their IP never extracted and nothing about them
