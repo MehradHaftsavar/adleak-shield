@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useSession } from 'next-auth/react';
 import { Code, Copy, CheckCircle, ExternalLink, AlertCircle, Loader2, ChevronDown, ChevronUp } from 'lucide-react';
+import { PrivacyPolicyTemplate } from '@/components/legal/PrivacyPolicyTemplate';
 
 function Accordion({ title, children, defaultOpen = false }: { title: React.ReactNode; children: React.ReactNode; defaultOpen?: boolean }) {
   const [open, setOpen] = useState(defaultOpen);
@@ -386,6 +387,16 @@ export function SnippetStep({ domain, onComplete, onBack }: SnippetStepProps) {
                 </div>
               </Accordion>
             </div>
+          </div>
+
+          {/* Privacy wording — deliberately NOT a numbered step.
+              The numbered steps are what makes tracking work; this is advisory,
+              and gating onboarding on it would mean asserting what the
+              customer's legal obligations are. Placed before "Test Your Setup"
+              so it is seen while they still have their site open, and repeated
+              permanently on /setup-guide because nobody remembers onboarding. */}
+          <div className="border border-gray-200 rounded-lg p-6">
+            <PrivacyPolicyTemplate />
           </div>
 
           {/* Test My Setup Button */}

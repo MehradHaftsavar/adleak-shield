@@ -65,17 +65,21 @@ export function maskIp(ip: string | null | undefined): string {
  *
  * WHY THIS REPLACED THE CLIENT-SIDE FINGERPRINT:
  * The tracker used to build an identifier in the browser and keep it in
- * sessionStorage. Both of those touch the visitor's device, which puts us
- * inside ePrivacy Article 5(3) and means a consent banner is required.
+ * sessionStorage. Both of those touch the visitor's device — the thing PECR
+ * regulation 6 turns on.
  *
  * Computing it here instead uses only information the browser already sends
- * with every HTTP request — the IP (assigned by their ISP) and the User-Agent
- * (sent by the browser). Neither is read from, nor stored on, the device, so
- * Article 5(3) never applies. This is the same approach Plausible and Fathom
- * use to operate without a consent banner.
+ * with every HTTP request: the IP (assigned by their ISP) and the User-Agent.
+ * Neither is read from, nor stored on, the device. That is the same approach
+ * Plausible and Fathom take. Note this is a statement about what the code
+ * does, not a conclusion about any particular site operator's obligations —
+ * see src/components/legal/PrivacyPolicyTemplate.tsx for the line we hold.
  *
  * The salt rotates daily and is deleted after 48h, so yesterday's hashes can
  * no longer be linked to anything — by us or anyone else.
+ *
+ * Visitors who object never reach this function: ingest.ts drops any request
+ * carrying "Sec-GPC: 1" before the body is read or the IP extracted.
  */
 export function hashVisitor(
   salt: string,

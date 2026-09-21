@@ -42,7 +42,7 @@ function Hero() {
             🍪 Zero cookies
           </span>
           <span className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-green-50 border border-green-200 text-green-800 text-xs font-semibold rounded-full">
-            ✓ No consent banner required
+            ✓ Cookieless by design
           </span>
           <span className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-green-50 border border-green-200 text-green-800 text-xs font-semibold rounded-full">
             🔒 GDPR compliant by design
@@ -144,7 +144,7 @@ const FEATURES = [
   {
     icon: '🔒',
     title: 'Privacy-First by Design',
-    desc: 'Zero cookies, and nothing stored on or read from your visitors’ devices. Visits are told apart by a server-side hash that becomes permanently unlinkable after 48 hours. GDPR compliant — no consent banner needed for tracking.',
+    desc: 'Zero cookies, and nothing stored on or read from your visitors’ devices. Visits are told apart by a server-side hash that becomes permanently unlinkable after 48 hours. Visitors who send a Global Privacy Control signal are never recorded.',
   },
   {
     icon: '🛡️',
@@ -205,7 +205,7 @@ const PLANS = [
       'Visitor Journey Timeline',
       'Monday morning email report',
       'CSV data export',
-      'Cookieless tracking — no consent banner needed',
+      'Cookieless tracking — nothing stored on visitors’ devices',
       'GDPR compliant by design',
       'Unregistered traffic alerts',
       'Cancel anytime',
@@ -226,7 +226,7 @@ const PLANS = [
       'Visitor Journey Timeline',
       'Monday morning email report',
       'CSV data export',
-      'Cookieless tracking — no consent banner needed',
+      'Cookieless tracking — nothing stored on visitors’ devices',
       'GDPR compliant by design',
       'Cancel anytime',
     ],
@@ -246,7 +246,7 @@ const PLANS = [
       'Visitor Journey Timeline',
       'Monday morning email report',
       'CSV data export',
-      'Cookieless tracking — no consent banner needed',
+      'Cookieless tracking — nothing stored on visitors’ devices',
       'GDPR compliant by design',
       'Cancel anytime',
     ],
@@ -359,11 +359,11 @@ const FAQS = [
   },
   {
     q: "Will it slow down my website or affect my visitors?",
-    a: "No. The tracking snippet is under 6KB and loads asynchronously — meaning it never blocks your page from loading. Your visitors won't notice any difference. It also uses zero cookies, so you don't need to update your cookie banner or consent mechanism.",
+    a: "No. The tracking snippet is under 6KB and loads asynchronously — meaning it never blocks your page from loading. Your visitors won't notice any difference. It also uses zero cookies and stores nothing on your visitors' devices.",
   },
   {
     q: "Is AdLeak Shield GDPR compliant?",
-    a: "Yes, and by design. The snippet stores nothing on your visitors' devices and reads nothing from them — no cookies, no local storage, no device fingerprinting. Visits are told apart using a one-way hash derived from a daily-rotating secret plus information the browser already sends with every request. That secret is deleted after 48 hours, so the hash can no longer be linked to any visit. Because nothing is stored on or read from the device, the rules that require a consent banner don't apply. AdLeak Shield is registered with the UK Information Commissioner's Office (ICO) under registration number C1953337.",
+    a: "Yes, and by design. The snippet stores nothing on your visitors' devices and reads nothing from them — no cookies, no local storage, no device fingerprinting. Visits are told apart using a one-way hash derived from a daily-rotating secret plus information the browser already sends with every request. That secret is deleted after 48 hours, so the hash can no longer be linked to any visit. Full IP addresses are never stored, and visitors whose browsers send a Global Privacy Control signal are not recorded at all. We give you ready-made wording for your privacy policy during setup. What a particular website needs beyond that depends on your business, so it's worth checking with your own adviser. AdLeak Shield is registered with the UK Information Commissioner's Office (ICO) under registration number C1953337.",
   },
   {
     q: "How much does it cost and is there a free trial?",

@@ -80,8 +80,7 @@ export default function CookiesPage() {
                 visitors find and use the website (page views, referrer, browser, device type). Umami is
                 self-hosted on our own infrastructure and is <strong>cookieless by design</strong> — it does
                 not set any cookies on your device and does not track you across websites. All data is
-                anonymised and aggregated. No consent banner is required because no cookies or persistent
-                identifiers are used.
+                anonymised and aggregated. No cookies or persistent identifiers are used.
               </p>
               <div className="overflow-x-auto">
                 <table className="w-full text-sm border border-gray-200 rounded-lg overflow-hidden">

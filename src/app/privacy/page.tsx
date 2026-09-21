@@ -70,6 +70,32 @@ export default function PrivacyPage() {
                 Terms of Service for your responsibilities in this regard.
               </p>
 
+              <h3 className="font-semibold text-gray-800 mt-4 mb-1">
+                2.3.1 How a Visitor Objects (Global Privacy Control)
+              </h3>
+              <p>
+                The snippet sets no cookies and neither stores nor reads anything on a visitor&apos;s device.
+                Visits are told apart using a one-way code derived from the visitor&apos;s IP address and
+                browser user-agent — information the browser sends with every request — combined with a
+                secret that changes daily and is deleted after 48 hours, after which the code can no longer
+                be linked to anyone. Full IP addresses are never stored.
+              </p>
+              <p className="mt-2">
+                Where a visitor&apos;s browser sends a <strong>Global Privacy Control</strong> signal
+                (<code className="text-xs bg-gray-100 px-1 py-0.5 rounded">Sec-GPC: 1</code>), we discard the
+                request before it is processed: nothing about that visit is recorded, and no IP address is
+                read. This is an opt-out, so recording is on by default and the absence of the signal is not
+                treated as an objection. A visitor can also object directly by contacting the website owner,
+                or us at the address in Section 12.
+              </p>
+              <p className="mt-2">
+                We provide every customer with ready-made wording describing all of the above, for use in
+                their own privacy policy. It is shown during setup and is always available on our{' '}
+                <a href="/setup-guide#privacy-wording" className="text-purple-600 hover:underline">
+                  setup guide
+                </a>.
+              </p>
+
               <h3 className="font-semibold text-gray-800 mt-4 mb-1">2.4 Usage Data</h3>
               <p>
                 We collect standard server logs and application usage data to operate, maintain, and improve

@@ -17,9 +17,16 @@
 // It stores nothing on the visitor's device and reads nothing from it — no
 // cookies, no sessionStorage, no localStorage, no device fingerprinting. The
 // visitor identifier is derived on the server from the IP and User-Agent the
-// browser already sends with every request. That keeps the whole tracker
-// outside ePrivacy Article 5(3), so no consent banner is required and no
-// visitor (or bot) can opt out of being counted.
+// browser already sends with every request.
+//
+// Those are statements of fact about this file, deliberately kept separate
+// from any conclusion about what a given site operator's legal obligations
+// are. Whether a particular site needs a consent mechanism is a question for
+// that operator and their own advisers, not a claim this codebase makes.
+//
+// Visitors who object are honoured server-side: the ingest function drops
+// every event carrying "Sec-GPC: 1". That is an opt-out, so collection stays
+// on by default and bots — which never set the header — are still counted.
 //
 // CRITICAL CONSTRAINTS:
 // - Must be under 6KB after minification (PRD requirement, Core Web Vitals)
@@ -82,13 +89,12 @@
   //
   // This script used to build an identifier from screen size, language and
   // user agent, then keep it in sessionStorage. Both of those touch the
-  // visitor's device, which puts the whole tracker inside ePrivacy Article
-  // 5(3) and requires a consent banner — and a bot that never clicks "accept"
-  // would simply never be recorded.
+  // visitor's device — the thing PECR regulation 6 turns on — and a consent
+  // gate would also mean a bot that never clicks "accept" is never recorded.
   //
   // The identifier is now derived on the server from the IP and User-Agent
-  // that the browser already sends with every request. Nothing is stored on
-  // or read from the device, so no consent is needed and every visit is seen.
+  // that the browser already sends with every request, so nothing is stored
+  // on or read from the device.
   //
   // The consequence here: this script has no memory. It cannot tell whether
   // this visit came from an ad, so it reports every page and lets the server
@@ -299,7 +305,7 @@
         referrer: referrer,
         pagePath: window.location.pathname,
         elementTag: tag,
-        elementHref: href.substring(0, 500),
+        elementHref: hrefForStorage(href),
         elementText: text.substring(0, 100),
       };
 
@@ -545,6 +551,21 @@
     if (w < 768) return "mobile";
     if (w < 1024) return "tablet";
     return "desktop";
+  }
+
+  // A link's query string can carry something the visitor typed on the
+  // customer's site — a registration in a "get a quote" link, an address in a
+  // booking link. Page paths never had this exposure (window.location.pathname
+  // excludes the query by definition), so this closes the one remaining route
+  // by which such a value could reach the database.
+  //
+  // Applied only where the href is stored, never where it is inspected: the
+  // tel:/mailto:/WhatsApp checks above still run against the full attribute,
+  // so conversion detection is unchanged. Fragments are kept — "#contact" says
+  // which section was clicked and carries no typed input.
+  function hrefForStorage(h) {
+    var i = h.indexOf("?");
+    return (i === -1 ? h : h.substring(0, i)).substring(0, 500);
   }
 
   // ===========================================================================

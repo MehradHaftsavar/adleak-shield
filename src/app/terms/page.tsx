@@ -158,6 +158,20 @@ export default function TermsPage() {
                   <strong>Other jurisdictions</strong>: You are responsible for complying with any applicable
                   local data protection laws (CCPA, LGPD, etc.).
                 </li>
+                <li>
+                  <strong>Visitor opt-out</strong>: We honour the Global Privacy Control signal
+                  (<code className="text-xs bg-gray-100 px-1 py-0.5 rounded">Sec-GPC: 1</code>) on your
+                  behalf — visits from browsers sending it are discarded before processing and never
+                  recorded. This is provided as an opt-out mechanism, not as consent.
+                </li>
+                <li>
+                  <strong>Privacy policy wording</strong>: We provide ready-made wording describing exactly
+                  what the tracker collects, for you to include in your own privacy policy. It is shown
+                  during setup and remains available on our{' '}
+                  <a href="/setup-guide#privacy-wording" className="text-purple-600 hover:underline">
+                    setup guide
+                  </a>. Reviewing it against the rest of your policy remains your responsibility.
+                </li>
               </ul>
               <p className="mt-2">
                 We strongly recommend seeking independent legal advice if you are uncertain about your

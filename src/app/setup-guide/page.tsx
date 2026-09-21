@@ -5,6 +5,8 @@
 // Linked from SnippetStep with platform-specific anchors.
 // =============================================================================
 
+import { PrivacyPolicyTemplate } from '@/components/legal/PrivacyPolicyTemplate';
+
 export const metadata = {
   title: 'Setup Guide — AdLeak Shield',
   description: 'Step-by-step instructions for installing AdLeak Shield on WordPress, Shopify, Wix, and hand-coded websites.',
@@ -406,6 +408,17 @@ export default function SetupGuidePage() {
                 </div>
               </div>
             </div>
+          </div>
+        </section>
+
+        {/* Privacy wording — the permanent home of the text customers paste
+            into their own privacy policy. Shown during onboarding too, but
+            people onboard once and then need to find this again months later
+            (a policy review, a new person joining). Same component in both
+            places so the two can never drift apart. */}
+        <section id="privacy-wording" className="scroll-mt-20">
+          <div className="bg-white border border-gray-200 rounded-xl p-6">
+            <PrivacyPolicyTemplate />
           </div>
         </section>
 

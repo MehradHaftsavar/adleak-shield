@@ -4,6 +4,7 @@ import crypto from "crypto";
 import { signUpSchema } from "@/lib/validators/auth";
 import { withAdminDb } from "@/lib/db/client";
 import { sendVerificationEmail } from "@/lib/email/resend";
+import { TERMS_VERSION } from "@/lib/legal";
 import * as mssql from "mssql";
 
 export async function POST(req: NextRequest) {
@@ -81,12 +82,21 @@ export async function POST(req: NextRequest) {
           .input("trialEndsAt", mssql.DateTimeOffset, trialEndsAt)
           .input("isOwner", mssql.Bit, isOwner)
           .input("planType", mssql.NVarChar(20), planType)
+          // Evidence of the clickwrap. The signup form will not submit without
+          // the box ticked (src/app/auth/signup/page.tsx), so reaching this
+          // INSERT is itself the acceptance — but Article 28 needs us to be
+          // able to show WHAT was accepted and WHEN, not merely that it was.
+          // Stamped server-side rather than taken from the request body, so a
+          // crafted POST cannot backdate or misattribute an acceptance.
+          .input("termsVersion", mssql.NVarChar(20), TERMS_VERSION)
           .query(
             `INSERT INTO Tenants
-              (email, password_hash, trial_ends_at, is_owner, subscription_status, email_verified, plan_type)
+              (email, password_hash, trial_ends_at, is_owner, subscription_status, email_verified, plan_type,
+               terms_accepted_at, terms_version)
              OUTPUT INSERTED.tenant_id
              VALUES
-              (@emailNew, @passwordHash, @trialEndsAt, @isOwner, 'trialing', 0, @planType)`
+              (@emailNew, @passwordHash, @trialEndsAt, @isOwner, 'trialing', 0, @planType,
+               SYSUTCDATETIME(), @termsVersion)`
           );
 
         console.log("[Signup] Tenant inserted, recordset:", newTenant.recordset);

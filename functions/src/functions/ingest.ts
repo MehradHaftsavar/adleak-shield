@@ -75,7 +75,26 @@ export async function ingestHandler(
   if (request.method !== "POST") {
     return { status: 405, headers: baseHeaders, body: "" };
   }
- 
+
+  // ---------- Global Privacy Control ----------
+  // "Sec-GPC: 1" is the visitor telling their browser, once, that they object
+  // to their data being collected. It rides on every request they make and is
+  // the recognised universal opt-out signal in twelve US states; in the UK it
+  // serves as the "simple means of objecting" that the PECR statistical-
+  // purposes exception requires, and as an Article 21 objection under UK GDPR.
+  //
+  // Checked here, before the body is even read, so an objecting visitor's
+  // payload is never parsed, their IP never extracted and nothing about them
+  // reaches the queue. 204 is returned exactly as on the success path — the
+  // tracker must not be able to tell the difference, or a site could detect
+  // and single out the visitors who opted out.
+  //
+  // This is an OPT-OUT, not consent: collection is on by default, so the
+  // absence of the header is not treated as an objection. Bots do not set it.
+  if ((request.headers.get("sec-gpc") ?? "").trim() === "1") {
+    return { status: 204, headers: baseHeaders };
+  }
+
   // ---------- Read body ----------
   // The tracker sends application/json via fetch or via Beacon API as a Blob.
   // Both result in a JSON-parseable body when we read it as text.
