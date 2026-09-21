@@ -38,7 +38,7 @@ export const metadata: Metadata = {
   openGraph: {
     title: "AdLeak Shield — Stop Paying for Google Ads Clicks That Never Convert",
     description:
-      "Find out exactly which keywords are eating your Google Ads budget without generating calls, leads, or sales. Cookieless tracking. GDPR compliant. Free 7-day trial.",
+      "Find out exactly which keywords are eating your Google Ads budget without generating calls, leads, or sales. Cookieless tracking. Privacy-first. Free 7-day trial.",
     url: "https://www.adleakshield.com",
     siteName: "AdLeak Shield",
     type: "website",

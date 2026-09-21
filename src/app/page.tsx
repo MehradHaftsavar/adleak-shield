@@ -45,7 +45,7 @@ function Hero() {
             ✓ Cookieless by design
           </span>
           <span className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-green-50 border border-green-200 text-green-800 text-xs font-semibold rounded-full">
-            🔒 GDPR compliant by design
+            🔒 Privacy-first by design
           </span>
         </div>
 
@@ -206,7 +206,7 @@ const PLANS = [
       'Monday morning email report',
       'CSV data export',
       'Cookieless tracking — nothing stored on visitors’ devices',
-      'GDPR compliant by design',
+      'Privacy-first — full IP addresses never stored',
       'Unregistered traffic alerts',
       'Cancel anytime',
     ],
@@ -227,7 +227,7 @@ const PLANS = [
       'Monday morning email report',
       'CSV data export',
       'Cookieless tracking — nothing stored on visitors’ devices',
-      'GDPR compliant by design',
+      'Privacy-first — full IP addresses never stored',
       'Cancel anytime',
     ],
     highlight: true,
@@ -247,7 +247,7 @@ const PLANS = [
       'Monday morning email report',
       'CSV data export',
       'Cookieless tracking — nothing stored on visitors’ devices',
-      'GDPR compliant by design',
+      'Privacy-first — full IP addresses never stored',
       'Cancel anytime',
     ],
     highlight: false,
