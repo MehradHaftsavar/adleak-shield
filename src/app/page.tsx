@@ -4,6 +4,7 @@
 // the hero text the moment the CSS arrives — no JS hydration delay.
 
 import Link   from 'next/link';
+import Image  from 'next/image';
 import Script from 'next/script';
 import { Navbar }         from '@/components/marketing/Navbar';
 import { FAQAccordion }   from '@/components/marketing/FAQAccordion';
@@ -263,6 +264,87 @@ const PLANS = [
   },
 ];
 
+// =============================================================================
+// SHOWCASE — screens from the live product.
+//
+// Every image is redacted: customer domain, campaign names, visitor locations
+// and account emails are blanked. The keywords and figures are real, and are
+// generic industry terms that identify nobody.
+// =============================================================================
+const SHOWCASE = [
+  {
+    src: '/screenshots/01-leak-table.png',
+    width: 2000,
+    height: 864,
+    alt: 'Leak table showing keywords ranked by wasted ad spend',
+    title: 'Which keywords waste money.',
+    caption: 'Every keyword, how many clicks it bought, how many went nowhere, and what that cost.',
+  },
+  {
+    src: '/screenshots/02-sessions-table.png',
+    width: 2000,
+    height: 987,
+    alt: 'Sessions table listing every ad visit and its outcome',
+    title: 'Every visit, and what came of it.',
+    caption: 'Bounced, stayed but did nothing, engaged, or got in touch — filterable by campaign, device and outcome.',
+  },
+  {
+    src: '/screenshots/08-test-my-setup.png',
+    width: 2000,
+    height: 989,
+    alt: 'Test My Setup screen that verifies the tracking snippet is installed',
+    title: 'Installation you can verify.',
+    caption: 'Opens your site with test parameters and checks the data actually arrived, so a bad install shows up straight away.',
+  },
+  {
+    src: '/screenshots/03-weekly-report-email.png',
+    width: 1186,
+    height: 1124,
+    alt: 'Weekly waste report email listing the top wasted keywords',
+    title: 'A summary every Monday.',
+    caption: 'What last week cost you, and the keywords to pause — without logging in.',
+  },
+];
+
+function Showcase() {
+  return (
+    <section id="inside" className="py-14 px-6 bg-slate-50">
+      <div className="max-w-5xl mx-auto">
+        <h2 className="text-3xl font-bold text-slate-900 text-center mb-3">
+          See inside
+        </h2>
+        <p className="text-slate-600 text-center mb-10 max-w-2xl mx-auto">
+          Screens from the live product. Customer names, campaigns and visitor locations
+          are blanked out — the keywords and figures are real.
+        </p>
+
+        <div className="space-y-10">
+          {SHOWCASE.map(shot => (
+            <figure key={shot.src}>
+              <div className="rounded-xl border border-slate-200 overflow-hidden bg-white shadow-sm">
+                <Image
+                  src={shot.src}
+                  alt={shot.alt}
+                  width={shot.width}
+                  height={shot.height}
+                  className="w-full h-auto"
+                />
+              </div>
+              <figcaption className="mt-3 text-sm text-slate-600 text-center max-w-2xl mx-auto">
+                <span className="font-semibold text-slate-900">{shot.title}</span>{' '}
+                {shot.caption}
+              </figcaption>
+            </figure>
+          ))}
+        </div>
+      </div>
+    </section>
+  );
+}
+
+// =============================================================================
+// PRICING
+// =============================================================================
 function Pricing() {
   return (
     <section id="pricing" className="py-14 px-6 bg-white">
@@ -465,6 +547,7 @@ export default function HomePage() {
         <Hero />
         <PainSection />
         <Features />
+        <Showcase />
         <Pricing />
         <FAQSection />
         <ContactSection />
