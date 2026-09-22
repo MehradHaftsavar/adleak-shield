@@ -31,7 +31,15 @@ function Hero() {
             viewport and would sit on top of anything rendered before it. */}
         <div className="max-w-2xl mx-auto mb-8 bg-blue-50 border border-blue-200 text-blue-900 text-sm rounded-lg px-4 py-3">
           <strong>Portfolio project.</strong> AdLeak Shield isn&apos;t currently accepting new
-          customers.
+          customers.{' '}
+          <a
+            href="https://github.com/MehradHaftsavar/adleak-shield"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="font-semibold underline underline-offset-2 hover:text-blue-700"
+          >
+            View the code on GitHub&nbsp;→
+          </a>
         </div>
         <span className="inline-block text-xs font-semibold uppercase tracking-widest text-blue-600 bg-blue-50 px-3 py-1 rounded-full mb-6">
           For small businesses
@@ -67,7 +75,7 @@ function Hero() {
           </a>
           {/* Anchor link — smooth scroll handled by CSS scroll-behavior in globals.css */}
           <a
-            href="#features"
+            href="#inside"
             className="w-full sm:w-auto px-8 py-3.5 border border-slate-300 hover:border-slate-400 text-slate-700 font-semibold rounded-lg transition-colors text-base text-center"
           >
             See how it works
